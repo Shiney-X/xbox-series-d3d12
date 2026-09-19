@@ -1,0 +1,11 @@
+{"probe":"capabilities","passed":true,"win32_error":0,"details":"architecture=9;page_size=4096;allocation_granularity=65536;dynamic_policy_available=1;dynamic_code_prohibited=0;thread_opt_out_allowed=0;cfg_policy_available=1;cfg_enabled=0"}
+{"probe":"virtual-memory","passed":true,"win32_error":0,"details":"size=65536;state=4096;type=131072;fixed_address_succeeded=1"}
+{"probe":"memory-aliases","passed":true,"win32_error":0,"details":"view_size=65536;reservation_size=131072;fixed_views=1;forward_alias=1;reverse_alias=1"}
+{"probe":"executable-memory","passed":true,"win32_error":0,"details":"return_value=42;exception_caught=0"}
+{"probe":"d3d12-device","passed":true,"win32_error":0,"details":"adapter=SraKmd_arden;vendor_id=5140;device_id=53248;dedicated_video_memory=134217728;node_count=1;options_available=1;resource_binding_tier=3;shader_model_available=1;highest_shader_model=96"}
+{"probe":"lifecycle-journal","passed":true,"win32_error":0,"details":"location=LocalState/phase0-lifecycle.jsonl;session=134343213091329772-6892"}
+{"probe":"memory-pressure","passed":true,"win32_error":0,"details":"limit=5368709120;expected_limit=5368709120;usage_before=8323072;target=268435456;committed=268435456;peak_usage=277286912;usage_after=8323072;level_before=0;level_peak=0;level_after=0;accounting_observed=1"}
+{"probe":"uwp-presentation","passed":true,"win32_error":0,"details":"CoreWindow D3D12 triangle presented;shader_compiler=DXC;dxc_api=IDxcCompiler;shader_model=6_0;shader_format=DXIL;draw_vertices=3"}
+{"probe":"lifecycle-suspend","passed":true,"win32_error":0,"details":"suspending event observed;dxgi_trim_supported=0;dxgi_trim_called=0;session=134343213091329772-6892"}
+{"probe":"lifecycle-resume","passed":true,"win32_error":0,"details":"resuming event observed;D3D12 triangle presented again;session=134343213091329772-6892"}
+{"probe":"report-storage","passed":true,"win32_error":0,"details":"location=LocalState/phase0-results.jsonl;mode=synchronous"}

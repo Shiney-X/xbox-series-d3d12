@@ -4,8 +4,8 @@ Port experimental do [shadPS4](https://github.com/shadps4-emu/shadPS4) para Xbox
 Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 
 > [!WARNING]
-> O projeto está na fase de validação de viabilidade. Ele ainda não executa jogos
-> no Xbox.
+> A Fase 0 de viabilidade foi concluída no Xbox Series S. O projeto ainda não
+> executa jogos; o próximo trabalho é integrar o upstream shadPS4.
 
 ## Estado atual
 
@@ -17,7 +17,7 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] Apresentação D3D12 mínima com indicação visual de sucesso ou falha.
 - [x] Execução, DXIL e triângulo validados no Series S em perfil Game.
 - [x] Placeholders e aliases de memória validados no Series S.
-- [ ] Validar pressão de memória e ciclo suspender/retomar no Series S.
+- [x] Pressão de memória e ciclo suspender/retomar validados no Series S.
 - [ ] Importação do upstream shadPS4.
 - [ ] Backend D3D12 integrado ao video core.
 

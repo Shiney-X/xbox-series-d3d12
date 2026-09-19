@@ -93,3 +93,18 @@ ser registrado como capability ausente, e não como falha do ciclo de vida.
 - arquivos brutos:
   [`xbox-series-s-game-memory-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-game-memory-lifecycle-10.0.26100.9426.jsonl) e
   [`xbox-series-s-game-lifecycle-journal-10.0.26100.9426.jsonl`](xbox-series-s-game-lifecycle-journal-10.0.26100.9426.jsonl).
+
+## Xbox Series S — resultado final da Fase 0
+
+O pacote `0.1.0.8` tratou a ausência de `IDXGIDevice3::Trim` como capability
+opcional. Todos os onze resultados passaram, o triângulo permaneceu visível
+depois da retomada e o journal confirmou `launch → suspend → resume` na mesma
+sessão e no mesmo processo.
+
+- resultado: onze de onze etapas aprovadas;
+- validação visual antes e depois da retomada: aprovada;
+- SHA-256 do relatório: `b8aaf5ee355d683337888a675f306c58ff46a2ab596a5ba6c915dc4559eb8045`;
+- SHA-256 do journal: `ad6e0cf433f1ab297b6b7fc883c7409af9913eab4bfba3a29d1ab34dd68669cd`;
+- arquivos brutos:
+  [`xbox-series-s-game-phase0-final-10.0.26100.9426.jsonl`](xbox-series-s-game-phase0-final-10.0.26100.9426.jsonl) e
+  [`xbox-series-s-game-phase0-final-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-game-phase0-final-lifecycle-10.0.26100.9426.jsonl).

@@ -2,6 +2,8 @@
 
 ## Fase 0 — Viabilidade UWP
 
+**Status: concluída no Xbox Series S em 19 de setembro de 2026.**
+
 - [x] Criar o scaffold do repositório.
 - [x] Implementar probe Win32 de capabilities.
 - [x] Implementar probe Win32 de memória virtual.
@@ -22,17 +24,17 @@
 - [x] Instrumentar suspensão e retomada com reapresentação D3D12.
 - [x] Validar pressão de memória no Series S em perfil Game.
 - [x] Validar suspensão, retomada no mesmo processo e nova apresentação D3D12.
-- [ ] Confirmar tela verde após tratar `IDXGIDevice3::Trim` como capability opcional.
+- [x] Confirmar tela verde após tratar `IDXGIDevice3::Trim` como capability opcional.
 
 ### Critério de saída
 
 A fase termina somente quando os resultados brutos do console estiverem
 registrados. Falha irrecuperável de mapeamento ou execução bloqueia o port UWP.
 
-O primeiro resultado bruto em perfil **Game** foi registrado para o Xbox
-Series S com sistema `10.0.26100.9426`; CPU, memória virtual, código executável,
-D3D12, apresentação e persistência passaram. Consulte
-[`docs/results`](results/README.md).
+O critério foi cumprido em perfil **Game** no Xbox Series S com sistema
+`10.0.26100.9426`. CPU, memória virtual, aliases, código executável, limite de
+5 GiB, D3D12/DXIL, apresentação, persistência e suspensão/retomada passaram.
+Consulte [`docs/results`](results/README.md).
 
 ## Fase 1 — Integração do upstream
 
