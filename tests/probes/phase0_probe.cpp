@@ -54,11 +54,12 @@ void PrintResult(const ProbeResult& result) {
 }
 
 #if defined(_MSC_VER)
-int InvokeGeneratedFunction(void* address, DWORD& exception_code) {
+int InvokeGeneratedFunction(void* address, bool& exception_caught) {
     __try {
         using GeneratedFunction = int (*)();
         return reinterpret_cast<GeneratedFunction>(address)();
-    } __except (exception_code = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER) {
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        exception_caught = true;
         return 0;
     }
 }
@@ -186,9 +187,9 @@ ProbeResult ProbeExecutableMemory() {
     }
 
     int return_value{};
-    DWORD exception_code{};
+    bool exception_caught{};
 #if defined(_MSC_VER)
-    return_value = InvokeGeneratedFunction(allocation, exception_code);
+    return_value = InvokeGeneratedFunction(allocation, exception_caught);
 #else
     using GeneratedFunction = int (*)();
     return_value = reinterpret_cast<GeneratedFunction>(allocation)();
@@ -197,11 +198,11 @@ ProbeResult ProbeExecutableMemory() {
     VirtualFree(allocation, 0, MEM_RELEASE);
 
     std::ostringstream details;
-    details << "return_value=" << return_value << ";exception_code=" << exception_code;
+    details << "return_value=" << return_value << ";exception_caught=" << exception_caught;
     return {
         .name = "executable-memory",
-        .passed = exception_code == 0 && return_value == 42,
-        .error = exception_code,
+        .passed = !exception_caught && return_value == 42,
+        .error = exception_caught ? ERROR_FUNCTION_FAILED : ERROR_SUCCESS,
         .details = details.str(),
     };
 #endif
