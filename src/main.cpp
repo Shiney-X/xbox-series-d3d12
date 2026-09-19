@@ -22,6 +22,7 @@
 #include "core/user_settings.h"
 #include "emulator.h"
 #include "imgui/big_picture/big_picture.h"
+#include "sdl_window.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -248,6 +249,11 @@ int main(int argc, char* argv[]) {
     }
 
     auto* emulator = Common::Singleton<Core::Emulator>::Instance();
+    emulator->SetWindowFactory(
+        [](s32 width, s32 height, Input::GameControllers* controllers,
+           std::string_view window_title) -> std::unique_ptr<Frontend::Window> {
+            return std::make_unique<Frontend::WindowSDL>(width, height, controllers, window_title);
+        });
     emulator->executableName = argv[0];
     emulator->waitForDebuggerBeforeRun = waitForDebugger;
     emulator->Run(ebootPath, gameArgs, overrideRoot, mounts, env_vars);

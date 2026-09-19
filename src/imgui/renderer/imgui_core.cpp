@@ -13,12 +13,12 @@
 #include "core/emulator_settings.h"
 #include "font_data.h"
 #include "font_stack.h"
+#include "frontend/window.h"
 #include "imgui/imgui_layer.h"
 #include "imgui_core.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_vulkan.h"
 #include "imgui_internal.h"
-#include "sdl_window.h"
 #include "texture_manager.h"
 #include "video_core/renderer_vulkan/vk_presenter.h"
 
@@ -60,7 +60,7 @@ bool IsGamepadInputCaptured() {
     return force_gamepad_input_capture_count.load(std::memory_order_relaxed) > 0;
 }
 
-void Initialize(const ::Vulkan::Instance& instance, const Frontend::WindowSDL& window,
+void Initialize(const ::Vulkan::Instance& instance, const Frontend::Window& window,
                 const u32 image_count, vk::Format surface_format,
                 const vk::AllocationCallbacks* allocator) {
 
@@ -110,7 +110,7 @@ void Initialize(const ::Vulkan::Instance& instance, const Frontend::WindowSDL& w
     StyleColorsDark();
 
     ::Core::Devtools::Layer::SetupSettings();
-    Sdl::Init(window.GetSDLWindow());
+    Sdl::Init(static_cast<SDL_Window*>(window.GetFrontendHandle()));
 
     const Vulkan::InitInfo vk_info{
         .instance = instance.GetInstance(),
@@ -135,7 +135,8 @@ void Initialize(const ::Vulkan::Instance& instance, const Frontend::WindowSDL& w
     ImFormatString(label, IM_ARRAYSIZE(label), "WindowOverViewport_%08X", GetMainViewport()->ID);
     dock_id = ImHashStr(label);
 
-    if (const auto dpi = SDL_GetWindowDisplayScale(window.GetSDLWindow()); dpi > 0.0f) {
+    auto* host_window = static_cast<SDL_Window*>(window.GetFrontendHandle());
+    if (const auto dpi = SDL_GetWindowDisplayScale(host_window); dpi > 0.0f) {
         GetIO().FontGlobalScale *= dpi;
     }
 

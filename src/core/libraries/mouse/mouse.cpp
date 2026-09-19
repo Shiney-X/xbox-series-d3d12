@@ -8,11 +8,9 @@
 #include "core/libraries/error_codes.h"
 #include "core/libraries/libs.h"
 #include "core/user_settings.h"
+#include "frontend/window.h"
 #include "mouse.h"
 #include "mouse_error.h"
-#include "sdl_window.h"
-
-extern Frontend::WindowSDL* g_window;
 
 namespace Libraries::Mouse {
 
@@ -64,8 +62,9 @@ int PS4_SYSV_ABI sceMouseGetDeviceInfo() {
 int PS4_SYSV_ABI sceMouseInit() {
     g_are_mice_enabled = EmulatorSettings.IsMiceUsedAsMice();
     if (g_are_mice_enabled) {
-        SDL_WarpMouseInWindow(g_window->GetSDLWindow(), 1, 1);
-        SDL_SetWindowRelativeMouseMode(g_window->GetSDLWindow(), true);
+        auto* host_window = static_cast<SDL_Window*>(Frontend::g_window->GetFrontendHandle());
+        SDL_WarpMouseInWindow(host_window, 1, 1);
+        SDL_SetWindowRelativeMouseMode(host_window, true);
     }
     int micecount = 0;
     auto micelist = SDL_GetMice(&micecount);

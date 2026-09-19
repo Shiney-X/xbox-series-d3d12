@@ -9,7 +9,7 @@
 #include "video_core/renderer_vulkan/vk_common.h"
 
 namespace Frontend {
-class WindowSDL;
+class Window;
 }
 
 namespace Vulkan {
@@ -19,7 +19,7 @@ class Scheduler;
 
 class Swapchain {
 public:
-    explicit Swapchain(const Instance& instance, const Frontend::WindowSDL& window);
+    explicit Swapchain(const Instance& instance, const Frontend::Window& window);
     ~Swapchain();
 
     /// Creates (or recreates) the swapchain with a given size.
@@ -113,7 +113,7 @@ private:
 
 private:
     const Instance& instance;
-    const Frontend::WindowSDL& window;
+    const Frontend::Window& window;
     vk::SwapchainKHR swapchain{};
     vk::SurfaceKHR surface{};
     vk::SurfaceFormatKHR surface_format;

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <set>
 #include <sstream>
+#include <utility>
 #include <fmt/core.h>
 #include <fmt/xchar.h>
 #include <hwinfo/hwinfo.h>
@@ -57,7 +58,7 @@
 #endif
 #include <core/file_format/npbind.h>
 
-Frontend::WindowSDL* g_window = nullptr;
+Frontend::Window* Frontend::g_window = nullptr;
 
 namespace Libraries::Kernel {
 extern char const* g_environment[64];
@@ -82,6 +83,10 @@ Emulator::Emulator() {
 }
 
 Emulator::~Emulator() {}
+
+void Emulator::SetWindowFactory(Frontend::WindowFactory factory) {
+    window_factory = std::move(factory);
+}
 
 void Emulator::Shutdown() {
     static bool exit_done = false;
@@ -586,11 +591,18 @@ void Emulator::Run(std::filesystem::path file, std::vector<std::string> args,
                                        Common::g_scm_branch, Common::g_scm_desc, game_title);
         }
     }
-    window = std::make_unique<Frontend::WindowSDL>(EmulatorSettings.GetWindowWidth(),
-                                                   EmulatorSettings.GetWindowHeight(), controllers,
-                                                   window_title);
+    if (!window_factory) {
+        LOG_CRITICAL(Frontend, "No host window factory was configured");
+        return;
+    }
+    window = window_factory(EmulatorSettings.GetWindowWidth(), EmulatorSettings.GetWindowHeight(),
+                            controllers, window_title);
+    if (!window) {
+        LOG_CRITICAL(Frontend, "The host failed to create a presentation window");
+        return;
+    }
 
-    g_window = window.get();
+    Frontend::g_window = window.get();
 
     if (auto icon = mnt->ReadFile("/app0/sce_sys/icon0.png")) {
         window->SetIcon(*icon);

@@ -9,8 +9,8 @@
 
 #include "common/singleton.h"
 #include "core/linker.h"
+#include "frontend/window.h"
 #include "input/controller.h"
-#include "sdl_window.h"
 
 namespace Core {
 
@@ -33,6 +33,8 @@ public:
     void UpdatePlayTime(const std::string& serial);
     void Shutdown();
 
+    void SetWindowFactory(Frontend::WindowFactory factory);
+
     /**
      * This will kill the current process and launch a new process with the same configuration
      * (using CLI args) but replacing the eboot image and guest arguments
@@ -54,7 +56,8 @@ private:
     Core::MemoryManager* memory;
     Input::GameControllers* controllers;
     Core::Linker* linker;
-    std::unique_ptr<Frontend::WindowSDL> window;
+    Frontend::WindowFactory window_factory;
+    std::unique_ptr<Frontend::Window> window;
     std::chrono::steady_clock::time_point start_time;
     std::jthread play_time_thread;
 };

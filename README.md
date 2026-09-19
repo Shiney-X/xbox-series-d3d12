@@ -69,6 +69,7 @@ O roteiro completo está em
 - [ADR-0001: UWP como baseline público](docs/adr/0001-uwp-public-baseline.md)
 - [ADR-0002: backend D3D12 nativo](docs/adr/0002-native-d3d12-backend.md)
 - [ADR-0003: integração do upstream com histórico](docs/adr/0003-upstream-history-integration.md)
+- [ADR-0004: fronteira de janela injetada pelo host](docs/adr/0004-host-window-boundary.md)
 
 ## Escopo legal e licença
 

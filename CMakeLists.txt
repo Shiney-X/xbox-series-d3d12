@@ -1221,6 +1221,7 @@ set(INPUT src/input/controller.cpp
 
 set(EMULATOR src/emulator.cpp
              src/emulator.h
+             src/frontend/window.h
              src/sdl_window.h
              src/sdl_window.cpp
 )
