@@ -2,6 +2,7 @@
 
 #include "library_folder_access.h"
 
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.AccessCache.h>
 #include <winrt/Windows.Storage.Pickers.h>
 
