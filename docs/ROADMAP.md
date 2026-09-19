@@ -65,13 +65,14 @@ console; navegador de diretórios em desenvolvimento.**
 - [x] Expor estados de varredura e acesso USB na tela Games.
 - [x] Persistir diagnóstico em `LocalState/phase1-library.jsonl`.
 - [x] Validar `KnownFolders.RemovableDevices` no Xbox Series S.
-- [ ] Criar navegador próprio para as pastas do USB.
+- [x] Implementar navegador próprio para as pastas do USB.
+- [x] Validar navegação e seleção de pasta no Xbox Series S.
 - [ ] Enumerar uma biblioteca real a partir da pasta escolhida.
 
-Nesta etapa, Jogos detecta o primeiro dispositivo removível, mas ainda não
-navega por suas pastas, enumera conteúdo ou inicia títulos. A bridge inicial
-prova que o mesmo MSIX compila e executa código da árvore upstream; ela não
-equivale a portar todos os subsistemas do emulador para UWP.
+Nesta etapa, Jogos detecta o primeiro dispositivo removível e navega por suas
+pastas, mas ainda não enumera jogos nem inicia títulos. A bridge inicial prova
+que o mesmo MSIX compila e executa código da árvore upstream; ela não equivale
+a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 

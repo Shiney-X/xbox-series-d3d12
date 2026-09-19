@@ -147,3 +147,28 @@ novas varreduras terminaram com `usb_ready`, `passed=true` e erro zero.
 - arquivos brutos:
   [`xbox-series-s-game-phase1-usb-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-usb-10.0.26100.9426.jsonl) e
   [`xbox-series-s-game-phase1-usb-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-usb-lifecycle-10.0.26100.9426.jsonl).
+
+## Xbox Series S — navegador USB da Fase 1
+
+O pacote `0.3.1.0` enumerou a raiz `F:\` de um pendrive inicializável e exibiu
+a pasta real `EFI` no shell D3D12. A captura confirmou foco e comandos; o
+journal registrou entrada e retorno entre diretórios, seleção da biblioteca
+com **X**, retorno ao shell e suspensão, sem falha de acesso.
+
+O relatório final tem estado `usb_folder_parent`, pois uma navegação posterior
+à seleção sobrescreveu o snapshot. O evento `library-folder-selected` no
+journal preserva a prova da seleção. O probe de memória desta instalação
+reportou limite de 1 GiB, indicando perfil App; isso não afetou o teste do
+navegador, mas o pacote deve ser reclassificado como Game antes dos testes do
+emulador.
+
+- sistema operacional: `10.0.26100.9426`;
+- raiz enumerada: `F:\`;
+- subpasta visível: `EFI`;
+- SHA-256 do relatório:
+  `474fb55161a61d7b4a96d02060a6590e1acca2ef2b75f40c2b267a14766e2b3c`;
+- SHA-256 do journal:
+  `a90c257beaaf603a28aa1a842b63c5d34a731b93c61bc9a5b97fb80055ddf8e7`;
+- arquivos brutos:
+  [`xbox-series-s-phase1-usb-browser-10.0.26100.9426.jsonl`](xbox-series-s-phase1-usb-browser-10.0.26100.9426.jsonl) e
+  [`xbox-series-s-phase1-usb-browser-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-phase1-usb-browser-lifecycle-10.0.26100.9426.jsonl).

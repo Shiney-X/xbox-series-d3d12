@@ -17,3 +17,9 @@ LibraryFolderAccess::FindFirstRemovableDeviceAsync() const {
   }
   co_return devices.GetAt(0);
 }
+
+Windows::Foundation::IAsyncOperation<
+    Windows::Foundation::Collections::IVectorView<StorageFolder>>
+LibraryFolderAccess::GetSubfoldersAsync(const StorageFolder &folder) const {
+  co_return co_await folder.GetFoldersAsync();
+}

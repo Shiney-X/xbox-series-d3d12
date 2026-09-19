@@ -4,6 +4,7 @@
 #pragma once
 
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.h>
 
 class LibraryFolderAccess final {
@@ -11,4 +12,10 @@ public:
   [[nodiscard]] winrt::Windows::Foundation::IAsyncOperation<
       winrt::Windows::Storage::StorageFolder>
   FindFirstRemovableDeviceAsync() const;
+
+  [[nodiscard]] winrt::Windows::Foundation::IAsyncOperation<
+      winrt::Windows::Foundation::Collections::IVectorView<
+          winrt::Windows::Storage::StorageFolder>>
+  GetSubfoldersAsync(
+      const winrt::Windows::Storage::StorageFolder &folder) const;
 };

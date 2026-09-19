@@ -356,15 +356,40 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
   if (state.page == XboxShellPage::Games) {
     switch (state.library_folder_state) {
     case LibraryFolderState::Restoring:
-      DrawText("SCANNING USB STORAGE", 0.105F, 0.31F, 5.0F, PrimaryText);
-      DrawText("CHECKING REMOVABLE DEVICES", 0.105F, 0.43F, 4.0F,
-               SecondaryText);
+      DrawText("READING USB STORAGE", 0.105F, 0.31F, 5.0F, PrimaryText);
+      DrawText("LOADING FOLDERS", 0.105F, 0.43F, 4.0F, SecondaryText);
       break;
     case LibraryFolderState::Ready:
-      DrawText("USB STORAGE READY", 0.105F, 0.29F, 5.5F, Accent);
-      DrawText("DEVICE  " + state.library_folder_name, 0.105F, 0.41F, 4.5F,
-               PrimaryText);
-      DrawText("A RESCAN USB", 0.105F, 0.55F, 4.0F, SecondaryText);
+      DrawText(state.library_selection_confirmed ? "LIBRARY FOLDER SELECTED"
+                                                 : "USB FOLDER BROWSER",
+               0.095F, 0.235F, 4.5F,
+               state.library_selection_confirmed ? Accent : PrimaryText);
+      DrawText(state.library_breadcrumb, 0.095F, 0.305F, 3.6F,
+               SecondaryText);
+
+      if (state.library_entries.empty()) {
+        DrawText("NO SUBFOLDERS", 0.105F, 0.43F, 5.0F, SecondaryText);
+        DrawText("X USE THIS FOLDER", 0.105F, 0.55F, 4.0F, Accent);
+      } else {
+        constexpr std::size_t visible_rows = 5U;
+        const std::size_t selected = std::min<std::size_t>(
+            state.selected_library_entry, state.library_entries.size() - 1U);
+        const std::size_t first =
+            selected < visible_rows ? 0U : selected - visible_rows + 1U;
+        const std::size_t last =
+            std::min(first + visible_rows, state.library_entries.size());
+        for (std::size_t index = first; index < last; ++index) {
+          const float y = 0.37F + static_cast<float>(index - first) * 0.062F;
+          const bool focused = index == selected;
+          if (focused) {
+            DrawRectangle(0.09F, y - 0.012F, 0.74F, 0.053F, PanelSelected);
+            DrawRectangle(0.09F, y - 0.012F, 0.006F, 0.053F, Focus);
+          }
+          DrawText(state.library_entries[index], 0.11F, y, 3.8F,
+                   focused ? PrimaryText : SecondaryText);
+        }
+        DrawText("A OPEN   X USE CURRENT", 0.64F, 0.70F, 3.0F, Accent);
+      }
       break;
     case LibraryFolderState::Failed:
       DrawText("FOLDER ACCESS FAILED", 0.105F, 0.29F, 5.5F, Failure);
@@ -396,8 +421,13 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);
   }
 
-  DrawText(state.page == XboxShellPage::Games ? "A SCAN USB   B BACK"
-                                              : "B BACK",
+  DrawText(state.page == XboxShellPage::Games
+               ? (state.library_folder_state == LibraryFolderState::Ready
+                      ? (state.library_at_device_root
+                             ? "DPAD MOVE   A OPEN   B HOME   X SELECT"
+                             : "DPAD MOVE   A OPEN   B UP   X SELECT")
+                      : "A SCAN USB   B BACK")
+               : "B BACK",
            0.065F, 0.865F, 4.0F, SecondaryText);
 }
 
