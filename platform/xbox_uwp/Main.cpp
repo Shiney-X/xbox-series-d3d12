@@ -292,10 +292,16 @@ private:
         changed = true;
       }
 
-      if (changed && renderer_) {
-        renderer_->Render(shell_state_);
-        AppendLifecycleEvent(session_id_, "navigation",
-                             "Xbox Shell navigation event presented");
+      if (changed) {
+        // Prevent Xbox shell navigation from also handling the same gamepad
+        // button. In particular, an unhandled GamepadB returns to Dev Home.
+        args.Handled(true);
+        if (renderer_) {
+          renderer_->Render(shell_state_);
+          AppendLifecycleEvent(
+              session_id_, "navigation",
+              "Xbox Shell navigation event presented;input_consumed=1");
+        }
       }
     } catch (...) {
       // Navigation failure must not terminate the UWP event loop.
