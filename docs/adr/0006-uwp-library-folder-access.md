@@ -24,8 +24,9 @@ abrir UI externa.
 
 O pacote `0.3.0.1` validou essa decisão no Series S: a API enumerou o primeiro
 dispositivo como `F:\`, retornou `usb_ready` sem erro e repetiu a varredura com
-sucesso. O próprio shell implementará a navegação por diretórios, sem expor o
-filesystem geral do sistema.
+sucesso. O pacote `0.3.1.0` adiciona ao próprio shell a navegação assíncrona
+por diretórios, sem expor o filesystem geral do sistema. O direcional move o
+foco, **A** entra, **B** retorna ao diretório pai e **X** confirma a pasta atual.
 
 ## Consequências
 

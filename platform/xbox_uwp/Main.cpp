@@ -5,6 +5,7 @@
 #include <winrt/Windows.ApplicationModel.Activation.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.Core.h>
@@ -379,56 +380,187 @@ private:
     }
   }
 
-  void SetLibraryReady(const StorageFolder &folder,
-                       std::string_view report_state) {
+  std::string CreateBreadcrumb(const StorageFolder &folder) const {
+    std::string breadcrumb;
+    for (const StorageFolder &parent : folder_stack_) {
+      if (!breadcrumb.empty()) {
+        breadcrumb += " / ";
+      }
+      breadcrumb += CreateFolderLabel(to_string(parent.Name()));
+    }
+    if (!breadcrumb.empty()) {
+      breadcrumb += " / ";
+    }
+    breadcrumb += CreateFolderLabel(to_string(folder.Name()));
+    constexpr std::size_t maximum_length = 52U;
+    if (breadcrumb.size() > maximum_length) {
+      breadcrumb = "... / " + breadcrumb.substr(breadcrumb.size() - 46U);
+    }
+    return breadcrumb;
+  }
+
+  void SetBrowserReady(
+      const StorageFolder &folder,
+      const Windows::Foundation::Collections::IVectorView<StorageFolder>
+          &subfolders,
+      std::string_view report_state) {
     const std::string folder_name = to_string(folder.Name());
+    current_folder_ = folder;
+    child_folders_.clear();
+    shell_state_.library_entries.clear();
+    child_folders_.reserve(subfolders.Size());
+    shell_state_.library_entries.reserve(subfolders.Size());
+    for (const StorageFolder &subfolder : subfolders) {
+      child_folders_.push_back(subfolder);
+      shell_state_.library_entries.push_back(
+          CreateFolderLabel(to_string(subfolder.Name())));
+    }
     shell_state_.library_folder_state = LibraryFolderState::Ready;
     shell_state_.library_folder_name = CreateFolderLabel(folder_name);
+    shell_state_.library_breadcrumb = CreateBreadcrumb(folder);
+    shell_state_.selected_library_entry = 0U;
+    shell_state_.library_at_device_root = folder_stack_.empty();
+    shell_state_.library_selection_confirmed = false;
+    std::ostringstream details;
+    details << "source=KnownFolders.RemovableDevices;device_index=0;depth="
+            << folder_stack_.size() << ";subfolders=" << child_folders_.size();
     PresentLibraryState(true, report_state, ERROR_SUCCESS, folder_name,
-                        "source=KnownFolders.RemovableDevices;device_index=0");
+                        details.str());
     AppendLifecycleEvent(session_id_, "library-folder",
-                         "removable storage access ready;device_index=0");
+                         "USB folder enumerated;input_consumed=1");
+  }
+
+  void SetLibraryFailure(const hresult_error &error,
+                         std::string_view operation) noexcept {
+    library_operation_active_ = false;
+    shell_state_.library_folder_state = LibraryFolderState::Failed;
+    shell_state_.library_entries.clear();
+    shell_state_.library_selection_confirmed = false;
+    PresentLibraryState(false, "usb_browser_failed",
+                        static_cast<std::uint32_t>(error.code().value), {},
+                        std::string(operation) + ": " +
+                            to_string(error.message()));
+  }
+
+  void SetUnknownLibraryFailure(std::string_view operation) noexcept {
+    library_operation_active_ = false;
+    shell_state_.library_folder_state = LibraryFolderState::Failed;
+    shell_state_.library_entries.clear();
+    shell_state_.library_selection_confirmed = false;
+    PresentLibraryState(false, "usb_browser_failed", ERROR_GEN_FAILURE, {},
+                        std::string(operation) + ": unknown failure");
   }
 
   fire_and_forget DetectRemovableStorage() {
     [[maybe_unused]] const auto lifetime = get_strong();
-    if (library_scan_active_) {
+    if (library_operation_active_) {
       co_return;
     }
 
     try {
-      library_scan_active_ = true;
+      library_operation_active_ = true;
       shell_state_.library_folder_state = LibraryFolderState::Restoring;
       shell_state_.library_folder_name.clear();
+      shell_state_.library_breadcrumb.clear();
+      shell_state_.library_entries.clear();
+      shell_state_.library_selection_confirmed = false;
       if (renderer_) {
         renderer_->Render(shell_state_);
       }
 
       const StorageFolder folder =
           co_await library_folder_access_.FindFirstRemovableDeviceAsync();
-      library_scan_active_ = false;
       if (!folder) {
+        library_operation_active_ = false;
+        current_folder_ = nullptr;
+        child_folders_.clear();
+        folder_stack_.clear();
         shell_state_.library_folder_state = LibraryFolderState::NotConfigured;
         shell_state_.library_folder_name.clear();
         PresentLibraryState(true, "usb_not_found", ERROR_SUCCESS, {},
                             "source=KnownFolders.RemovableDevices;devices=0");
         co_return;
       }
-      SetLibraryReady(folder, "usb_ready");
+      const auto subfolders =
+          co_await library_folder_access_.GetSubfoldersAsync(folder);
+      folder_stack_.clear();
+      library_operation_active_ = false;
+      SetBrowserReady(folder, subfolders, "usb_browser_ready");
     } catch (const hresult_error &error) {
-      library_scan_active_ = false;
-      shell_state_.library_folder_state = LibraryFolderState::Failed;
-      shell_state_.library_folder_name.clear();
-      PresentLibraryState(false, "usb_access_failed",
-                          static_cast<std::uint32_t>(error.code().value), {},
-                          to_string(error.message()));
+      SetLibraryFailure(error, "scan removable storage");
     } catch (...) {
-      library_scan_active_ = false;
-      shell_state_.library_folder_state = LibraryFolderState::Failed;
-      shell_state_.library_folder_name.clear();
-      PresentLibraryState(false, "usb_access_failed", ERROR_GEN_FAILURE, {},
-                          "unknown removable storage failure");
+      SetUnknownLibraryFailure("scan removable storage");
     }
+  }
+
+  fire_and_forget OpenSelectedFolder() {
+    [[maybe_unused]] const auto lifetime = get_strong();
+    if (library_operation_active_ ||
+        shell_state_.selected_library_entry >= child_folders_.size()) {
+      co_return;
+    }
+
+    const StorageFolder target =
+        child_folders_[shell_state_.selected_library_entry];
+    try {
+      library_operation_active_ = true;
+      shell_state_.library_folder_state = LibraryFolderState::Restoring;
+      shell_state_.library_selection_confirmed = false;
+      if (renderer_) {
+        renderer_->Render(shell_state_);
+      }
+      const auto subfolders =
+          co_await library_folder_access_.GetSubfoldersAsync(target);
+      folder_stack_.push_back(current_folder_);
+      library_operation_active_ = false;
+      SetBrowserReady(target, subfolders, "usb_folder_opened");
+    } catch (const hresult_error &error) {
+      SetLibraryFailure(error, "open USB folder");
+    } catch (...) {
+      SetUnknownLibraryFailure("open USB folder");
+    }
+  }
+
+  fire_and_forget OpenParentFolder() {
+    [[maybe_unused]] const auto lifetime = get_strong();
+    if (library_operation_active_ || folder_stack_.empty()) {
+      co_return;
+    }
+
+    const StorageFolder target = folder_stack_.back();
+    try {
+      library_operation_active_ = true;
+      shell_state_.library_folder_state = LibraryFolderState::Restoring;
+      shell_state_.library_selection_confirmed = false;
+      if (renderer_) {
+        renderer_->Render(shell_state_);
+      }
+      const auto subfolders =
+          co_await library_folder_access_.GetSubfoldersAsync(target);
+      folder_stack_.pop_back();
+      library_operation_active_ = false;
+      SetBrowserReady(target, subfolders, "usb_folder_parent");
+    } catch (const hresult_error &error) {
+      SetLibraryFailure(error, "open parent USB folder");
+    } catch (...) {
+      SetUnknownLibraryFailure("open parent USB folder");
+    }
+  }
+
+  void SelectCurrentLibraryFolder() {
+    if (!current_folder_ || library_operation_active_) {
+      return;
+    }
+    const std::string folder_name = to_string(current_folder_.Name());
+    shell_state_.library_selection_confirmed = true;
+    std::ostringstream details;
+    details << "source=KnownFolders.RemovableDevices;device_index=0;depth="
+            << folder_stack_.size() << ";breadcrumb="
+            << shell_state_.library_breadcrumb;
+    PresentLibraryState(true, "folder_selected", ERROR_SUCCESS, folder_name,
+                        details.str());
+    AppendLifecycleEvent(session_id_, "library-folder-selected",
+                         "USB library folder selected;input_consumed=1");
   }
 
   void OnKeyDown(const CoreWindow &, const KeyEventArgs &args) noexcept {
@@ -450,11 +582,59 @@ private:
           shell_state_.page = pages[shell_state_.selected_item];
           changed = true;
         }
-      } else if (shell_state_.page == XboxShellPage::Games &&
-                 (key == VirtualKey::GamepadA || key == VirtualKey::Enter)) {
-        args.Handled(true);
-        DetectRemovableStorage();
-        return;
+      } else if (shell_state_.page == XboxShellPage::Games) {
+        if (library_operation_active_) {
+          if (key == VirtualKey::GamepadA || key == VirtualKey::GamepadB ||
+              key == VirtualKey::Enter || key == VirtualKey::Escape) {
+            args.Handled(true);
+          }
+          return;
+        }
+
+        if (shell_state_.library_folder_state == LibraryFolderState::Ready) {
+          if ((key == VirtualKey::GamepadDPadUp || key == VirtualKey::Up) &&
+              !child_folders_.empty()) {
+            shell_state_.selected_library_entry =
+                (shell_state_.selected_library_entry +
+                 static_cast<std::uint32_t>(child_folders_.size()) - 1U) %
+                static_cast<std::uint32_t>(child_folders_.size());
+            shell_state_.library_selection_confirmed = false;
+            changed = true;
+          } else if ((key == VirtualKey::GamepadDPadDown ||
+                      key == VirtualKey::Down) &&
+                     !child_folders_.empty()) {
+            shell_state_.selected_library_entry =
+                (shell_state_.selected_library_entry + 1U) %
+                static_cast<std::uint32_t>(child_folders_.size());
+            shell_state_.library_selection_confirmed = false;
+            changed = true;
+          } else if (key == VirtualKey::GamepadA || key == VirtualKey::Enter) {
+            args.Handled(true);
+            OpenSelectedFolder();
+            return;
+          } else if (key == VirtualKey::GamepadX) {
+            args.Handled(true);
+            SelectCurrentLibraryFolder();
+            return;
+          } else if (key == VirtualKey::GamepadB ||
+                     key == VirtualKey::Escape) {
+            args.Handled(true);
+            if (folder_stack_.empty()) {
+              shell_state_.page = XboxShellPage::Home;
+              changed = true;
+            } else {
+              OpenParentFolder();
+              return;
+            }
+          }
+        } else if (key == VirtualKey::GamepadA || key == VirtualKey::Enter) {
+          args.Handled(true);
+          DetectRemovableStorage();
+          return;
+        } else if (key == VirtualKey::GamepadB || key == VirtualKey::Escape) {
+          shell_state_.page = XboxShellPage::Home;
+          changed = true;
+        }
       } else if (key == VirtualKey::GamepadB || key == VirtualKey::Escape) {
         shell_state_.page = XboxShellPage::Home;
         changed = true;
@@ -578,7 +758,10 @@ private:
   ::Core::Uwp::BridgeStatus bridge_status_{};
   XboxShellState shell_state_{};
   LibraryFolderAccess library_folder_access_{};
-  bool library_scan_active_{};
+  StorageFolder current_folder_{nullptr};
+  std::vector<StorageFolder> child_folders_;
+  std::vector<StorageFolder> folder_stack_;
+  bool library_operation_active_{};
   std::unique_ptr<D3D12StatusRenderer> renderer_;
 };
 

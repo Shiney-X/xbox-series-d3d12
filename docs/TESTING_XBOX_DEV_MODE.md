@@ -104,20 +104,24 @@ Se o Xbox encerrar o processo em vez de retomá-lo, o journal mostrará uma nova
 sessão `launch` depois de `suspend`, sem o evento `resume` correspondente. Esse
 resultado deve ser preservado; não é equivalente a uma retomada aprovada.
 
-## Testar o acesso USB da biblioteca
+## Testar o navegador USB da biblioteca
 
-O pacote `0.3.0.1` substitui o `FolderPicker`, que permaneceu carregando sem
-origens no Xbox, por acesso direto e controlado a dispositivos removíveis. Ele
-ainda não navega nas pastas, procura ou executa jogos.
+O pacote `0.3.1.0` acessa o dispositivo removível diretamente e renderiza o
+navegador de pastas dentro do shell D3D12. Ele ainda não procura nem executa
+jogos.
 
 1. Formate um pendrive como armazenamento de mídia reconhecido pelo Xbox.
 2. Conecte o pendrive antes de iniciar o aplicativo.
-3. Abra **Games**. A primeira varredura ocorre automaticamente.
-4. Se necessário, pressione **A** em `SCAN USB` para repetir a detecção.
-5. Confirme que nenhum seletor externo é aberto.
-6. Confirme `USB STORAGE READY` e o nome do dispositivo.
-7. Remova o USB, pressione **A** e confirme `NO USB STORAGE FOUND`.
-8. Reconecte o USB, pressione **A** e confirme que o dispositivo reaparece.
+3. Crie antes uma estrutura simples, por exemplo `F:\Games\SonicMania`.
+4. Abra **Games** e confirme que nenhum seletor externo é aberto.
+5. Confirme `USB FOLDER BROWSER`, o breadcrumb e a lista de subpastas.
+6. Use o direcional para selecionar `Games` e pressione **A**.
+7. Confirme que o breadcrumb e a lista mudam para o novo diretório.
+8. Pressione **B** e confirme o retorno para a raiz do dispositivo.
+9. Entre novamente em `Games` e pressione **X** para selecionar a pasta.
+10. Confirme `LIBRARY FOLDER SELECTED` na tela.
+11. Pressione **B** dentro de uma subpasta para subir; na raiz, **B** retorna
+    para a tela inicial sem fechar o aplicativo.
 
 ## Coletar o relatório
 
@@ -165,9 +169,10 @@ A bridge do core deve produzir em `phase1-core.jsonl`:
 {"component":"shadps4-core-uwp","passed":true,"details":"upstream=v0.18.0;initialized=1;psf_abi=1;endian=1"}
 ```
 
-Com o USB conectado, `phase1-library.jsonl` deve conter `passed:true`, estado
-`usb_ready` e `source=KnownFolders.RemovableDevices`. O relatório guarda o nome
-do dispositivo, mas não persiste seu caminho absoluto.
+Depois de pressionar **X**, `phase1-library.jsonl` deve conter `passed:true`,
+estado `folder_selected`, `source=KnownFolders.RemovableDevices`, a profundidade
+e o breadcrumb. O relatório guarda os nomes para diagnóstico, mas não persiste
+um caminho absoluto.
 
 O probe de pressão registra o limite atual, o limite esperado pelo Xbox, uso
 antes/depois, pico observado e a quantidade efetivamente alocada. O journal usa
@@ -199,5 +204,5 @@ apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 ## Critério para avançar
 
 Avançar para a enumeração de jogos somente depois de confirmar no Series S:
-detecção com e sem o pendrive, retorno com `USB STORAGE READY` e
-`state:"usb_ready"` em `phase1-library.jsonl`.
+listagem, rolagem, entrada e retorno entre diretórios, seleção com **X** e
+`state:"folder_selected"` em `phase1-library.jsonl`.

@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 enum class XboxShellPage : std::uint8_t {
   Home,
@@ -33,6 +34,11 @@ struct XboxShellState {
   std::string_view upstream_version{"unknown"};
   LibraryFolderState library_folder_state{LibraryFolderState::NotConfigured};
   std::string library_folder_name;
+  std::string library_breadcrumb;
+  std::vector<std::string> library_entries;
+  std::uint32_t selected_library_entry{};
+  bool library_at_device_root{true};
+  bool library_selection_confirmed{};
 };
 
 class D3D12StatusRenderer final {
