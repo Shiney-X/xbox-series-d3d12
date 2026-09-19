@@ -26,6 +26,17 @@ Arquivo bruto: [`xbox-series-s-game-10.0.26100.9426.jsonl`](xbox-series-s-game-1
 Arquivo bruto:
 [`xbox-series-s-game-triangle-10.0.26100.9426.jsonl`](xbox-series-s-game-triangle-10.0.26100.9426.jsonl).
 
+## Xbox Series S — incompatibilidade `IDxcCompiler3`
+
+O pacote `0.1.0.4` carregou o runtime DXC, mas retornou `E_NOINTERFACE`
+(`0x80004002`) antes do primeiro `Present` ao solicitar `IDxcCompiler3`. Os
+demais probes e a persistência continuaram aprovados. O host passou a usar
+`IDxcLibrary` + `IDxcCompiler`, mantendo a saída Shader Model 6/DXIL.
+
+- SHA-256 do JSONL: `5413d1ba439c22cd63b3abd0a9c791bf40597472675cb16c5e912f8b7a84b1b0`;
+- arquivo bruto:
+  [`xbox-series-s-game-dxc-interface-failure-10.0.26100.9426.jsonl`](xbox-series-s-game-dxc-interface-failure-10.0.26100.9426.jsonl).
+
 O valor de 128 MiB retornado como memória de vídeo dedicada é a visão do
 DXGI dentro do sandbox UWP. Ele não representa a memória física total do
 console nem deve ser usado como budget de residency.

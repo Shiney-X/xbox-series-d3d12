@@ -120,12 +120,20 @@ public:
             renderer_->Render(passed);
             results_.push_back({"uwp-presentation", true, 0,
                                 "CoreWindow D3D12 triangle presented;shader_compiler=DXC;"
-                                "shader_model=6_0;shader_format=DXIL;draw_vertices=3"});
+                                "dxc_api=IDxcCompiler;shader_model=6_0;shader_format=DXIL;"
+                                "draw_vertices=3"});
             presentation_succeeded = true;
         } catch (const hresult_error& error) {
             results_.push_back({"uwp-presentation", false,
                                 static_cast<std::uint32_t>(error.code().value),
                                 to_string(error.message())});
+            if (renderer_) {
+                try {
+                    renderer_->Render(false);
+                } catch (...) {
+                    // The JSON report remains the authoritative failure channel.
+                }
+            }
         }
 
         results_.push_back(SaveReport(results_));

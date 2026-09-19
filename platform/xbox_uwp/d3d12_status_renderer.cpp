@@ -108,8 +108,6 @@ void D3D12StatusRenderer::Initialize(IUnknown* core_window, float width, float h
         IID_PPV_ARGS(command_list_.ReleaseAndGetAddressOf())));
     winrt::check_hresult(command_list_->Close());
 
-    CreateTrianglePipeline();
-
     winrt::check_hresult(
         device_->CreateFence(0, D3D12_FENCE_FLAG_NONE,
                              IID_PPV_ARGS(fence_.ReleaseAndGetAddressOf())));
@@ -118,6 +116,8 @@ void D3D12StatusRenderer::Initialize(IUnknown* core_window, float width, float h
         fence_event_ = INVALID_HANDLE_VALUE;
         winrt::throw_last_error();
     }
+
+    CreateTrianglePipeline();
 }
 
 void D3D12StatusRenderer::Render(bool passed) {
@@ -161,25 +161,30 @@ void D3D12StatusRenderer::Render(bool passed) {
 }
 
 void D3D12StatusRenderer::CreateTrianglePipeline() {
-    ComPtr<IDxcCompiler3> compiler;
+    ComPtr<IDxcLibrary> library;
+    ComPtr<IDxcCompiler> compiler;
+    winrt::check_hresult(
+        DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(library.ReleaseAndGetAddressOf())));
     winrt::check_hresult(
         DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(compiler.ReleaseAndGetAddressOf())));
 
-    const DxcBuffer source{TriangleShader, std::strlen(TriangleShader), DXC_CP_UTF8};
+    ComPtr<IDxcBlobEncoding> source;
+    winrt::check_hresult(library->CreateBlobWithEncodingFromPinned(
+        TriangleShader, static_cast<UINT32>(std::strlen(TriangleShader)), DXC_CP_UTF8,
+        source.ReleaseAndGetAddressOf()));
     const auto compile_shader = [&](const wchar_t* entry_point,
                                     const wchar_t* target) -> ComPtr<IDxcBlob> {
-        const wchar_t* arguments[] = {L"-E", entry_point, L"-T", target, L"-Ges", L"-O3"};
-        ComPtr<IDxcResult> result;
-        winrt::check_hresult(compiler->Compile(&source, arguments, 6, nullptr,
-                                               IID_PPV_ARGS(result.ReleaseAndGetAddressOf())));
+        const wchar_t* arguments[] = {L"-Ges", L"-O3"};
+        ComPtr<IDxcOperationResult> result;
+        winrt::check_hresult(compiler->Compile(
+            source.Get(), L"triangle.hlsl", entry_point, target, arguments, 2, nullptr, 0,
+            nullptr, result.ReleaseAndGetAddressOf()));
         HRESULT status = E_FAIL;
         winrt::check_hresult(result->GetStatus(&status));
         winrt::check_hresult(status);
 
         ComPtr<IDxcBlob> shader;
-        winrt::check_hresult(result->GetOutput(DXC_OUT_OBJECT,
-                                               IID_PPV_ARGS(shader.ReleaseAndGetAddressOf()),
-                                               nullptr));
+        winrt::check_hresult(result->GetResult(shader.ReleaseAndGetAddressOf()));
         return shader;
     };
 

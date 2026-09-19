@@ -78,6 +78,11 @@ como Shader Model 6/DXIL. `dxcompiler.dll` e o validador `dxil.dll` da versão d
 Windows SDK usada no build são empacotados junto ao MSIX, evitando dependência
 implícita de uma instalação de ferramentas no console.
 
+O probe usa as interfaces estáveis `IDxcLibrary` e `IDxcCompiler`. O primeiro
+teste com `IDxcCompiler3` retornou `E_NOINTERFACE` no Series S, embora a mesma
+versão compilasse no SDK 26100. A escolha da interface antiga afeta somente a
+API de invocação do compilador; a saída continua sendo Shader Model 6/DXIL.
+
 ## Fronteira futura do renderer
 
 Os contratos neutros deverão cobrir:
