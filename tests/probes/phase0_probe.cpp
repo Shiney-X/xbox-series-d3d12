@@ -58,8 +58,7 @@ int InvokeGeneratedFunction(void* address, DWORD& exception_code) {
     __try {
         using GeneratedFunction = int (*)();
         return reinterpret_cast<GeneratedFunction>(address)();
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-        exception_code = GetExceptionCode();
+    } __except (exception_code = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER) {
         return 0;
     }
 }
