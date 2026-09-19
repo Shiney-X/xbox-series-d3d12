@@ -9,11 +9,21 @@ on:
     paths-ignore:
       - "documents/**"
       - "**/*.md"
+      - "platform/xbox_uwp/**"
+      - "scripts/windows/Build-UwpPackage.ps1"
+      - "src/core/uwp/**"
+      - "src/phase0/**"
+      - "tests/probes/**"
 
   pull_request:
     paths-ignore:
       - "documents/**"
       - "**/*.md"
+      - "platform/xbox_uwp/**"
+      - "scripts/windows/Build-UwpPackage.ps1"
+      - "src/core/uwp/**"
+      - "src/phase0/**"
+      - "tests/probes/**"
 
   workflow_dispatch:
 

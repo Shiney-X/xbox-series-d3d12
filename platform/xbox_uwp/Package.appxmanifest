@@ -7,10 +7,10 @@
   <Identity
     Name="ShineyX.xbox-series-d3d12"
     Publisher="CN=xbox-series-d3d12-dev"
-    Version="0.1.0.8" />
+    Version="0.2.0.0" />
   <mp:PhoneIdentity PhoneProductId="2d321cd1-304e-4496-b383-78f208531352" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
-    <DisplayName>xbox-series-d3d12 probes</DisplayName>
+    <DisplayName>shadPS4 Xbox Shell</DisplayName>
     <PublisherDisplayName>Shiney-X</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <uap:SupportedUsers>multiple</uap:SupportedUsers>
@@ -24,10 +24,10 @@
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="xbox_series_d3d12.App">
       <uap:VisualElements
-        DisplayName="xbox-series-d3d12 probes"
+        DisplayName="shadPS4 Xbox Shell"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
-        Description="Xbox Dev Mode Phase 0 feasibility probes"
+        Description="Experimental shadPS4 UWP host for Xbox Dev Mode"
         BackgroundColor="#101820">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#101820" />

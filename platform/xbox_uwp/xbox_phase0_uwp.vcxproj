@@ -64,10 +64,10 @@
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;_WIN32_WINNT=0x0A00;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <CompileAsWinRT>false</CompileAsWinRT>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\src\phase0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\src;$(ProjectDir)..\..\src\phase0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>d3d12.lib;dxcompiler.lib;dxgi.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -78,12 +78,14 @@
   <ItemGroup>
     <ClInclude Include="d3d12_status_renderer.h" />
     <ClInclude Include="memory_pressure_probe.h" />
+    <ClInclude Include="..\..\src\core\uwp\core_bridge.h" />
     <ClInclude Include="..\..\src\phase0\probes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="d3d12_status_renderer.cpp" />
     <ClCompile Include="memory_pressure_probe.cpp" />
+    <ClCompile Include="..\..\src\core\uwp\core_bridge.cpp" />
     <ClCompile Include="..\..\src\phase0\probes.cpp" />
   </ItemGroup>
   <ItemGroup>
