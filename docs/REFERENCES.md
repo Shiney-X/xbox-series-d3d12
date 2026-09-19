@@ -1,0 +1,28 @@
+# Referências técnicas
+
+Fontes primárias usadas nas decisões iniciais:
+
+- [shadPS4: Emulator Design](https://github.com/shadps4-emu/shadPS4/wiki/VI.-Emulator-Design-%5BDevs%5D)
+- [Microsoft: recursos de sistema para UWP no Xbox](https://learn.microsoft.com/en-us/previous-versions/windows/uwp/xbox-apps/system-resource-allocation)
+- [Microsoft: acesso aos recursos do GDK](https://learn.microsoft.com/en-us/gaming/gdk/docs/gdk-dev/development-downloads/access-resources)
+- [Microsoft: capability `codeGeneration`](https://learn.microsoft.com/en-us/uwp/schemas/appxpackage/uapmanifestschema/element-capability)
+- [Microsoft: `VirtualProtectFromApp`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotectfromapp)
+- [Microsoft: `VirtualAlloc2FromApp`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2fromapp)
+- [Microsoft: `MapViewOfFile3FromApp`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile3fromapp)
+- [Microsoft: `UnmapViewOfFileEx`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-unmapviewoffileex)
+- [Microsoft: `Windows.System.MemoryManager`](https://learn.microsoft.com/en-us/uwp/api/windows.system.memorymanager?view=winrt-26100)
+- [Microsoft: suspensão de aplicativo DirectX/UWP em C++](https://learn.microsoft.com/en-us/windows/uwp/gaming/how-to-suspend-an-app-directx-and-cpp)
+- [Microsoft: limitações UWP no Xbox](https://learn.microsoft.com/en-us/uwp/extension-sdks/uwp-limitations-on-xbox)
+- [Microsoft: opções de desenvolvimento UWP no Xbox](https://learn.microsoft.com/en-us/uwp/apps-for-xbox/development-options)
+- [Microsoft: visão geral do Windows Device Portal](https://learn.microsoft.com/en-us/windows/advanced-settings/device-portal)
+- [Microsoft: `ApplicationData.LocalFolder`](https://learn.microsoft.com/en-us/uwp/api/windows.storage.applicationdata.localfolder)
+- [Microsoft ATG: amostra DirectX 12 UWP em C++/WinRT](https://github.com/microsoft/Xbox-ATG-Samples/tree/main/UWPSamples/IntroGraphics/SimpleTriangleCppWinRT_UWP12)
+- [Microsoft: DirectX Shader Compiler](https://github.com/microsoft/DirectXShaderCompiler)
+- [Microsoft: requisitos para executar shaders DXIL](https://github.com/microsoft/DirectXShaderCompiler/wiki/Running-Shaders)
+- [Microsoft: Vulkan-on-D3D12 specifications](https://github.com/microsoft/DirectX-Specs/blob/master/d3d/VulkanOn12.md)
+- [Khronos: SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross)
+- [vkd3d-proton: direção D3D12 para Vulkan](https://github.com/HansKristian-Work/vkd3d-proton)
+
+Registre a data e a versão do sistema operacional junto a todo resultado obtido
+no console. O comportamento medido tem precedência sobre suposições feitas a
+partir de um PC desktop.

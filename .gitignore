@@ -1,0 +1,12 @@
+/out/
+/platform/xbox_uwp/Assets/
+/.vs/
+/CMakeUserPresets.json
+*.user
+*.pfx
+*.cer
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.dmp
