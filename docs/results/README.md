@@ -57,3 +57,17 @@ havia um usuário conectado. Sem usuário conectado, o mesmo pacote executado
 como Game expôs normalmente `LocalState/phase0-results.jsonl`. Isso é tratado
 como uma particularidade de enumeração do armazenamento por usuário no Device
 Portal, não como falha do probe.
+
+## Xbox Series S — placeholders e aliases de memória
+
+O pacote `0.1.0.6`, executado em perfil **Game**, reservou e dividiu uma região
+de placeholders em duas views fixas da mesma seção de 64 KiB. Escritas feitas
+por qualquer uma das views ficaram imediatamente visíveis na outra. O
+triângulo DXIL também foi confirmado visualmente, sem regressão na apresentação.
+
+- sistema operacional: `10.0.26100.9426`;
+- resultado: sete de sete etapas aprovadas;
+- `fixed_views=1`, `forward_alias=1`, `reverse_alias=1`;
+- SHA-256 do JSONL: `8b7211fa894a4580222b095c3e6f759d461bbd5e41bd5719c1072e3cd40c4dec`;
+- arquivo bruto:
+  [`xbox-series-s-game-aliases-10.0.26100.9426.jsonl`](xbox-series-s-game-aliases-10.0.26100.9426.jsonl).
