@@ -89,9 +89,9 @@ ProbeResult ProbeCapabilities() {
     const DWORD policy_error = dynamic_policy_available ? ERROR_SUCCESS : GetLastError();
 
     PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY control_flow_guard{};
-    const BOOL cfg_policy_available = GetProcessMitigationPolicy(
-        GetCurrentProcess(), ProcessControlFlowGuardPolicy, &control_flow_guard,
-        sizeof(control_flow_guard));
+    const BOOL cfg_policy_available =
+        GetProcessMitigationPolicy(GetCurrentProcess(), ProcessControlFlowGuardPolicy,
+                                   &control_flow_guard, sizeof(control_flow_guard));
 
     std::ostringstream details;
     details << "architecture=" << system_info.wProcessorArchitecture
@@ -103,9 +103,8 @@ ProbeResult ProbeCapabilities() {
             << ";cfg_policy_available=" << (cfg_policy_available != FALSE)
             << ";cfg_enabled=" << control_flow_guard.EnableControlFlowGuard;
 
-    return {"capabilities",
-            system_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64, policy_error,
-            details.str()};
+    return {"capabilities", system_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64,
+            policy_error, details.str()};
 }
 
 ProbeResult ProbeVirtualMemory() {
@@ -113,8 +112,7 @@ ProbeResult ProbeVirtualMemory() {
     GetSystemInfo(&system_info);
     const SIZE_T size = system_info.dwAllocationGranularity;
 
-    void* allocation =
-        VirtualAllocFromApp(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    void* allocation = VirtualAllocFromApp(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     if (allocation == nullptr) {
         return {"virtual-memory", false, GetLastError(), "initial reservation failed"};
     }
@@ -148,8 +146,8 @@ ProbeResult ProbeVirtualMemory() {
         return {"virtual-memory", false, GetLastError(), "release failed"};
     }
 
-    void* fixed_allocation = VirtualAllocFromApp(requested_address, size,
-                                                 MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    void* fixed_allocation =
+        VirtualAllocFromApp(requested_address, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     const bool fixed_address_succeeded = fixed_allocation == requested_address;
     const DWORD fixed_address_error = fixed_allocation == nullptr ? GetLastError() : ERROR_SUCCESS;
     if (fixed_allocation != nullptr) {
@@ -157,8 +155,7 @@ ProbeResult ProbeVirtualMemory() {
     }
 
     std::ostringstream details;
-    details << "size=" << size << ";state=" << memory_info.State
-            << ";type=" << memory_info.Type
+    details << "size=" << size << ";state=" << memory_info.State << ";type=" << memory_info.Type
             << ";fixed_address_succeeded=" << fixed_address_succeeded;
 
     return {"virtual-memory", fixed_address_succeeded, fixed_address_error, details.str()};
@@ -250,8 +247,8 @@ ProbeResult ProbeExecutableMemory() {
     return {"executable-memory", false, ERROR_NOT_SUPPORTED, "x86-64 is required"};
 #else
     constexpr SIZE_T allocation_size = 64 * 1024;
-    void* allocation = VirtualAllocFromApp(nullptr, allocation_size,
-                                           MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    void* allocation =
+        VirtualAllocFromApp(nullptr, allocation_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     if (allocation == nullptr) {
         return {"executable-memory", false, GetLastError(), "RW allocation failed"};
     }
@@ -353,13 +350,13 @@ ProbeResult ProbeD3D12Device() {
             << ";device_id=" << selected_description.DeviceId
             << ";dedicated_video_memory=" << selected_description.DedicatedVideoMemory
             << ";node_count=" << device->GetNodeCount()
-            << ";options_available=" << SUCCEEDED(options_result)
-            << ";resource_binding_tier="
+            << ";options_available=" << SUCCEEDED(options_result) << ";resource_binding_tier="
             << (SUCCEEDED(options_result) ? static_cast<unsigned>(options.ResourceBindingTier) : 0)
             << ";shader_model_available=" << SUCCEEDED(shader_model_result)
             << ";highest_shader_model="
-            << (SUCCEEDED(shader_model_result) ? static_cast<unsigned>(shader_model.HighestShaderModel)
-                                               : 0);
+            << (SUCCEEDED(shader_model_result)
+                    ? static_cast<unsigned>(shader_model.HighestShaderModel)
+                    : 0);
 
     return {"d3d12-device", true, ERROR_SUCCESS, details.str()};
 }
@@ -376,16 +373,16 @@ std::vector<ProbeResult> RunAllProbes() {
 }
 
 bool AllPassed(const std::vector<ProbeResult>& results) noexcept {
-    return !results.empty() &&
-           std::all_of(results.begin(), results.end(),
-                       [](const ProbeResult& result) { return result.passed; });
+    return !results.empty() && std::all_of(results.begin(), results.end(),
+                                           [](const ProbeResult& result) { return result.passed; });
 }
 
 std::string SerializeJsonLine(const ProbeResult& result) {
     std::ostringstream output;
-    output << "{\"probe\":\"" << EscapeJson(result.name) << "\",\"passed\":"
-           << (result.passed ? "true" : "false") << ",\"win32_error\":" << result.error
-           << ",\"details\":\"" << EscapeJson(result.details) << "\"}";
+    output << "{\"probe\":\"" << EscapeJson(result.name)
+           << "\",\"passed\":" << (result.passed ? "true" : "false")
+           << ",\"win32_error\":" << result.error << ",\"details\":\"" << EscapeJson(result.details)
+           << "\"}";
     return output.str();
 }
 

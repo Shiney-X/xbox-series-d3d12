@@ -1,14 +1,39 @@
 {
-  "version": 6,
+  "version": 9,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 25,
+    "minor": 30,
     "patch": 0
   },
+  "include": ["cmake/CMake${hostSystemName}Presets.json"],
   "configurePresets": [
     {
+      "name": "x64-Clang-Debug",
+      "displayName": "Clang x64 Debug",
+      "inherits": ["x64-Clang-Base"],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x64-Clang-Release",
+      "displayName": "Clang x64 Release",
+      "inherits": ["x64-Clang-Base"],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-Clang-RelWithDebInfo",
+      "displayName": "Clang x64 RelWithDebInfo",
+      "inherits": ["x64-Clang-Base"],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
       "name": "windows-msvc",
-      "displayName": "Windows x64 - Visual Studio 2022",
+      "displayName": "Windows x64 - Phase 0 probes",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/out/build/windows-msvc",
@@ -18,7 +43,7 @@
         "rhs": "Windows"
       },
       "cacheVariables": {
-        "XBOX_D3D12_BUILD_PROBES": "ON"
+        "XBOX_D3D12_PHASE0_ONLY": "ON"
       }
     }
   ],

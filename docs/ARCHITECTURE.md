@@ -96,3 +96,18 @@ Os contratos neutros deverão cobrir:
 - queries e apresentação.
 
 Tipos `vk::*` ou `ID3D12*` não poderão atravessar essa fronteira.
+
+## Fronteira do host
+
+`Frontend::Window` é o contrato entre o ciclo de execução do emulador e a
+janela fornecida pela plataforma. `Core::Emulator` recebe uma
+`Frontend::WindowFactory`; ele não escolhe SDL, UWP ou outro toolkit.
+
+No desktop, `main.cpp` injeta `WindowSDL`. O host UWP deverá injetar uma
+implementação baseada em `CoreWindow`, com seu próprio loop de eventos e
+superfície D3D12. A interface Vulkan também consome o contrato neutro e obtém o
+handle nativo por `WindowSystemInfo`.
+
+O handle opaco retornado por `GetFrontendHandle()` é uma ponte transitória para
+os adaptadores SDL de ImGui e mouse. Código novo de core ou renderer não deve
+depender desse handle.
