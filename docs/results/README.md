@@ -37,6 +37,17 @@ demais probes e a persistência continuaram aprovados. O host passou a usar
 - arquivo bruto:
   [`xbox-series-s-game-dxc-interface-failure-10.0.26100.9426.jsonl`](xbox-series-s-game-dxc-interface-failure-10.0.26100.9426.jsonl).
 
+## Xbox Series S — DXC/DXIL
+
+O pacote `0.1.0.5` compilou em runtime os vertex e pixel shaders como Shader
+Model 6/DXIL usando `IDxcCompiler`, criou o graphics PSO, desenhou o triângulo e
+apresentou no perfil **Game**. A imagem foi confirmada visualmente no console.
+
+- resultado: seis de seis probes aprovados;
+- SHA-256 do JSONL: `2c5113f741f0a86ae37e174619b8628ec061884513170e01451d7250d86fe55f`;
+- arquivo bruto:
+  [`xbox-series-s-game-dxil-10.0.26100.9426.jsonl`](xbox-series-s-game-dxil-10.0.26100.9426.jsonl).
+
 O valor de 128 MiB retornado como memória de vídeo dedicada é a visão do
 DXGI dentro do sandbox UWP. Ele não representa a memória física total do
 console nem deve ser usado como budget de residency.

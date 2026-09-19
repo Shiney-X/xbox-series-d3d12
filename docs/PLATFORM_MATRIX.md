@@ -7,6 +7,7 @@
 | Dispositivo D3D12 | CI validado | Validado no `SraKmd_arden` | Sim, API específica |
 | Swapchain D3D12 | Não necessária no runner | `CoreWindow` + `Present` validados | API específica |
 | Graphics PSO + draw | Não necessário no runner | Triângulo validado no Series S | API específica |
+| DXC + Shader Model 6/DXIL | Disponível no SDK | Validado via `IDxcCompiler` | Toolchain específica |
 | Vulkan nativo | Dependente do driver | Não | Não é o baseline |
 | Filesystem irrestrito | Sim | Não | APIs GDK |
 | Qt desktop | Sim | Não planejado | Não planejado |
