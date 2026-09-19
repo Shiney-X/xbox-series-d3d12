@@ -15,11 +15,11 @@
 #include <vector>
 
 using namespace winrt;
-using namespace Windows::ApplicationModel;
-using namespace Windows::ApplicationModel::Activation;
-using namespace Windows::ApplicationModel::Core;
-using namespace Windows::Storage;
-using namespace Windows::UI::Core;
+using namespace winrt::Windows::ApplicationModel;
+using namespace winrt::Windows::ApplicationModel::Activation;
+using namespace winrt::Windows::ApplicationModel::Core;
+using namespace winrt::Windows::Storage;
+using namespace winrt::Windows::UI::Core;
 using XboxSeriesD3D12::Phase0::ProbeResult;
 
 namespace {
@@ -35,7 +35,7 @@ fire_and_forget SaveReportAsync(std::string report) {
     }
 }
 
-class ViewProvider final : public implements<ViewProvider, IFrameworkView> {
+class ViewProvider : public implements<ViewProvider, IFrameworkView> {
 public:
     void Initialize(const CoreApplicationView& application_view) {
         application_view.Activated({this, &ViewProvider::OnActivated});
@@ -84,7 +84,7 @@ private:
     std::unique_ptr<D3D12StatusRenderer> renderer_;
 };
 
-class ViewProviderFactory final : public implements<ViewProviderFactory, IFrameworkViewSource> {
+class ViewProviderFactory : public implements<ViewProviderFactory, IFrameworkViewSource> {
 public:
     IFrameworkView CreateView() { return make<ViewProvider>(); }
 };
