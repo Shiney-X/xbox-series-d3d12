@@ -240,7 +240,9 @@ ProbeResult ProbeMemoryAliases() {
             << ";fixed_views=1;forward_alias=" << forward_alias
             << ";reverse_alias=" << reverse_alias;
     return {"memory-aliases", forward_alias && reverse_alias,
-            forward_alias && reverse_alias ? ERROR_SUCCESS : ERROR_INVALID_DATA, details.str()};
+            static_cast<std::uint32_t>(forward_alias && reverse_alias ? ERROR_SUCCESS
+                                                                      : ERROR_INVALID_DATA),
+            details.str()};
 }
 
 ProbeResult ProbeExecutableMemory() {
