@@ -38,8 +38,8 @@ Consulte [`docs/results`](results/README.md).
 
 ## Fase 1 — Integração do upstream
 
-**Status: integração base e shell Xbox concluídos; acesso USB à biblioteca em
-validação.**
+**Status: integração base, shell Xbox e acesso inicial ao USB validados no
+console; navegador de diretórios em desenvolvimento.**
 
 - [x] Definir estratégia de importação preservando histórico Git.
 - [x] Registrar revisão upstream de referência.
@@ -64,7 +64,7 @@ validação.**
 - [x] Detectar assincronamente o primeiro dispositivo removível.
 - [x] Expor estados de varredura e acesso USB na tela Games.
 - [x] Persistir diagnóstico em `LocalState/phase1-library.jsonl`.
-- [ ] Validar `KnownFolders.RemovableDevices` no Xbox Series S.
+- [x] Validar `KnownFolders.RemovableDevices` no Xbox Series S.
 - [ ] Criar navegador próprio para as pastas do USB.
 - [ ] Enumerar uma biblioteca real a partir da pasta escolhida.
 

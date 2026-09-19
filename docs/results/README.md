@@ -129,3 +129,21 @@ O journal registrou doze eventos de navegação com `input_consumed=1` antes da
 - arquivos brutos:
   [`xbox-series-s-game-phase1-core-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-core-10.0.26100.9426.jsonl) e
   [`xbox-series-s-game-phase1-navigation-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-navigation-10.0.26100.9426.jsonl).
+
+## Xbox Series S — acesso USB da Fase 1
+
+O pacote `0.3.0.1`, executado em perfil **Game**, acessou diretamente
+`KnownFolders.RemovableDevices` sem abrir o `FolderPicker`. O primeiro
+dispositivo removível foi identificado como `F:\`; o teste inicial e cinco
+novas varreduras terminaram com `usb_ready`, `passed=true` e erro zero.
+
+- sistema operacional: `10.0.26100.9426`;
+- dispositivo detectado: `F:\` (`device_index=0`);
+- suspensão ao final da sessão: registrada com sucesso;
+- SHA-256 do relatório:
+  `01aee9c17aded8e56c1a2490da7bb50656e82f538416e3d6620fe188582e3b02`;
+- SHA-256 do journal:
+  `bd6c66c94099cc1f1516e959aa973411095de9d9842d6086088c87c8d7e4487d`;
+- arquivos brutos:
+  [`xbox-series-s-game-phase1-usb-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-usb-10.0.26100.9426.jsonl) e
+  [`xbox-series-s-game-phase1-usb-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-usb-lifecycle-10.0.26100.9426.jsonl).

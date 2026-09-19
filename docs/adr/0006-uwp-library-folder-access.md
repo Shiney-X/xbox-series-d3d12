@@ -22,13 +22,14 @@ descoberta e carregamento controlado de dumps PS4. A tela Games detecta o
 primeiro dispositivo removível de forma assíncrona e mostra o resultado sem
 abrir UI externa.
 
-Este primeiro incremento seleciona a raiz do primeiro dispositivo. Depois da
-validação no Series S, o próprio shell implementará navegação por diretórios,
-sem expor o filesystem geral do sistema.
+O pacote `0.3.0.1` validou essa decisão no Series S: a API enumerou o primeiro
+dispositivo como `F:\`, retornou `usb_ready` sem erro e repetiu a varredura com
+sucesso. O próprio shell implementará a navegação por diretórios, sem expor o
+filesystem geral do sistema.
 
 ## Consequências
 
-- A biblioteca passa a depender de armazenamento USB para conteýo externo.
+- A biblioteca passa a depender de armazenamento USB para conteúdo externo.
 - O acesso continua limitado pelas capabilities e associações de tipos UWP.
 - O aplicativo não persiste caminhos absolutos nem usa capabilities restritas.
 - Arquivos sem extensão e tipos ainda não declarados precisarão de uma etapa
