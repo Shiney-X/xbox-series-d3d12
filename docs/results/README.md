@@ -20,6 +20,7 @@ Arquivo bruto: [`xbox-series-s-game-10.0.26100.9426.jsonl`](xbox-series-s-game-1
 - shader de probe: HLSL Shader Model 5 compilado em runtime por `D3DCompile`;
 - chamada de desenho: `DrawInstanced` com três vértices;
 - resultado: seis de seis probes aprovados;
+- validação visual: triângulo colorido confirmado por captura do console;
 - SHA-256 do JSONL: `07da540e6ef75480ba3361bc101ac423a4cf927b6d35b60db225f9b15519348d`.
 
 Arquivo bruto:

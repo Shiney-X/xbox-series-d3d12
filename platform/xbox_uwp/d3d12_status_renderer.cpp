@@ -2,6 +2,7 @@
 
 #include "d3d12_status_renderer.h"
 
+#include <dxcapi.h>
 #include <winrt/base.h>
 
 #include <algorithm>
@@ -160,24 +161,35 @@ void D3D12StatusRenderer::Render(bool passed) {
 }
 
 void D3D12StatusRenderer::CreateTrianglePipeline() {
-    ComPtr<ID3DBlob> vertex_shader;
-    ComPtr<ID3DBlob> pixel_shader;
-    ComPtr<ID3DBlob> diagnostics;
-    constexpr UINT compile_flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3;
-    winrt::check_hresult(D3DCompile(TriangleShader, std::strlen(TriangleShader), "triangle.hlsl",
-                                   nullptr, nullptr, "VSMain", "vs_5_0", compile_flags, 0,
-                                   vertex_shader.ReleaseAndGetAddressOf(),
-                                   diagnostics.ReleaseAndGetAddressOf()));
-    diagnostics.Reset();
-    winrt::check_hresult(D3DCompile(TriangleShader, std::strlen(TriangleShader), "triangle.hlsl",
-                                   nullptr, nullptr, "PSMain", "ps_5_0", compile_flags, 0,
-                                   pixel_shader.ReleaseAndGetAddressOf(),
-                                   diagnostics.ReleaseAndGetAddressOf()));
+    ComPtr<IDxcCompiler3> compiler;
+    winrt::check_hresult(
+        DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(compiler.ReleaseAndGetAddressOf())));
+
+    const DxcBuffer source{TriangleShader, std::strlen(TriangleShader), DXC_CP_UTF8};
+    const auto compile_shader = [&](const wchar_t* entry_point,
+                                    const wchar_t* target) -> ComPtr<IDxcBlob> {
+        const wchar_t* arguments[] = {L"-E", entry_point, L"-T", target, L"-Ges", L"-O3"};
+        ComPtr<IDxcResult> result;
+        winrt::check_hresult(compiler->Compile(&source, arguments, 6, nullptr,
+                                               IID_PPV_ARGS(result.ReleaseAndGetAddressOf())));
+        HRESULT status = E_FAIL;
+        winrt::check_hresult(result->GetStatus(&status));
+        winrt::check_hresult(status);
+
+        ComPtr<IDxcBlob> shader;
+        winrt::check_hresult(result->GetOutput(DXC_OUT_OBJECT,
+                                               IID_PPV_ARGS(shader.ReleaseAndGetAddressOf()),
+                                               nullptr));
+        return shader;
+    };
+
+    const ComPtr<IDxcBlob> vertex_shader = compile_shader(L"VSMain", L"vs_6_0");
+    const ComPtr<IDxcBlob> pixel_shader = compile_shader(L"PSMain", L"ps_6_0");
 
     D3D12_ROOT_SIGNATURE_DESC root_description{};
     root_description.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
     ComPtr<ID3DBlob> serialized_root;
-    diagnostics.Reset();
+    ComPtr<ID3DBlob> diagnostics;
     winrt::check_hresult(D3D12SerializeRootSignature(
         &root_description, D3D_ROOT_SIGNATURE_VERSION_1,
         serialized_root.ReleaseAndGetAddressOf(), diagnostics.ReleaseAndGetAddressOf()));

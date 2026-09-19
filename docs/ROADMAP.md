@@ -15,7 +15,8 @@
 - [x] Apresentar um clear D3D12 por swapchain UWP.
 - [x] Implementar triângulo D3D12 com root signature e PSO.
 - [x] Validar o triângulo D3D12 no Xbox Series S em perfil Game.
-- [ ] Substituir o probe DXBC/Shader Model 5 por DXC/DXIL em runtime.
+- [x] Substituir o probe DXBC/Shader Model 5 por DXC/DXIL em runtime.
+- [ ] Validar DXC/DXIL no Xbox Series S em perfil Game.
 - [ ] Medir pressão de memória, suspensão e retomada.
 
 ### Critério de saída

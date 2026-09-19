@@ -12,6 +12,8 @@ Fontes primárias usadas nas decisões iniciais:
 - [Microsoft: visão geral do Windows Device Portal](https://learn.microsoft.com/en-us/windows/advanced-settings/device-portal)
 - [Microsoft: `ApplicationData.LocalFolder`](https://learn.microsoft.com/en-us/uwp/api/windows.storage.applicationdata.localfolder)
 - [Microsoft ATG: amostra DirectX 12 UWP em C++/WinRT](https://github.com/microsoft/Xbox-ATG-Samples/tree/main/UWPSamples/IntroGraphics/SimpleTriangleCppWinRT_UWP12)
+- [Microsoft: DirectX Shader Compiler](https://github.com/microsoft/DirectXShaderCompiler)
+- [Microsoft: requisitos para executar shaders DXIL](https://github.com/microsoft/DirectXShaderCompiler/wiki/Running-Shaders)
 - [Microsoft: Vulkan-on-D3D12 specifications](https://github.com/microsoft/DirectX-Specs/blob/master/d3d/VulkanOn12.md)
 - [Khronos: SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross)
 - [vkd3d-proton: direção D3D12 para Vulkan](https://github.com/HansKristian-Work/vkd3d-proton)

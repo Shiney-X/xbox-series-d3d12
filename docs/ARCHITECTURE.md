@@ -73,10 +73,10 @@ Páginas simultaneamente graváveis e executáveis não fazem parte do desenho.
 
 O host do Gate C cria dispositivo, command queue, swapchain de `CoreWindow`,
 fence, root signature e graphics PSO. Um shader de probe usa `SV_VertexID` para
-desenhar um triângulo sem vertex buffer. Nesta etapa ele é compilado em runtime
-por `D3DCompile` como Shader Model 5/DXBC, reduzindo as dependências do pacote.
-Esse compilador é apenas um degrau de validação do pipeline; o backend usará
-DXC/DXIL e não deve construir abstrações em torno de DXBC.
+desenhar um triângulo sem vertex buffer. Ele é compilado em runtime pelo DXC
+como Shader Model 6/DXIL. `dxcompiler.dll` e o validador `dxil.dll` da versão do
+Windows SDK usada no build são empacotados junto ao MSIX, evitando dependência
+implícita de uma instalação de ferramentas no console.
 
 ## Fronteira futura do renderer
 

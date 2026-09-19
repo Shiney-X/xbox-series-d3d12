@@ -70,7 +70,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\src\phase0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>d3d12.lib;d3dcompiler.lib;dxgi.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxcompiler.lib;dxgi.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
     </Link>
   </ItemDefinitionGroup>
@@ -95,6 +95,16 @@
     <Image Include="Assets\Square150x150Logo.png" />
     <Image Include="Assets\Wide310x150Logo.png" />
     <Image Include="Assets\SplashScreen.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(WindowsSdkDir)Redist\D3D\x64\dxcompiler.dll">
+      <Link>dxcompiler.dll</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </Content>
+    <Content Include="$(WindowsSdkDir)Redist\D3D\x64\dxil.dll">
+      <Link>dxil.dll</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </Content>
   </ItemGroup>
 
   <Target Name="GenerateProbeAssets" BeforeTargets="PrepareForBuild">

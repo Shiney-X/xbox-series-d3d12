@@ -13,7 +13,7 @@ persistência:
 3. transição de página RW para RX e execução de seis bytes de código x86-64;
 4. criação de um dispositivo D3D12 de hardware e consulta de capabilities;
 5. criação de swapchain para `CoreWindow`, root signature, PSO, compilação
-   HLSL Shader Model 5, desenho de um triângulo e `Present`.
+   HLSL Shader Model 6 para DXIL por DXC, desenho de um triângulo e `Present`.
 6. gravação síncrona do relatório no armazenamento local do pacote.
 
 A tela final fica verde somente quando os probes, a apresentação e a gravação
@@ -34,7 +34,7 @@ detalhado sempre deve ser coletado.
 1. Abra a execução mais recente do workflow **Windows probes** no GitHub.
 2. Baixe o artefato `xbox-phase0-uwp-sideload`.
 3. Extraia o ZIP. Entre na pasta
-   `AppPackages/xbox_phase0_uwp_0.1.0.2_x64_Test` e localize o `.msix`, o
+   `AppPackages/xbox_phase0_uwp_0.1.0.3_x64_Test` e localize o `.msix`, o
    certificado `.cer` e o pacote em `Dependencies/x64`.
 
 O certificado é efêmero e serve somente para sideload do build correspondente.
