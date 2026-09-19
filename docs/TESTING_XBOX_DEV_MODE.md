@@ -22,7 +22,8 @@ detalhado sempre deve ser coletado.
 ## Pré-requisitos
 
 - Xbox Series S ativado e iniciado em Dev Mode;
-- um usuário conectado no console;
+- para coleta reproduzível pelo Device Portal, nenhum usuário conectado no
+  console (consulte a observação abaixo);
 - acesso remoto/Device Portal habilitado no Dev Home;
 - PC e Xbox na mesma rede;
 - navegador capaz de abrir o endereço HTTPS mostrado pelo Dev Home.
@@ -77,6 +78,14 @@ privada.
    - data/hora do teste;
    - classificação App/Game;
    - cor exibida ou descrição do crash.
+
+### Armazenamento por usuário
+
+No Xbox Series S testado, o Device Portal não enumerou o `LocalState` do
+processo quando havia um usuário conectado, embora o probe de escrita tivesse
+sucesso. Ao desconectar o usuário, executar novamente e atualizar o File
+Explorer, o arquivo apareceu normalmente. Essa condição afeta a coleta pelo
+portal, não a execução dos probes.
 
 Cada linha é um objeto JSON independente. Um exemplo de sucesso do probe de
 execução é:

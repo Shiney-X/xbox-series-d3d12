@@ -2,10 +2,10 @@
 
 | Capacidade | Windows desktop x64 | Xbox UWP Dev Mode | Xbox GDK/GameCore |
 |---|---:|---:|---:|
-| Execução x86-64 nativa | Sim | A validar | Sim, acesso condicionado |
-| `codeGeneration` | Não requerida | Requerida | Modelo diferente |
-| Dispositivo D3D12 | CI validado | Probe pronto; executar no console | Sim, API específica |
-| Swapchain D3D12 | Não necessária no runner | Host pronto; executar no console | API específica |
+| Execução x86-64 nativa | Sim | Validada no Series S | Sim, acesso condicionado |
+| `codeGeneration` | Não requerida | Validada com página RW→RX | Modelo diferente |
+| Dispositivo D3D12 | CI validado | Validado no `SraKmd_arden` | Sim, API específica |
+| Swapchain D3D12 | Não necessária no runner | `CoreWindow` + `Present` validados | API específica |
 | Vulkan nativo | Dependente do driver | Não | Não é o baseline |
 | Filesystem irrestrito | Sim | Não | APIs GDK |
 | Qt desktop | Sim | Não planejado | Não planejado |

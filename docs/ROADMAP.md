@@ -10,7 +10,7 @@
 - [x] Adicionar template de manifest com `codeGeneration`.
 - [x] Criar host UWP x64 para executar os mesmos probes.
 - [x] Gerar pacote de sideload assinado no CI.
-- [ ] Implantar e executar no Xbox Series S sem debugger.
+- [x] Implantar e executar no Xbox Series S sem debugger.
 - [ ] Implementar aliases e placeholders no probe de memória.
 - [x] Apresentar um clear D3D12 por swapchain UWP.
 - [ ] Implementar triângulo D3D12 e compilação DXC em runtime.
@@ -20,6 +20,11 @@
 
 A fase termina somente quando os resultados brutos do console estiverem
 registrados. Falha irrecuperável de mapeamento ou execução bloqueia o port UWP.
+
+O primeiro resultado bruto em perfil **Game** foi registrado para o Xbox
+Series S com sistema `10.0.26100.9426`; CPU, memória virtual, código executável,
+D3D12, apresentação e persistência passaram. Consulte
+[`docs/results`](results/README.md).
 
 ## Fase 1 — Integração do upstream
 
