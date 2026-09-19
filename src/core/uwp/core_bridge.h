@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <span>
 #include <string>
 
 namespace Core::Uwp {
@@ -20,6 +22,15 @@ struct BridgeStatus {
     [[nodiscard]] std::string SerializeDetails() const;
 };
 
+struct GameMetadata {
+    bool valid{};
+    std::string title;
+    std::string title_id;
+    std::string app_version;
+    std::string error;
+};
+
 [[nodiscard]] BridgeStatus InitializeBridge() noexcept;
+[[nodiscard]] GameMetadata ParseParamSfo(std::span<const std::uint8_t> bytes) noexcept;
 
 } // namespace Core::Uwp
