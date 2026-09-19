@@ -41,7 +41,7 @@ Consulte [`docs/results`](results/README.md).
 - [x] Definir estratégia de importação preservando histórico Git.
 - [x] Registrar revisão upstream de referência.
 - [x] Integrar `v.0.18.0` na raiz e resolver colisões da Fase 0.
-- [ ] Obter build Windows desktop sem regressões.
+- [x] Obter build Windows desktop sem regressões.
 - [ ] Isolar frontend/UI desktop do host UWP.
 
 ## Fase 2 — Desacoplamento gráfico
