@@ -28,8 +28,9 @@ menos um falhou. O resultado detalhado sempre deve ser coletado.
 
 1. Abra a execução mais recente do workflow **Windows probes** no GitHub.
 2. Baixe o artefato `xbox-phase0-uwp-sideload`.
-3. Extraia o ZIP. Localize o `.appx`, o arquivo
-   `xbox-series-d3d12-dev.cer` e eventuais pacotes em `Dependencies/x64`.
+3. Extraia o ZIP. Entre na pasta
+   `AppPackages/xbox_phase0_uwp_0.1.0.0_x64_Test` e localize o `.msix`, o
+   certificado `.cer` e o pacote em `Dependencies/x64`.
 
 O certificado é efêmero e serve somente para sideload do build correspondente.
 Não instale nem distribua um arquivo `.pfx`; o workflow não publica a chave
@@ -40,10 +41,11 @@ privada.
 1. No PC, abra o endereço do Device Portal exibido no Dev Home e autentique.
 2. Abra **Home** ou **Apps manager** e escolha a opção para adicionar/implantar
    um aplicativo.
-3. Selecione o arquivo `.appx` como pacote principal.
+3. Selecione o arquivo `.msix` como pacote principal.
 4. Se o portal solicitar um certificado, selecione
    `xbox-series-d3d12-dev.cer`.
-5. Adicione todos os `.appx` presentes em `Dependencies/x64`, se existirem.
+5. Adicione `Dependencies/x64/Microsoft.VCLibs.x64.14.00.appx` como
+   dependência.
 6. Instale o pacote e aguarde a confirmação.
 7. No Dev Home, configure o aplicativo como **Game** quando essa opção estiver
    disponível; isso evita medir o perfil de recursos de um aplicativo comum.
