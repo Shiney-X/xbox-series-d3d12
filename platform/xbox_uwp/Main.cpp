@@ -161,7 +161,7 @@ ProbeResult SaveReport(const std::vector<ProbeResult> &results) noexcept {
 }
 
 std::uint32_t
-WriteCoreBridgeReport(const Core::Uwp::BridgeStatus &status) noexcept {
+WriteCoreBridgeReport(const ::Core::Uwp::BridgeStatus &status) noexcept {
   try {
     const StorageFolder folder = ApplicationData::Current().LocalFolder();
     const std::wstring path =
@@ -206,7 +206,7 @@ public:
     window.Closed([this](const auto &, const auto &) { exit_ = true; });
     window.KeyDown({this, &ViewProvider::OnKeyDown});
     session_id_ = CreateSessionId();
-    bridge_status_ = Core::Uwp::InitializeBridge();
+    bridge_status_ = ::Core::Uwp::InitializeBridge();
     results_ = XboxSeriesD3D12::Phase0::RunAllProbes();
     const std::uint32_t bridge_report_error =
         WriteCoreBridgeReport(bridge_status_);
@@ -401,7 +401,7 @@ private:
   bool exit_{};
   std::string session_id_;
   std::vector<ProbeResult> results_;
-  Core::Uwp::BridgeStatus bridge_status_{};
+  ::Core::Uwp::BridgeStatus bridge_status_{};
   XboxShellState shell_state_{};
   std::unique_ptr<D3D12StatusRenderer> renderer_;
 };
