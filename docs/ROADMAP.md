@@ -38,11 +38,29 @@ Consulte [`docs/results`](results/README.md).
 
 ## Fase 1 — Integração do upstream
 
+**Status: integração base concluída; shell Xbox em validação.**
+
 - [x] Definir estratégia de importação preservando histórico Git.
 - [x] Registrar revisão upstream de referência.
 - [x] Integrar `v.0.18.0` na raiz e resolver colisões da Fase 0.
 - [x] Obter build Windows desktop sem regressões.
 - [x] Isolar frontend/UI desktop do host UWP.
+
+### Fase 1B — Interface inicial no Xbox
+
+- [x] Criar uma bridge UWP compilada contra tipos reais do core upstream.
+- [x] Substituir a tela do triângulo por um shell D3D12 nativo.
+- [x] Adicionar navegação por direcional, A e B.
+- [x] Exibir seções Jogos, Configurações e Diagnósticos.
+- [x] Persistir o resultado da bridge em `LocalState/phase1-core.jsonl`.
+- [ ] Validar desenho, navegação e retomada no Xbox Series S em perfil Game.
+- [ ] Implementar seletor de pasta pela API UWP e token persistente.
+- [ ] Enumerar uma biblioteca real a partir da pasta escolhida.
+
+Nesta etapa, Jogos e Configurações são telas funcionais de navegação,
+mas ainda não importam conteúdo nem iniciam títulos. A bridge inicial prova
+que o mesmo MSIX compila e executa código da árvore upstream; ela não equivale
+a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 

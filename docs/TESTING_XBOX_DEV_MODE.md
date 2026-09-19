@@ -1,12 +1,12 @@
-# Teste no Xbox Series S Dev Mode
+# Teste da interface no Xbox Series S Dev Mode
 
 Este roteiro valida o sandbox real do Xbox. Um resultado obtido no Windows
 desktop não substitui esta execução.
 
 ## O que o pacote mede
 
-O aplicativo executa seis probes, uma apresentação e duas verificações de
-persistência:
+O aplicativo executa os probes da Fase 0, valida uma bridge compilada contra o
+core upstream e apresenta a interface inicial:
 
 1. arquitetura x64 e políticas de mitigação do processo;
 2. reserva, commit, proteção e realocação no mesmo endereço virtual;
@@ -17,13 +17,16 @@ persistência:
 6. leitura do limite real do sandbox e alocação controlada de no máximo 5%
    desse limite, limitada a 256 MiB e a um quarto da memória ainda disponível;
 7. criação de swapchain para `CoreWindow`, root signature, PSO, compilação
-   HLSL Shader Model 6 para DXIL por DXC, desenho de um triângulo e `Present`.
-8. gravação síncrona do relatório e de um journal do ciclo de vida no
+   HLSL Shader Model 6 para DXIL por DXC e desenho do shell por D3D12;
+8. validação de tipos endian e do ABI de `PSFHeader`/`PSFRawEntry` vindos do
+   core shadPS4 `v0.18.0` no mesmo executável UWP;
+9. navegação entre Jogos, Configurações e Diagnósticos pelo controle;
+10. gravação síncrona dos relatórios e de um journal do ciclo de vida no
    armazenamento local do pacote.
 
-A tela final fica verde somente quando os probes, a apresentação e a gravação
-passam. Vermelho indica falha em pelo menos uma dessas etapas. O resultado
-detalhado sempre deve ser coletado.
+O indicador **CORE LINKED** confirma que a bridge foi inicializada. O rodapé
+mostra **SYSTEM PROBES PASS** somente quando os probes, a apresentação e a
+gravação passam. O resultado detalhado sempre deve ser coletado.
 
 ## Pré-requisitos
 
@@ -36,11 +39,11 @@ detalhado sempre deve ser coletado.
 
 ## Obter o pacote
 
-1. Abra a execução mais recente do workflow **Windows probes** no GitHub.
-2. Baixe o artefato `xbox-phase0-uwp-sideload`.
+1. Abra a execução mais recente do workflow **Xbox UWP shell** no GitHub.
+2. Baixe o artefato `xbox-shell-uwp-sideload`.
 3. Extraia o ZIP. Entre na pasta
-   `AppPackages/xbox_phase0_uwp_0.1.0.8_x64_Test` e localize o `.msix`, o
-   certificado `.cer` e o pacote em `Dependencies/x64`.
+   `AppPackages` e localize o `.msix`, o certificado `.cer` e o pacote em
+   `Dependencies/x64`.
 
 O certificado é efêmero e serve somente para sideload do build correspondente.
 Não instale nem distribua um arquivo `.pfx`; o workflow não publica a chave
@@ -60,15 +63,23 @@ privada.
 7. No Dev Home, configure o aplicativo como **Game** quando essa opção estiver
    disponível; isso evita medir o perfil de recursos de um aplicativo comum.
 
+Como o certificado de teste muda a cada build, desinstale a versão anterior se
+o portal rejeitar a atualização por conflito de assinatura. Configure o novo
+pacote como **Game antes da primeira abertura**.
+
 ## Executar e interpretar
 
-1. Inicie **xbox-series-d3d12 probes** pelo Dev Home, sem debugger conectado.
+1. Inicie **shadPS4 Xbox Shell** pelo Dev Home, sem debugger conectado.
 2. Aguarde a tela estabilizar:
-   - triângulo colorido sobre fundo escuro: CPU/memória/D3D12, PSO, draw,
-     apresentação e persistência passaram;
-   - vermelho: ao menos um probe ou a gravação do relatório falhou;
+   - menu com três cartões e `CORE LINKED`: shell e bridge foram iniciados;
+   - `SYSTEM PROBES PASS`: CPU/memória/D3D12, apresentação e persistência
+     passaram;
+   - `CORE FAILED` ou `SYSTEM PROBES FAIL`: colete os relatórios;
    - retorno imediato ao Dev Home: falha de ativação ou crash antes do render.
-3. Anote a versão do sistema operacional exibida no Dev Home e se o app foi
+3. Use esquerda/direita no direcional para mover o foco entre os cartões.
+4. Pressione **A** em cada cartão e confirme a abertura da página.
+5. Pressione **B** e confirme o retorno ao início.
+6. Anote a versão do sistema operacional exibida no Dev Home e se o app foi
    classificado como App ou Game.
 
 ## Testar suspensão e retomada
@@ -76,11 +87,12 @@ privada.
 Faça esta sequência sem usuário conectado, para que os arquivos permaneçam
 visíveis no Device Portal:
 
-1. Inicie o probe e confirme o triângulo.
+1. Inicie o aplicativo e confirme a interface.
 2. Volte ao Dev Home, deixando o aplicativo em segundo plano.
 3. Aguarde dez segundos.
-4. Abra novamente **xbox-series-d3d12 probes**.
-5. Confirme que o triângulo reaparece sem tela vermelha ou encerramento.
+4. Abra novamente **shadPS4 Xbox Shell**.
+5. Confirme que a interface reaparece, aceita navegação e mantém os indicadores
+   de sucesso.
 6. Repita o ciclo uma segunda vez para verificar que o comportamento é estável.
 
 O dispositivo D3D12 `SraKmd_arden` medido não expôs `IDXGIDevice3`. O probe
@@ -98,9 +110,11 @@ resultado deve ser preservado; não é equivalente a uma retomada aprovada.
    `ShineyX.xbox-series-d3d12_*`.
 3. Entre em `LocalState` e baixe `phase0-results.jsonl`.
 4. Baixe também `phase0-lifecycle.jsonl`.
-5. Se `LocalState` estiver vazio, procure o relatório em `LocalCache`. Essa
-   é a rota de contingência usada quando o perfil Game recusa a primeira gravação.
-6. Não edite os arquivos. Anexe-os a uma issue junto com:
+5. Baixe `phase1-core.jsonl`.
+6. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
+   Essa é a rota de contingência usada quando o perfil Game recusa a primeira
+   gravação.
+7. Não edite os arquivos. Anexe-os a uma issue junto com:
    - modelo do console;
    - versão do sistema operacional;
    - data/hora do teste;
@@ -126,6 +140,12 @@ O novo probe de aliases deve produzir uma linha equivalente a:
 
 ```json
 {"probe":"memory-aliases","passed":true,"win32_error":0,"details":"view_size=65536;reservation_size=131072;fixed_views=1;forward_alias=1;reverse_alias=1"}
+```
+
+A bridge do core deve produzir em `phase1-core.jsonl`:
+
+```json
+{"component":"shadps4-core-uwp","passed":true,"details":"upstream=v0.18.0;initialized=1;psf_abi=1;endian=1"}
 ```
 
 O probe de pressão registra o limite atual, o limite esperado pelo Xbox, uso
@@ -157,8 +177,6 @@ apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 
 ## Critério para avançar
 
-Não iniciar a integração do upstream shadPS4 antes de obter o arquivo bruto do
-Series S. Falha em `executable-memory`, `virtual-memory`, `memory-aliases` ou
-`memory-pressure` exige uma decisão de arquitetura; ausência de `resume` exige
-análise do ciclo de vida; falha apenas em
-`d3d12-device`/`uwp-presentation` direciona o trabalho ao host gráfico.
+Avançar para o seletor de pastas somente depois de confirmar no Series S:
+interface visível, três cartões navegáveis, A/B funcionais, retomada estável,
+`SYSTEM PROBES PASS` e `passed:true` em `phase1-core.jsonl`.

@@ -6,8 +6,10 @@
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Storage.h>
+#include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.Core.h>
 
+#include "core/uwp/core_bridge.h"
 #include "d3d12_status_renderer.h"
 #include "memory_pressure_probe.h"
 #include "probes.h"
@@ -24,6 +26,7 @@ using namespace winrt::Windows::ApplicationModel;
 using namespace winrt::Windows::ApplicationModel::Activation;
 using namespace winrt::Windows::ApplicationModel::Core;
 using namespace winrt::Windows::Storage;
+using namespace winrt::Windows::System;
 using namespace winrt::Windows::UI::Core;
 using XboxSeriesD3D12::Phase0::ProbeResult;
 
@@ -157,6 +160,40 @@ ProbeResult SaveReport(const std::vector<ProbeResult> &results) noexcept {
               ";local_cache_error=" + std::to_string(local_cache_error)};
 }
 
+std::uint32_t
+WriteCoreBridgeReport(const ::Core::Uwp::BridgeStatus &status) noexcept {
+  try {
+    const StorageFolder folder = ApplicationData::Current().LocalFolder();
+    const std::wstring path =
+        std::wstring(folder.Path().c_str()) + L"\\phase1-core.jsonl";
+    const HANDLE file = CreateFile2FromAppW(
+        path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+      return GetLastError();
+    }
+
+    std::ostringstream output;
+    output << "{\"component\":\"shadps4-core-uwp\",\"passed\":"
+           << (status.AllPassed() ? "true" : "false") << ",\"details\":\""
+           << status.SerializeDetails() << "\"}\n";
+    const std::string serialized = output.str();
+    DWORD written = 0;
+    const bool succeeded = WriteFile(file, serialized.data(),
+                                     static_cast<DWORD>(serialized.size()),
+                                     &written, nullptr) != FALSE;
+    const std::uint32_t error =
+        succeeded && written == serialized.size()
+            ? ERROR_SUCCESS
+            : (succeeded ? ERROR_WRITE_FAULT : GetLastError());
+    CloseHandle(file);
+    return error;
+  } catch (const hresult_error &error) {
+    return static_cast<std::uint32_t>(error.code().value);
+  } catch (...) {
+    return ERROR_GEN_FAILURE;
+  }
+}
+
 class ViewProvider : public implements<ViewProvider, IFrameworkView> {
 public:
   void Initialize(const CoreApplicationView &application_view) {
@@ -167,8 +204,18 @@ public:
 
   void SetWindow(const CoreWindow &window) {
     window.Closed([this](const auto &, const auto &) { exit_ = true; });
+    window.KeyDown({this, &ViewProvider::OnKeyDown});
     session_id_ = CreateSessionId();
+    bridge_status_ = ::Core::Uwp::InitializeBridge();
     results_ = XboxSeriesD3D12::Phase0::RunAllProbes();
+    const std::uint32_t bridge_report_error =
+        WriteCoreBridgeReport(bridge_status_);
+    results_.push_back(
+        {"shadps4-core-uwp",
+         bridge_status_.AllPassed() && bridge_report_error == ERROR_SUCCESS,
+         bridge_report_error,
+         bridge_status_.SerializeDetails() +
+             ";report=LocalState/phase1-core.jsonl"});
     const std::uint32_t journal_error =
         AppendLifecycleEvent(session_id_, "launch", "process started");
     results_.push_back(
@@ -183,30 +230,27 @@ public:
       const auto bounds = window.Bounds();
       renderer_->Initialize(static_cast<::IUnknown *>(get_abi(window)),
                             bounds.Width, bounds.Height);
-      renderer_->Render(passed);
+      shell_state_.core_ready = bridge_status_.AllPassed();
+      shell_state_.probes_passed = passed;
+      shell_state_.upstream_version = bridge_status_.upstream_version;
+      renderer_->Render(shell_state_);
       results_.push_back(
           {"uwp-presentation", true, 0,
-           "CoreWindow D3D12 triangle presented;shader_compiler=DXC;"
+           "CoreWindow D3D12 Xbox Shell presented;shader_compiler=DXC;"
            "dxc_api=IDxcCompiler;shader_model=6_0;shader_format=DXIL;"
-           "draw_vertices=3"});
+           "input=CoreWindow.Gamepad;core_bridge=linked"});
       presentation_succeeded = true;
     } catch (const hresult_error &error) {
       results_.push_back({"uwp-presentation", false,
                           static_cast<std::uint32_t>(error.code().value),
                           to_string(error.message())});
-      if (renderer_) {
-        try {
-          renderer_->Render(false);
-        } catch (...) {
-          // The JSON report remains the authoritative failure channel.
-        }
-      }
     }
 
     PersistReport();
     passed = XboxSeriesD3D12::Phase0::AllPassed(results_);
     if (presentation_succeeded) {
-      renderer_->Render(passed);
+      shell_state_.probes_passed = passed;
+      renderer_->Render(shell_state_);
     }
   }
 
@@ -224,6 +268,40 @@ public:
   void Uninitialize() { renderer_.reset(); }
 
 private:
+  void OnKeyDown(const CoreWindow &, const KeyEventArgs &args) noexcept {
+    try {
+      const VirtualKey key = args.VirtualKey();
+      bool changed = false;
+      if (shell_state_.page == XboxShellPage::Home) {
+        if (key == VirtualKey::GamepadDPadLeft || key == VirtualKey::Left) {
+          shell_state_.selected_item = (shell_state_.selected_item + 2U) % 3U;
+          changed = true;
+        } else if (key == VirtualKey::GamepadDPadRight ||
+                   key == VirtualKey::Right) {
+          shell_state_.selected_item = (shell_state_.selected_item + 1U) % 3U;
+          changed = true;
+        } else if (key == VirtualKey::GamepadA || key == VirtualKey::Enter) {
+          constexpr XboxShellPage pages[]{XboxShellPage::Games,
+                                          XboxShellPage::Settings,
+                                          XboxShellPage::Diagnostics};
+          shell_state_.page = pages[shell_state_.selected_item];
+          changed = true;
+        }
+      } else if (key == VirtualKey::GamepadB || key == VirtualKey::Escape) {
+        shell_state_.page = XboxShellPage::Home;
+        changed = true;
+      }
+
+      if (changed && renderer_) {
+        renderer_->Render(shell_state_);
+        AppendLifecycleEvent(session_id_, "navigation",
+                             "Xbox Shell navigation event presented");
+      }
+    } catch (...) {
+      // Navigation failure must not terminate the UWP event loop.
+    }
+  }
+
   void UpsertResult(ProbeResult result) {
     const auto existing = std::find_if(results_.begin(), results_.end(),
                                        [&result](const ProbeResult &candidate) {
@@ -289,16 +367,16 @@ private:
     const std::uint32_t journal_error =
         AppendLifecycleEvent(session_id_, "resume", "resuming event observed");
     try {
-      const bool passed = XboxSeriesD3D12::Phase0::AllPassed(results_);
       if (!renderer_) {
         UpsertResult({"lifecycle-resume", false, ERROR_INVALID_HANDLE,
                       "resuming event observed without an active renderer"});
       } else {
-        renderer_->Render(passed);
-        UpsertResult(
-            {"lifecycle-resume", journal_error == ERROR_SUCCESS, journal_error,
-             "resuming event observed;D3D12 triangle presented again;session=" +
-                 session_id_});
+        renderer_->Render(shell_state_);
+        UpsertResult({"lifecycle-resume", journal_error == ERROR_SUCCESS,
+                      journal_error,
+                      "resuming event observed;D3D12 Xbox Shell presented "
+                      "again;session=" +
+                          session_id_});
       }
     } catch (const hresult_error &error) {
       UpsertResult({"lifecycle-resume", false,
@@ -323,6 +401,8 @@ private:
   bool exit_{};
   std::string session_id_;
   std::vector<ProbeResult> results_;
+  ::Core::Uwp::BridgeStatus bridge_status_{};
+  XboxShellState shell_state_{};
   std::unique_ptr<D3D12StatusRenderer> renderer_;
 };
 

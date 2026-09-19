@@ -5,7 +5,8 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 
 > [!WARNING]
 > A Fase 0 de viabilidade foi concluída no Xbox Series S. O código upstream está
-> integrado, mas este port ainda não executa jogos no Xbox.
+> integrado e a primeira interface UWP nativa está em validação, mas este port
+> ainda não executa jogos no Xbox.
 
 ## Estado atual
 
@@ -15,6 +16,8 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] Histórico do shadPS4 `v.0.18.0` integrado na raiz.
 - [x] Build desktop Windows upstream validado sem regressões.
 - [x] Frontend desktop isolado do futuro host UWP por contrato de janela injetável.
+- [x] Shell inicial UWP/D3D12 e bridge verificável com o core upstream.
+- [ ] Validar navegação da interface no Xbox Series S em perfil Game.
 - [ ] Backend D3D12 integrado ao video core.
 
 ## Baseline upstream
@@ -51,10 +54,13 @@ out\build\windows-msvc\Debug\xbox_phase0_probe.exe --all
 O preset `windows-msvc` ativa `XBOX_D3D12_PHASE0_ONLY`; portanto, essa validação
 não configura nem compila as dependências completas do emulador.
 
-## Testar no Xbox Series S
+## Testar a interface no Xbox Series S
 
-O workflow **Windows probes** produz o artefato temporário
-`xbox-phase0-uwp-sideload`, com o pacote x64 assinado e o certificado público.
+O workflow **Xbox UWP shell** produz o artefato temporário
+`xbox-shell-uwp-sideload`, com o pacote x64 assinado e o certificado público.
+Essa interface é renderizada diretamente por D3D12 no host UWP do console;
+não é um mock desktop. O direcional alterna entre Jogos, Configurações e
+Diagnósticos, **A** abre uma seção e **B** retorna.
 O roteiro completo está em
 [Teste no Xbox Dev Mode](docs/TESTING_XBOX_DEV_MODE.md).
 
@@ -70,6 +76,7 @@ O roteiro completo está em
 - [ADR-0002: backend D3D12 nativo](docs/adr/0002-native-d3d12-backend.md)
 - [ADR-0003: integração do upstream com histórico](docs/adr/0003-upstream-history-integration.md)
 - [ADR-0004: fronteira de janela injetada pelo host](docs/adr/0004-host-window-boundary.md)
+- [ADR-0005: bridge do core e shell UWP](docs/adr/0005-uwp-core-bridge-and-shell.md)
 
 ## Escopo legal e licença
 
