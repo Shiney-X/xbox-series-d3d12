@@ -67,6 +67,11 @@ Como o certificado de teste muda a cada build, desinstale a versão anterior se
 o portal rejeitar a atualização por conflito de assinatura. Configure o novo
 pacote como **Game antes da primeira abertura**.
 
+Depois de cada reinstalação, confirme novamente a classificação no Dev Home.
+Um limite de `1073741824` bytes no probe `memory-pressure` indica que o processo
+recebeu o perfil App de 1 GiB; o perfil Game validado anteriormente reportou
+`5368709120` bytes (5 GiB).
+
 ## Executar e interpretar
 
 1. Inicie **shadPS4 Xbox Shell** pelo Dev Home, sem debugger conectado.

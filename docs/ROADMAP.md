@@ -66,7 +66,7 @@ console; navegador de diretórios em desenvolvimento.**
 - [x] Persistir diagnóstico em `LocalState/phase1-library.jsonl`.
 - [x] Validar `KnownFolders.RemovableDevices` no Xbox Series S.
 - [x] Implementar navegador próprio para as pastas do USB.
-- [ ] Validar navegação e seleção de pasta no Xbox Series S.
+- [x] Validar navegação e seleção de pasta no Xbox Series S.
 - [ ] Enumerar uma biblioteca real a partir da pasta escolhida.
 
 Nesta etapa, Jogos detecta o primeiro dispositivo removível e navega por suas
