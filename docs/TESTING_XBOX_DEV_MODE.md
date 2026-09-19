@@ -81,7 +81,7 @@ execução é:
 ## Build local opcional
 
 Em um PC Windows com Visual Studio 2022, workload C++ para UWP e Windows SDK
-10.0.19041.0, execute:
+10.0.26100.0, execute:
 
 ```powershell
 .\scripts\windows\Build-UwpPackage.ps1
@@ -91,6 +91,9 @@ O script cria um certificado de sideload temporário no repositório de
 certificados do usuário, compila o pacote, exporta apenas o `.cer` público e
 remove o certificado com chave privada após o build. A saída fica em
 `out\package\xbox-uwp`.
+
+O pacote mantém `10.0.19041.0` como versão mínima do alvo; o SDK 26100 é usado
+apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 
 ## Critério para avançar
 
