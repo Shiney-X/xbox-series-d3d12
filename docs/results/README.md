@@ -12,6 +12,19 @@
 
 Arquivo bruto: [`xbox-series-s-game-10.0.26100.9426.jsonl`](xbox-series-s-game-10.0.26100.9426.jsonl).
 
+## Xbox Series S — triângulo D3D12
+
+- sistema operacional: `10.0.26100.9426`;
+- classificação do pacote: **Game**;
+- pacote: `0.1.0.2`;
+- shader de probe: HLSL Shader Model 5 compilado em runtime por `D3DCompile`;
+- chamada de desenho: `DrawInstanced` com três vértices;
+- resultado: seis de seis probes aprovados;
+- SHA-256 do JSONL: `07da540e6ef75480ba3361bc101ac423a4cf927b6d35b60db225f9b15519348d`.
+
+Arquivo bruto:
+[`xbox-series-s-game-triangle-10.0.26100.9426.jsonl`](xbox-series-s-game-triangle-10.0.26100.9426.jsonl).
+
 O valor de 128 MiB retornado como memória de vídeo dedicada é a visão do
 DXGI dentro do sandbox UWP. Ele não representa a memória física total do
 console nem deve ser usado como budget de residency.
