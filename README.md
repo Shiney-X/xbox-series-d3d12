@@ -14,7 +14,7 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] D3D12, DXC/DXIL, apresentação e suspensão/retomada validados no Series S.
 - [x] Histórico do shadPS4 `v.0.18.0` integrado na raiz.
 - [x] Build desktop Windows upstream validado sem regressões.
-- [ ] Frontend desktop isolado do futuro host UWP.
+- [x] Frontend desktop isolado do futuro host UWP por contrato de janela injetável.
 - [ ] Backend D3D12 integrado ao video core.
 
 ## Baseline upstream

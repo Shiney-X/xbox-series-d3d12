@@ -47,3 +47,9 @@ Evidências: [Build and Release](https://github.com/Shiney-X/xbox-series-d3d12/a
 e [Windows probes](https://github.com/Shiney-X/xbox-series-d3d12/actions/runs/35467148585).
 O job desktop macOS da mesma execução falhou e não integra o critério de
 saída Windows/Xbox desta fase; os testes C++ macOS passaram.
+
+A fronteira de host foi validada posteriormente na execução
+[Build and Release](https://github.com/Shiney-X/xbox-series-d3d12/actions/runs/35470008899):
+os testes C++ passaram em Windows, Linux e macOS, e o executável SDL Windows foi
+compilado e empacotado. Os probes e o pacote UWP permaneceram verdes na execução
+[Windows probes](https://github.com/Shiney-X/xbox-series-d3d12/actions/runs/35470008934).
