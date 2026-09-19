@@ -202,7 +202,7 @@ ProbeResult ProbeExecutableMemory() {
     return {
         .name = "executable-memory",
         .passed = !exception_caught && return_value == 42,
-        .error = exception_caught ? ERROR_FUNCTION_FAILED : ERROR_SUCCESS,
+        .error = exception_caught ? static_cast<DWORD>(ERROR_FUNCTION_FAILED) : ERROR_SUCCESS,
         .details = details.str(),
     };
 #endif
