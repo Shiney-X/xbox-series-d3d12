@@ -1,4 +1,5 @@
 /out/
+/platform/xbox_uwp/Assets/
 /.vs/
 /CMakeUserPresets.json
 *.user

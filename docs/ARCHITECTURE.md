@@ -44,6 +44,11 @@ flowchart LR
 
 ## Gates de viabilidade
 
+Os probes são implementados em `src/phase0` sem dependência de console ou UI.
+Dois hosts consomem a mesma biblioteca: o runner Win32 usado pelo CI e o host
+UWP x64 instalado no Xbox. Isso evita comparar implementações diferentes ao
+investigar divergências entre desktop e console.
+
 ### Gate A: memória virtual
 
 - reserva e commit de grandes intervalos;
@@ -65,6 +70,11 @@ Páginas simultaneamente graváveis e executáveis não fazem parte do desenho.
 - root signature e PSO;
 - apresentação sem debugger;
 - DRED e coleta de logs em falha.
+
+O primeiro degrau do Gate C já cria um dispositivo, uma command queue e uma
+swapchain de `CoreWindow`, faz um clear verde/vermelho e apresenta. Ele ainda
+não contém PSO, shaders ou sincronização de múltiplos frames; esses itens
+pertencem ao probe seguinte.
 
 ## Fronteira futura do renderer
 

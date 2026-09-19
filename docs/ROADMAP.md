@@ -6,10 +6,13 @@
 - [x] Implementar probe Win32 de capabilities.
 - [x] Implementar probe Win32 de memória virtual.
 - [x] Implementar probe Win32 de memória executável.
+- [x] Implementar probe de dispositivo D3D12.
 - [x] Adicionar template de manifest com `codeGeneration`.
-- [ ] Criar host UWP x64 para executar os mesmos probes.
+- [x] Criar host UWP x64 para executar os mesmos probes.
+- [x] Gerar pacote de sideload assinado no CI.
 - [ ] Implantar e executar no Xbox Series S sem debugger.
 - [ ] Implementar aliases e placeholders no probe de memória.
+- [x] Apresentar um clear D3D12 por swapchain UWP.
 - [ ] Implementar triângulo D3D12 e compilação DXC em runtime.
 - [ ] Medir pressão de memória, suspensão e retomada.
 

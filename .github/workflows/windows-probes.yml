@@ -24,3 +24,22 @@ jobs:
 
       - name: Run probes
         run: ctest --preset windows-msvc-debug
+
+  build-uwp-package:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build signed UWP sideload package
+        shell: powershell
+        run: .\scripts\windows\Build-UwpPackage.ps1
+
+      - name: Upload Xbox Dev Mode package
+        uses: actions/upload-artifact@v4
+        with:
+          name: xbox-phase0-uwp-sideload
+          path: out/package/xbox-uwp/
+          if-no-files-found: error
+          retention-days: 14

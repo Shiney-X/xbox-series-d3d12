@@ -1,0 +1,58 @@
+name: Xbox Phase 0 probe result
+description: Registre uma execução do pacote no Xbox Series S Dev Mode.
+title: "[Xbox probe] "
+labels:
+  - xbox-probe
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Execute o pacote sem debugger e copie o conteúdo bruto de `phase0-results.jsonl`.
+        Não inclua credenciais ou o endereço IP do console.
+  - type: input
+    id: console
+    attributes:
+      label: Console
+      placeholder: Xbox Series S
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: Versão do sistema operacional
+    validations:
+      required: true
+  - type: dropdown
+    id: resource-profile
+    attributes:
+      label: Classificação no Dev Home
+      options:
+        - Game
+        - App
+        - Não identificado
+    validations:
+      required: true
+  - type: dropdown
+    id: screen
+    attributes:
+      label: Resultado visual
+      options:
+        - Verde
+        - Vermelho
+        - Crash/retorno ao Dev Home
+        - Sem imagem
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: phase0-results.jsonl
+      description: Cole todas as linhas sem alterar o conteúdo.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Observações
+      description: Inclua passos adicionais ou mensagens do Device Portal.

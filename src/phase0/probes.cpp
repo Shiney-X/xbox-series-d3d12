@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include <Windows.h>
+#include "probes.h"
 
+#include <Windows.h>
+#include <d3d12.h>
+#include <dxgi1_4.h>
+#include <wrl/client.h>
+
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <sstream>
-#include <string>
 #include <string_view>
-#include <vector>
+#include <utility>
 
+namespace XboxSeriesD3D12::Phase0 {
 namespace {
 
-struct ProbeResult {
-    std::string name;
-    bool passed{};
-    DWORD error{};
-    std::string details;
-};
+using Microsoft::WRL::ComPtr;
 
 std::string EscapeJson(std::string_view input) {
     std::string output;
@@ -47,10 +47,21 @@ std::string EscapeJson(std::string_view input) {
     return output;
 }
 
-void PrintResult(const ProbeResult& result) {
-    std::cout << "{\"probe\":\"" << EscapeJson(result.name) << "\",\"passed\":"
-              << (result.passed ? "true" : "false") << ",\"win32_error\":" << result.error
-              << ",\"details\":\"" << EscapeJson(result.details) << "\"}\n";
+std::string WideToUtf8(std::wstring_view input) {
+    if (input.empty()) {
+        return {};
+    }
+
+    const int size = WideCharToMultiByte(CP_UTF8, 0, input.data(), static_cast<int>(input.size()),
+                                         nullptr, 0, nullptr, nullptr);
+    if (size <= 0) {
+        return "<conversion-failed>";
+    }
+
+    std::string output(static_cast<std::size_t>(size), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, input.data(), static_cast<int>(input.size()), output.data(),
+                        size, nullptr, nullptr);
+    return output;
 }
 
 #if defined(_MSC_VER)
@@ -64,6 +75,8 @@ int InvokeGeneratedFunction(void* address, bool& exception_caught) {
     }
 }
 #endif
+
+} // namespace
 
 ProbeResult ProbeCapabilities() {
     SYSTEM_INFO system_info{};
@@ -208,31 +221,108 @@ ProbeResult ProbeExecutableMemory() {
 #endif
 }
 
-} // namespace
-
-int main(int argc, char** argv) {
-    const std::string_view command = argc > 1 ? argv[1] : "--all";
-    std::vector<ProbeResult> results;
-
-    if (command == "--all" || command == "--capabilities") {
-        results.push_back(ProbeCapabilities());
-    }
-    if (command == "--all" || command == "--memory") {
-        results.push_back(ProbeVirtualMemory());
-    }
-    if (command == "--all" || command == "--execution") {
-        results.push_back(ProbeExecutableMemory());
+ProbeResult ProbeD3D12Device() {
+    ComPtr<IDXGIFactory4> factory;
+    HRESULT result = CreateDXGIFactory1(IID_PPV_ARGS(factory.ReleaseAndGetAddressOf()));
+    if (FAILED(result)) {
+        return {"d3d12-device", false, static_cast<std::uint32_t>(result),
+                "CreateDXGIFactory1 failed"};
     }
 
-    if (results.empty()) {
-        std::cerr << "usage: xbox_phase0_probe [--all|--capabilities|--memory|--execution]\n";
-        return 2;
+    ComPtr<IDXGIAdapter1> selected_adapter;
+    DXGI_ADAPTER_DESC1 selected_description{};
+    for (UINT index = 0;; ++index) {
+        ComPtr<IDXGIAdapter1> adapter;
+        result = factory->EnumAdapters1(index, adapter.ReleaseAndGetAddressOf());
+        if (result == DXGI_ERROR_NOT_FOUND) {
+            break;
+        }
+        if (FAILED(result)) {
+            return {"d3d12-device", false, static_cast<std::uint32_t>(result),
+                    "EnumAdapters1 failed"};
+        }
+
+        DXGI_ADAPTER_DESC1 description{};
+        adapter->GetDesc1(&description);
+        if ((description.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0) {
+            continue;
+        }
+        if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                                        __uuidof(ID3D12Device), nullptr))) {
+            selected_adapter = std::move(adapter);
+            selected_description = description;
+            break;
+        }
     }
 
-    bool all_passed = true;
-    for (const auto& result : results) {
-        PrintResult(result);
-        all_passed &= result.passed;
+    if (!selected_adapter) {
+        return {"d3d12-device", false, static_cast<std::uint32_t>(DXGI_ERROR_UNSUPPORTED),
+                "no hardware D3D12 adapter"};
     }
-    return all_passed ? 0 : 1;
+
+    ComPtr<ID3D12Device> device;
+    result = D3D12CreateDevice(selected_adapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                               IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
+    if (FAILED(result)) {
+        return {"d3d12-device", false, static_cast<std::uint32_t>(result),
+                "D3D12CreateDevice failed"};
+    }
+
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
+    const HRESULT options_result =
+        device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options));
+
+    D3D12_FEATURE_DATA_SHADER_MODEL shader_model{D3D_SHADER_MODEL_6_0};
+    const HRESULT shader_model_result = device->CheckFeatureSupport(
+        D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
+
+    std::ostringstream details;
+    details << "adapter=" << WideToUtf8(selected_description.Description)
+            << ";vendor_id=" << selected_description.VendorId
+            << ";device_id=" << selected_description.DeviceId
+            << ";dedicated_video_memory=" << selected_description.DedicatedVideoMemory
+            << ";node_count=" << device->GetNodeCount()
+            << ";options_available=" << SUCCEEDED(options_result)
+            << ";resource_binding_tier="
+            << (SUCCEEDED(options_result) ? static_cast<unsigned>(options.ResourceBindingTier) : 0)
+            << ";shader_model_available=" << SUCCEEDED(shader_model_result)
+            << ";highest_shader_model="
+            << (SUCCEEDED(shader_model_result) ? static_cast<unsigned>(shader_model.HighestShaderModel)
+                                               : 0);
+
+    return {"d3d12-device", true, ERROR_SUCCESS, details.str()};
 }
+
+std::vector<ProbeResult> RunAllProbes() {
+    std::vector<ProbeResult> results;
+    results.reserve(4);
+    results.push_back(ProbeCapabilities());
+    results.push_back(ProbeVirtualMemory());
+    results.push_back(ProbeExecutableMemory());
+    results.push_back(ProbeD3D12Device());
+    return results;
+}
+
+bool AllPassed(const std::vector<ProbeResult>& results) noexcept {
+    return !results.empty() &&
+           std::all_of(results.begin(), results.end(),
+                       [](const ProbeResult& result) { return result.passed; });
+}
+
+std::string SerializeJsonLine(const ProbeResult& result) {
+    std::ostringstream output;
+    output << "{\"probe\":\"" << EscapeJson(result.name) << "\",\"passed\":"
+           << (result.passed ? "true" : "false") << ",\"win32_error\":" << result.error
+           << ",\"details\":\"" << EscapeJson(result.details) << "\"}";
+    return output.str();
+}
+
+std::string SerializeJsonLines(const std::vector<ProbeResult>& results) {
+    std::ostringstream output;
+    for (const auto& result : results) {
+        output << SerializeJsonLine(result) << '\n';
+    }
+    return output.str();
+}
+
+} // namespace XboxSeriesD3D12::Phase0

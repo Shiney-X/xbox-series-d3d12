@@ -4,7 +4,8 @@
 |---|---:|---:|---:|
 | Execução x86-64 nativa | Sim | A validar | Sim, acesso condicionado |
 | `codeGeneration` | Não requerida | Requerida | Modelo diferente |
-| D3D12 | Sim | Sim | Sim, API específica |
+| Dispositivo D3D12 | CI validado | Probe pronto; executar no console | Sim, API específica |
+| Swapchain D3D12 | Não necessária no runner | Host pronto; executar no console | API específica |
 | Vulkan nativo | Dependente do driver | Não | Não é o baseline |
 | Filesystem irrestrito | Sim | Não | APIs GDK |
 | Qt desktop | Sim | Não planejado | Não planejado |
