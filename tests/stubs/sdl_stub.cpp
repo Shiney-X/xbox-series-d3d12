@@ -6,7 +6,13 @@
 
 namespace Frontend {
 WindowSDL::~WindowSDL() = default;
-}
+
+void WindowSDL::SetIcon(std::span<const u8>) {}
+void WindowSDL::WaitEvent() {}
+void WindowSDL::InitTimers() {}
+void WindowSDL::RequestKeyboard() {}
+void WindowSDL::ReleaseKeyboard() {}
+} // namespace Frontend
 
 extern "C" {
 
