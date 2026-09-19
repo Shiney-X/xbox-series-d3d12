@@ -401,7 +401,7 @@ private:
 
   void SetBrowserReady(
       const StorageFolder &folder,
-      const Windows::Foundation::Collections::IVectorView<StorageFolder>
+      const winrt::Windows::Foundation::Collections::IVectorView<StorageFolder>
           &subfolders,
       std::string_view report_state) {
     const std::string folder_name = to_string(folder.Name());
