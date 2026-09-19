@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include "d3d12_status_renderer.h"
-#include "probes.h"
+#include <winrt/base.h>
 
 #include <winrt/Windows.ApplicationModel.Activation.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.UI.Core.h>
+
+#include "d3d12_status_renderer.h"
+#include "probes.h"
 
 #include <memory>
 #include <string>
