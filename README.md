@@ -68,9 +68,11 @@ O roteiro completo de instalação, execução e coleta está em
 - [Roadmap](docs/ROADMAP.md)
 - [Matriz de plataforma](docs/PLATFORM_MATRIX.md)
 - [Teste no Xbox Dev Mode](docs/TESTING_XBOX_DEV_MODE.md)
+- [Baseline upstream](docs/UPSTREAM.md)
 - [Referências técnicas](docs/REFERENCES.md)
 - [ADR-0001: UWP como baseline público](docs/adr/0001-uwp-public-baseline.md)
 - [ADR-0002: backend D3D12 nativo](docs/adr/0002-native-d3d12-backend.md)
+- [ADR-0003: integração do upstream com histórico](docs/adr/0003-upstream-history-integration.md)
 
 ## Escopo legal
 

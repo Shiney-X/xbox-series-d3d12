@@ -38,8 +38,9 @@ Consulte [`docs/results`](results/README.md).
 
 ## Fase 1 — Integração do upstream
 
-- [ ] Definir estratégia de importação preservando histórico Git.
-- [ ] Registrar revisão upstream de referência.
+- [x] Definir estratégia de importação preservando histórico Git.
+- [x] Registrar revisão upstream de referência.
+- [ ] Integrar `v.0.18.0` na raiz e resolver colisões da Fase 0.
 - [ ] Obter build Windows desktop sem regressões.
 - [ ] Isolar frontend/UI desktop do host UWP.
 
