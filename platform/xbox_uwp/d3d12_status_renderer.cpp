@@ -8,6 +8,12 @@
 
 using Microsoft::WRL::ComPtr;
 
+D3D12StatusRenderer::~D3D12StatusRenderer() {
+    if (fence_event_ != INVALID_HANDLE_VALUE) {
+        CloseHandle(fence_event_);
+    }
+}
+
 void D3D12StatusRenderer::Initialize(IUnknown* core_window, float width, float height) {
     winrt::check_hresult(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0,
                                           IID_PPV_ARGS(device_.ReleaseAndGetAddressOf())));
@@ -60,6 +66,15 @@ void D3D12StatusRenderer::Initialize(IUnknown* core_window, float width, float h
         0, D3D12_COMMAND_LIST_TYPE_DIRECT, command_allocator_.Get(), nullptr,
         IID_PPV_ARGS(command_list_.ReleaseAndGetAddressOf())));
     winrt::check_hresult(command_list_->Close());
+
+    winrt::check_hresult(
+        device_->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+                             IID_PPV_ARGS(fence_.ReleaseAndGetAddressOf())));
+    fence_event_ = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
+    if (fence_event_ == nullptr) {
+        fence_event_ = INVALID_HANDLE_VALUE;
+        winrt::throw_last_error();
+    }
 }
 
 void D3D12StatusRenderer::Render(bool passed) {
@@ -90,4 +105,18 @@ void D3D12StatusRenderer::Render(bool passed) {
     ID3D12CommandList* command_lists[] = {command_list_.Get()};
     command_queue_->ExecuteCommandLists(1, command_lists);
     winrt::check_hresult(swap_chain_->Present(1, 0));
+    WaitForGpu();
+}
+
+void D3D12StatusRenderer::WaitForGpu() {
+    const UINT64 value = ++fence_value_;
+    winrt::check_hresult(command_queue_->Signal(fence_.Get(), value));
+    if (fence_->GetCompletedValue() >= value) {
+        return;
+    }
+
+    winrt::check_hresult(fence_->SetEventOnCompletion(value, fence_event_));
+    if (WaitForSingleObjectEx(fence_event_, INFINITE, FALSE) == WAIT_FAILED) {
+        winrt::throw_last_error();
+    }
 }

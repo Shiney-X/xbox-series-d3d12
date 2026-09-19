@@ -47,9 +47,11 @@ out\build\windows-msvc\Debug\xbox_phase0_probe.exe --all
 ```
 
 Os resultados desktop são emitidos como JSON Lines. O host UWP grava o mesmo
-formato em `LocalState/phase0-results.jsonl`, que pode ser baixado pelo Device
-Portal. No console, uma tela verde significa que os probes de CPU/memória/D3D12
-passaram; uma tela vermelha significa falha em pelo menos um probe.
+formato de maneira síncrona em `LocalState/phase0-results.jsonl`, com fallback
+para `LocalCache/phase0-results.jsonl`, e inclui o probe `report-storage`. No
+console, uma tela verde significa que CPU/memória/D3D12, apresentação e
+persistência passaram; uma tela vermelha significa falha em pelo menos uma
+dessas etapas.
 
 ## Testar no Xbox Series S
 

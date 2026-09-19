@@ -10,10 +10,14 @@
 
 class D3D12StatusRenderer final {
 public:
+    ~D3D12StatusRenderer();
+
     void Initialize(IUnknown* core_window, float width, float height);
     void Render(bool passed);
 
 private:
+    void WaitForGpu();
+
     static constexpr UINT FrameCount = 2;
 
     Microsoft::WRL::ComPtr<ID3D12Device> device_;
@@ -22,6 +26,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtv_heap_;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator_;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> command_list_;
+    Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, FrameCount> render_targets_;
+    HANDLE fence_event_{INVALID_HANDLE_VALUE};
+    UINT64 fence_value_{};
     UINT rtv_descriptor_size_{};
 };

@@ -4,7 +4,6 @@
 
 #include <winrt/Windows.ApplicationModel.Activation.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
-#include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.UI.Core.h>
 
@@ -26,15 +25,78 @@ using XboxSeriesD3D12::Phase0::ProbeResult;
 
 namespace {
 
-fire_and_forget SaveReportAsync(std::string report) {
+std::uint32_t WriteReport(const StorageFolder& folder, const wchar_t* filename,
+                          const std::vector<ProbeResult>& results,
+                          const ProbeResult& storage_result) noexcept {
     try {
-        const StorageFolder folder = ApplicationData::Current().LocalFolder();
-        const StorageFile file = co_await folder.CreateFileAsync(
-            L"phase0-results.jsonl", CreationCollisionOption::ReplaceExisting);
-        co_await FileIO::WriteTextAsync(file, to_hstring(report));
+        std::vector<ProbeResult> persisted_results = results;
+        persisted_results.push_back(storage_result);
+        const std::string report =
+            XboxSeriesD3D12::Phase0::SerializeJsonLines(persisted_results);
+        const hstring folder_path = folder.Path();
+        const std::wstring path = std::wstring(folder_path.c_str()) + L"\\" + filename;
+
+        const HANDLE file = CreateFile2FromAppW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+                                                CREATE_ALWAYS, nullptr);
+        if (file == INVALID_HANDLE_VALUE) {
+            return GetLastError();
+        }
+
+        DWORD written = 0;
+        const bool write_succeeded =
+            WriteFile(file, report.data(), static_cast<DWORD>(report.size()), &written,
+                      nullptr) != FALSE;
+        const std::uint32_t error = write_succeeded && written == report.size()
+                                        ? ERROR_SUCCESS
+                                        : (write_succeeded ? ERROR_WRITE_FAULT : GetLastError());
+        CloseHandle(file);
+        return error;
+    } catch (const hresult_error& error) {
+        return static_cast<std::uint32_t>(error.code().value);
     } catch (...) {
-        // The status color still communicates the aggregate result if storage fails.
+        return ERROR_GEN_FAILURE;
     }
+}
+
+ProbeResult SaveReport(const std::vector<ProbeResult>& results) noexcept {
+    constexpr wchar_t filename[] = L"phase0-results.jsonl";
+
+    ProbeResult local_state{"report-storage", true, ERROR_SUCCESS,
+                            "location=LocalState/phase0-results.jsonl;mode=synchronous"};
+    std::uint32_t local_state_error = ERROR_GEN_FAILURE;
+    try {
+        local_state_error =
+            WriteReport(ApplicationData::Current().LocalFolder(), filename, results, local_state);
+    } catch (const hresult_error& error) {
+        local_state_error = static_cast<std::uint32_t>(error.code().value);
+    } catch (...) {
+        local_state_error = ERROR_GEN_FAILURE;
+    }
+    if (local_state_error == ERROR_SUCCESS) {
+        return local_state;
+    }
+
+    ProbeResult local_cache{
+        "report-storage", true, ERROR_SUCCESS,
+        "location=LocalCache/phase0-results.jsonl;mode=synchronous;local_state_error=" +
+            std::to_string(local_state_error)};
+    std::uint32_t local_cache_error = ERROR_GEN_FAILURE;
+    try {
+        local_cache_error = WriteReport(ApplicationData::Current().LocalCacheFolder(), filename,
+                                        results, local_cache);
+    } catch (const hresult_error& error) {
+        local_cache_error = static_cast<std::uint32_t>(error.code().value);
+    } catch (...) {
+        local_cache_error = ERROR_GEN_FAILURE;
+    }
+    if (local_cache_error == ERROR_SUCCESS) {
+        return local_cache;
+    }
+
+    return {"report-storage", false, local_state_error,
+            "location=unavailable;mode=synchronous;local_state_error=" +
+                std::to_string(local_state_error) +
+                ";local_cache_error=" + std::to_string(local_cache_error)};
 }
 
 class ViewProvider : public implements<ViewProvider, IFrameworkView> {
@@ -47,6 +109,7 @@ public:
         window.Closed([this](const auto&, const auto&) { exit_ = true; });
         results_ = XboxSeriesD3D12::Phase0::RunAllProbes();
         bool passed = XboxSeriesD3D12::Phase0::AllPassed(results_);
+        bool presentation_succeeded = false;
 
         try {
             renderer_ = std::make_unique<D3D12StatusRenderer>();
@@ -56,13 +119,18 @@ public:
             renderer_->Render(passed);
             results_.push_back({"uwp-presentation", true, 0,
                                 "CoreWindow D3D12 swap chain presented"});
+            presentation_succeeded = true;
         } catch (const hresult_error& error) {
             results_.push_back({"uwp-presentation", false,
                                 static_cast<std::uint32_t>(error.code().value),
                                 to_string(error.message())});
         }
 
-        SaveReportAsync(XboxSeriesD3D12::Phase0::SerializeJsonLines(results_));
+        results_.push_back(SaveReport(results_));
+        passed = XboxSeriesD3D12::Phase0::AllPassed(results_);
+        if (presentation_succeeded) {
+            renderer_->Render(passed);
+        }
     }
 
     void Load(const hstring&) {}
