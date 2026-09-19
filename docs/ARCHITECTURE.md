@@ -111,3 +111,22 @@ handle nativo por `WindowSystemInfo`.
 O handle opaco retornado por `GetFrontendHandle()` é uma ponte transitória para
 os adaptadores SDL de ImGui e mouse. Código novo de core ou renderer não deve
 depender desse handle.
+
+## Biblioteca USB no host UWP
+
+O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
+selecionada é mantida como uma cadeia relativa ao dispositivo removível e
+resolvida novamente por objetos `StorageFolder` a cada ativação.
+
+```text
+KnownFolders.RemovableDevices
+  -> caminho relativo persistido
+  -> enumeração StorageFolder limitada
+  -> eboot.bin + sce_sys/param.sfo
+  -> parser PSF limitado da bridge do core
+  -> modelo textual do shell D3D12
+```
+
+O parser recebe bytes lidos por `FileIO`, usa os layouts PSF do upstream e não
+confia em offsets, contagens ou terminação NUL vindos do arquivo. Essa fronteira
+mantém as APIs WinRT no host e os detalhes do formato Orbis na bridge do core.

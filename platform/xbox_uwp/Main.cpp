@@ -4,8 +4,9 @@
 
 #include <winrt/Windows.ApplicationModel.Activation.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
-#include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.Core.h>
@@ -19,6 +20,7 @@
 #include <algorithm>
 #include <cctype>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -30,6 +32,7 @@ using namespace winrt::Windows::ApplicationModel;
 using namespace winrt::Windows::ApplicationModel::Activation;
 using namespace winrt::Windows::ApplicationModel::Core;
 using namespace winrt::Windows::Storage;
+using namespace winrt::Windows::Storage::Streams;
 using namespace winrt::Windows::System;
 using namespace winrt::Windows::UI::Core;
 using XboxSeriesD3D12::Phase0::ProbeResult;
@@ -287,6 +290,60 @@ std::uint32_t WriteLibraryReport(bool passed, std::string_view state,
   }
 }
 
+struct DiscoveredGame {
+  XboxGameListEntry display;
+  std::string folder_name;
+};
+
+std::uint32_t WriteLibraryScanReport(
+    bool passed, std::string_view state, std::uint32_t operation_error,
+    std::size_t directories_scanned, std::size_t invalid_metadata,
+    const std::vector<DiscoveredGame> &games) noexcept {
+  try {
+    const StorageFolder folder = ApplicationData::Current().LocalFolder();
+    const std::wstring path =
+        std::wstring(folder.Path().c_str()) + L"\\phase1-library-scan.jsonl";
+    const HANDLE file = CreateFile2FromAppW(
+        path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+      return GetLastError();
+    }
+
+    std::ostringstream output;
+    output << "{\"component\":\"uwp-library-scan\",\"passed\":"
+           << (passed ? "true" : "false") << ",\"state\":\""
+           << EscapeJson(state) << "\",\"win32_error\":" << operation_error
+           << ",\"directories_scanned\":" << directories_scanned
+           << ",\"invalid_metadata\":" << invalid_metadata
+           << ",\"games_found\":" << games.size() << "}\n";
+    for (std::size_t index = 0; index < games.size(); ++index) {
+      const DiscoveredGame &game = games[index];
+      output << "{\"component\":\"uwp-library-game\",\"index\":" << index
+             << ",\"title\":\"" << EscapeJson(game.display.title)
+             << "\",\"title_id\":\"" << EscapeJson(game.display.title_id)
+             << "\",\"app_version\":\"" << EscapeJson(game.display.app_version)
+             << "\",\"folder_name\":\"" << EscapeJson(game.folder_name)
+             << "\"}\n";
+    }
+    const std::string serialized = output.str();
+    DWORD written = 0;
+    const bool succeeded = WriteFile(file, serialized.data(),
+                                     static_cast<DWORD>(serialized.size()),
+                                     &written, nullptr) != FALSE;
+    const bool flushed = succeeded && FlushFileBuffers(file) != FALSE;
+    const std::uint32_t error =
+        flushed && written == serialized.size()
+            ? ERROR_SUCCESS
+            : (succeeded ? ERROR_WRITE_FAULT : GetLastError());
+    CloseHandle(file);
+    return error;
+  } catch (const hresult_error &error) {
+    return static_cast<std::uint32_t>(error.code().value);
+  } catch (...) {
+    return ERROR_GEN_FAILURE;
+  }
+}
+
 class ViewProvider : public implements<ViewProvider, IFrameworkView> {
 public:
   void Initialize(const CoreApplicationView &application_view) {
@@ -399,6 +456,67 @@ private:
     return breadcrumb;
   }
 
+  std::string CreateRelativeLibraryPath() const {
+    if (folder_stack_.empty()) {
+      return {};
+    }
+    std::string relative_path;
+    for (std::size_t index = 1U; index < folder_stack_.size(); ++index) {
+      if (!relative_path.empty()) {
+        relative_path += '/';
+      }
+      relative_path += to_string(folder_stack_[index].Name());
+    }
+    if (!relative_path.empty()) {
+      relative_path += '/';
+    }
+    relative_path += to_string(current_folder_.Name());
+    return relative_path;
+  }
+
+  void PersistLibrarySelection() {
+    const auto values = ApplicationData::Current().LocalSettings().Values();
+    values.Insert(hstring{L"libraryRelativePath"},
+                  box_value(to_hstring(CreateRelativeLibraryPath())));
+  }
+
+  std::optional<std::vector<std::string>> ReadPersistedLibraryPath() const {
+    try {
+      const auto values = ApplicationData::Current().LocalSettings().Values();
+      const hstring key{L"libraryRelativePath"};
+      if (!values.HasKey(key)) {
+        return std::nullopt;
+      }
+      const std::string stored =
+          to_string(unbox_value<hstring>(values.Lookup(key)));
+      constexpr std::size_t maximum_stored_path = 2048U;
+      constexpr std::size_t maximum_components = 16U;
+      if (stored.size() > maximum_stored_path) {
+        return std::nullopt;
+      }
+      std::vector<std::string> components;
+      std::size_t begin = 0U;
+      while (begin < stored.size()) {
+        const std::size_t separator = stored.find('/', begin);
+        const std::size_t end =
+            separator == std::string::npos ? stored.size() : separator;
+        if (end > begin) {
+          if (components.size() >= maximum_components) {
+            return std::nullopt;
+          }
+          components.push_back(stored.substr(begin, end - begin));
+        }
+        if (separator == std::string::npos) {
+          break;
+        }
+        begin = separator + 1U;
+      }
+      return components;
+    } catch (...) {
+      return std::nullopt;
+    }
+  }
+
   void SetBrowserReady(
       const StorageFolder &folder,
       const winrt::Windows::Foundation::Collections::IVectorView<StorageFolder>
@@ -421,6 +539,9 @@ private:
     shell_state_.selected_library_entry = 0U;
     shell_state_.library_at_device_root = folder_stack_.empty();
     shell_state_.library_selection_confirmed = false;
+    shell_state_.library_scan_state = LibraryScanState::Inactive;
+    shell_state_.games.clear();
+    shell_state_.selected_game = 0U;
     std::ostringstream details;
     details << "source=KnownFolders.RemovableDevices;device_index=0;depth="
             << folder_stack_.size() << ";subfolders=" << child_folders_.size();
@@ -481,11 +602,41 @@ private:
                             "source=KnownFolders.RemovableDevices;devices=0");
         co_return;
       }
-      const auto subfolders =
-          co_await library_folder_access_.GetSubfoldersAsync(folder);
+
+      StorageFolder selected_folder = folder;
       folder_stack_.clear();
+      const auto persisted_path = ReadPersistedLibraryPath();
+      bool restored_selection = persisted_path.has_value();
+      if (persisted_path) {
+        for (const std::string &component : *persisted_path) {
+          const IStorageItem item =
+              co_await selected_folder.TryGetItemAsync(to_hstring(component));
+          const StorageFolder child =
+              item ? item.try_as<StorageFolder>() : nullptr;
+          if (!child) {
+            restored_selection = false;
+            break;
+          }
+          folder_stack_.push_back(selected_folder);
+          selected_folder = child;
+        }
+      }
+      if (!restored_selection) {
+        folder_stack_.clear();
+        selected_folder = folder;
+        ApplicationData::Current().LocalSettings().Values().Remove(
+            hstring{L"libraryRelativePath"});
+      }
+      const auto subfolders =
+          co_await library_folder_access_.GetSubfoldersAsync(selected_folder);
       library_operation_active_ = false;
-      SetBrowserReady(folder, subfolders, "usb_browser_ready");
+      SetBrowserReady(selected_folder, subfolders,
+                      restored_selection ? "library_folder_restored"
+                                         : "usb_browser_ready");
+      if (restored_selection) {
+        shell_state_.library_selection_confirmed = true;
+        ScanSelectedLibrary();
+      }
     } catch (const hresult_error &error) {
       SetLibraryFailure(error, "scan removable storage");
     } catch (...) {
@@ -547,20 +698,158 @@ private:
     }
   }
 
+  fire_and_forget ScanSelectedLibrary() {
+    [[maybe_unused]] const auto lifetime = get_strong();
+    if (library_operation_active_ || !current_folder_) {
+      co_return;
+    }
+
+    struct PendingFolder {
+      StorageFolder folder{nullptr};
+      std::uint32_t depth{};
+    };
+
+    constexpr std::uint32_t maximum_depth = 3U;
+    constexpr std::size_t maximum_directories = 128U;
+    constexpr std::size_t maximum_games = 32U;
+    std::vector<PendingFolder> pending{{current_folder_, 0U}};
+    std::vector<DiscoveredGame> discovered;
+    std::size_t next_folder = 0U;
+    std::size_t directories_scanned = 0U;
+    std::size_t invalid_metadata = 0U;
+
+    try {
+      library_operation_active_ = true;
+      shell_state_.library_scan_state = LibraryScanState::Scanning;
+      shell_state_.games.clear();
+      shell_state_.selected_game = 0U;
+      if (renderer_) {
+        renderer_->Render(shell_state_);
+      }
+
+      while (next_folder < pending.size() &&
+             directories_scanned < maximum_directories &&
+             discovered.size() < maximum_games) {
+        const PendingFolder candidate = pending[next_folder++];
+        ++directories_scanned;
+        bool is_game = false;
+        try {
+          const IStorageItem eboot_item =
+              co_await candidate.folder.TryGetItemAsync(L"eboot.bin");
+          const IStorageItem sce_system_item =
+              co_await candidate.folder.TryGetItemAsync(L"sce_sys");
+          const StorageFolder sce_system =
+              sce_system_item ? sce_system_item.try_as<StorageFolder>()
+                              : nullptr;
+          if (eboot_item && eboot_item.IsOfType(StorageItemTypes::File) &&
+              sce_system) {
+            const IStorageItem param_item =
+                co_await sce_system.TryGetItemAsync(L"param.sfo");
+            const StorageFile param_file =
+                param_item ? param_item.try_as<StorageFile>() : nullptr;
+            if (param_file) {
+              const IBuffer buffer =
+                  co_await FileIO::ReadBufferAsync(param_file);
+              constexpr std::uint32_t maximum_sfo_size = 4U * 1024U * 1024U;
+              if (buffer.Length() > 0U && buffer.Length() <= maximum_sfo_size) {
+                std::vector<std::uint8_t> bytes(buffer.Length());
+                const DataReader reader = DataReader::FromBuffer(buffer);
+                reader.ReadBytes(bytes);
+                const ::Core::Uwp::GameMetadata metadata =
+                    ::Core::Uwp::ParseParamSfo(bytes);
+                if (metadata.valid) {
+                  DiscoveredGame game{};
+                  game.display.title = CreateFolderLabel(metadata.title);
+                  game.display.title_id = CreateFolderLabel(metadata.title_id);
+                  game.display.app_version =
+                      CreateFolderLabel(metadata.app_version);
+                  game.folder_name = to_string(candidate.folder.Name());
+                  discovered.push_back(std::move(game));
+                  is_game = true;
+                } else {
+                  ++invalid_metadata;
+                }
+              } else {
+                ++invalid_metadata;
+              }
+            }
+          }
+
+          if (!is_game && candidate.depth < maximum_depth) {
+            const auto subfolders =
+                co_await library_folder_access_.GetSubfoldersAsync(
+                    candidate.folder);
+            for (const StorageFolder &subfolder : subfolders) {
+              if (pending.size() >= maximum_directories) {
+                break;
+              }
+              pending.push_back({subfolder, candidate.depth + 1U});
+            }
+          }
+        } catch (const hresult_error &) {
+          // A protected or transient directory must not abort the whole scan.
+        }
+      }
+
+      shell_state_.games.clear();
+      shell_state_.games.reserve(discovered.size());
+      for (const DiscoveredGame &game : discovered) {
+        shell_state_.games.push_back(game.display);
+      }
+      shell_state_.library_scan_state = discovered.empty()
+                                            ? LibraryScanState::Empty
+                                            : LibraryScanState::Ready;
+      library_operation_active_ = false;
+      const std::uint32_t report_error = WriteLibraryScanReport(
+          true, discovered.empty() ? "no_games_found" : "games_found",
+          ERROR_SUCCESS, directories_scanned, invalid_metadata, discovered);
+      if (report_error != ERROR_SUCCESS) {
+        shell_state_.library_scan_state = LibraryScanState::Failed;
+      }
+      if (renderer_) {
+        renderer_->Render(shell_state_);
+      }
+      const std::string lifecycle_details =
+          "scan complete;games=" + std::to_string(discovered.size()) +
+          ";directories=" + std::to_string(directories_scanned);
+      AppendLifecycleEvent(session_id_, "library-scan",
+                           lifecycle_details.c_str());
+    } catch (const hresult_error &error) {
+      library_operation_active_ = false;
+      shell_state_.library_scan_state = LibraryScanState::Failed;
+      WriteLibraryScanReport(false, "scan_failed",
+                             static_cast<std::uint32_t>(error.code().value),
+                             directories_scanned, invalid_metadata, discovered);
+      if (renderer_) {
+        renderer_->Render(shell_state_);
+      }
+    } catch (...) {
+      library_operation_active_ = false;
+      shell_state_.library_scan_state = LibraryScanState::Failed;
+      WriteLibraryScanReport(false, "scan_failed", ERROR_GEN_FAILURE,
+                             directories_scanned, invalid_metadata, discovered);
+      if (renderer_) {
+        renderer_->Render(shell_state_);
+      }
+    }
+  }
+
   void SelectCurrentLibraryFolder() {
     if (!current_folder_ || library_operation_active_) {
       return;
     }
     const std::string folder_name = to_string(current_folder_.Name());
     shell_state_.library_selection_confirmed = true;
+    PersistLibrarySelection();
     std::ostringstream details;
     details << "source=KnownFolders.RemovableDevices;device_index=0;depth="
-            << folder_stack_.size() << ";breadcrumb="
-            << shell_state_.library_breadcrumb;
+            << folder_stack_.size()
+            << ";breadcrumb=" << shell_state_.library_breadcrumb;
     PresentLibraryState(true, "folder_selected", ERROR_SUCCESS, folder_name,
                         details.str());
     AppendLifecycleEvent(session_id_, "library-folder-selected",
                          "USB library folder selected;input_consumed=1");
+    ScanSelectedLibrary();
   }
 
   void OnKeyDown(const CoreWindow &, const KeyEventArgs &args) noexcept {
@@ -592,8 +881,35 @@ private:
         }
 
         if (shell_state_.library_folder_state == LibraryFolderState::Ready) {
-          if ((key == VirtualKey::GamepadDPadUp || key == VirtualKey::Up) &&
-              !child_folders_.empty()) {
+          if (shell_state_.library_scan_state != LibraryScanState::Inactive) {
+            if ((key == VirtualKey::GamepadDPadUp || key == VirtualKey::Up) &&
+                !shell_state_.games.empty()) {
+              shell_state_.selected_game =
+                  (shell_state_.selected_game +
+                   static_cast<std::uint32_t>(shell_state_.games.size()) - 1U) %
+                  static_cast<std::uint32_t>(shell_state_.games.size());
+              changed = true;
+            } else if ((key == VirtualKey::GamepadDPadDown ||
+                        key == VirtualKey::Down) &&
+                       !shell_state_.games.empty()) {
+              shell_state_.selected_game =
+                  (shell_state_.selected_game + 1U) %
+                  static_cast<std::uint32_t>(shell_state_.games.size());
+              changed = true;
+            } else if (key == VirtualKey::GamepadX) {
+              args.Handled(true);
+              ScanSelectedLibrary();
+              return;
+            } else if (key == VirtualKey::GamepadB ||
+                       key == VirtualKey::Escape) {
+              shell_state_.library_scan_state = LibraryScanState::Inactive;
+              shell_state_.games.clear();
+              shell_state_.selected_game = 0U;
+              changed = true;
+            }
+          } else if ((key == VirtualKey::GamepadDPadUp ||
+                      key == VirtualKey::Up) &&
+                     !child_folders_.empty()) {
             shell_state_.selected_library_entry =
                 (shell_state_.selected_library_entry +
                  static_cast<std::uint32_t>(child_folders_.size()) - 1U) %
@@ -616,8 +932,7 @@ private:
             args.Handled(true);
             SelectCurrentLibraryFolder();
             return;
-          } else if (key == VirtualKey::GamepadB ||
-                     key == VirtualKey::Escape) {
+          } else if (key == VirtualKey::GamepadB || key == VirtualKey::Escape) {
             args.Handled(true);
             if (folder_stack_.empty()) {
               shell_state_.page = XboxShellPage::Home;

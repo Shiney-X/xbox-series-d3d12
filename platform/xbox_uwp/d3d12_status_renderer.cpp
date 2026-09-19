@@ -360,35 +360,74 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
       DrawText("LOADING FOLDERS", 0.105F, 0.43F, 4.0F, SecondaryText);
       break;
     case LibraryFolderState::Ready:
-      DrawText(state.library_selection_confirmed ? "LIBRARY FOLDER SELECTED"
-                                                 : "USB FOLDER BROWSER",
-               0.095F, 0.235F, 4.5F,
-               state.library_selection_confirmed ? Accent : PrimaryText);
-      DrawText(state.library_breadcrumb, 0.095F, 0.305F, 3.6F,
-               SecondaryText);
-
-      if (state.library_entries.empty()) {
-        DrawText("NO SUBFOLDERS", 0.105F, 0.43F, 5.0F, SecondaryText);
-        DrawText("X USE THIS FOLDER", 0.105F, 0.55F, 4.0F, Accent);
-      } else {
-        constexpr std::size_t visible_rows = 5U;
-        const std::size_t selected = std::min<std::size_t>(
-            state.selected_library_entry, state.library_entries.size() - 1U);
+      if (state.library_scan_state == LibraryScanState::Scanning) {
+        DrawText("SCANNING GAME LIBRARY", 0.095F, 0.25F, 4.8F, Accent);
+        DrawText(state.library_breadcrumb, 0.095F, 0.34F, 3.6F, SecondaryText);
+        DrawText("READING PARAM SFO", 0.105F, 0.48F, 4.3F, PrimaryText);
+      } else if (state.library_scan_state == LibraryScanState::Empty) {
+        DrawText("NO PS4 GAMES FOUND", 0.095F, 0.25F, 4.8F, PrimaryText);
+        DrawText(state.library_breadcrumb, 0.095F, 0.34F, 3.6F, SecondaryText);
+        DrawText("EXPECTED SCE SYS PARAM SFO", 0.105F, 0.47F, 3.8F,
+                 SecondaryText);
+        DrawText("AND EBOOT BIN", 0.105F, 0.55F, 3.8F, SecondaryText);
+      } else if (state.library_scan_state == LibraryScanState::Failed) {
+        DrawText("LIBRARY SCAN FAILED", 0.095F, 0.25F, 4.8F, Failure);
+        DrawText("SEE PHASE1-LIBRARY-SCAN JSONL", 0.095F, 0.39F, 3.6F,
+                 SecondaryText);
+      } else if (state.library_scan_state == LibraryScanState::Ready) {
+        DrawText("PS4 GAME LIBRARY", 0.095F, 0.23F, 4.8F, Accent);
+        DrawText(state.library_breadcrumb, 0.095F, 0.30F, 3.4F, SecondaryText);
+        constexpr std::size_t visible_rows = 4U;
+        const std::size_t selected =
+            std::min<std::size_t>(state.selected_game, state.games.size() - 1U);
         const std::size_t first =
             selected < visible_rows ? 0U : selected - visible_rows + 1U;
         const std::size_t last =
-            std::min(first + visible_rows, state.library_entries.size());
+            std::min(first + visible_rows, state.games.size());
         for (std::size_t index = first; index < last; ++index) {
-          const float y = 0.37F + static_cast<float>(index - first) * 0.062F;
+          const float y = 0.365F + static_cast<float>(index - first) * 0.067F;
           const bool focused = index == selected;
           if (focused) {
-            DrawRectangle(0.09F, y - 0.012F, 0.74F, 0.053F, PanelSelected);
-            DrawRectangle(0.09F, y - 0.012F, 0.006F, 0.053F, Focus);
+            DrawRectangle(0.09F, y - 0.012F, 0.74F, 0.056F, PanelSelected);
+            DrawRectangle(0.09F, y - 0.012F, 0.006F, 0.056F, Focus);
           }
-          DrawText(state.library_entries[index], 0.11F, y, 3.8F,
+          DrawText(state.games[index].title, 0.11F, y, 3.8F,
                    focused ? PrimaryText : SecondaryText);
         }
-        DrawText("A OPEN   X USE CURRENT", 0.64F, 0.70F, 3.0F, Accent);
+        DrawText("TITLE ID  " + state.games[selected].title_id, 0.105F, 0.66F,
+                 3.4F, PrimaryText);
+        DrawText("VERSION  " + state.games[selected].app_version, 0.56F, 0.66F,
+                 3.4F, SecondaryText);
+      } else {
+        DrawText(state.library_selection_confirmed ? "LIBRARY FOLDER SELECTED"
+                                                   : "USB FOLDER BROWSER",
+                 0.095F, 0.235F, 4.5F,
+                 state.library_selection_confirmed ? Accent : PrimaryText);
+        DrawText(state.library_breadcrumb, 0.095F, 0.305F, 3.6F, SecondaryText);
+
+        if (state.library_entries.empty()) {
+          DrawText("NO SUBFOLDERS", 0.105F, 0.43F, 5.0F, SecondaryText);
+          DrawText("X USE THIS FOLDER", 0.105F, 0.55F, 4.0F, Accent);
+        } else {
+          constexpr std::size_t visible_rows = 5U;
+          const std::size_t selected = std::min<std::size_t>(
+              state.selected_library_entry, state.library_entries.size() - 1U);
+          const std::size_t first =
+              selected < visible_rows ? 0U : selected - visible_rows + 1U;
+          const std::size_t last =
+              std::min(first + visible_rows, state.library_entries.size());
+          for (std::size_t index = first; index < last; ++index) {
+            const float y = 0.37F + static_cast<float>(index - first) * 0.062F;
+            const bool focused = index == selected;
+            if (focused) {
+              DrawRectangle(0.09F, y - 0.012F, 0.74F, 0.053F, PanelSelected);
+              DrawRectangle(0.09F, y - 0.012F, 0.006F, 0.053F, Focus);
+            }
+            DrawText(state.library_entries[index], 0.11F, y, 3.8F,
+                     focused ? PrimaryText : SecondaryText);
+          }
+          DrawText("A OPEN   X USE CURRENT", 0.64F, 0.70F, 3.0F, Accent);
+        }
       }
       break;
     case LibraryFolderState::Failed:
@@ -423,9 +462,11 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
 
   DrawText(state.page == XboxShellPage::Games
                ? (state.library_folder_state == LibraryFolderState::Ready
-                      ? (state.library_at_device_root
-                             ? "DPAD MOVE   A OPEN   B HOME   X SELECT"
-                             : "DPAD MOVE   A OPEN   B UP   X SELECT")
+                      ? (state.library_scan_state != LibraryScanState::Inactive
+                             ? "DPAD MOVE   B FOLDERS   X RESCAN"
+                             : (state.library_at_device_root
+                                    ? "DPAD MOVE   A OPEN   B HOME   X SELECT"
+                                    : "DPAD MOVE   A OPEN   B UP   X SELECT"))
                       : "A SCAN USB   B BACK")
                : "B BACK",
            0.065F, 0.865F, 4.0F, SecondaryText);
