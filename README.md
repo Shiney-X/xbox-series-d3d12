@@ -17,7 +17,8 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] Build desktop Windows upstream validado sem regressões.
 - [x] Frontend desktop isolado do futuro host UWP por contrato de janela injetável.
 - [x] Shell inicial UWP/D3D12 e bridge verificável com o core upstream.
-- [ ] Validar navegação da interface no Xbox Series S em perfil Game.
+- [x] Navegação da interface validada no Xbox Series S em perfil Game.
+- [ ] Validar acesso direto ao armazenamento USB no Xbox.
 - [ ] Backend D3D12 integrado ao video core.
 
 ## Baseline upstream
@@ -77,6 +78,7 @@ O roteiro completo está em
 - [ADR-0003: integração do upstream com histórico](docs/adr/0003-upstream-history-integration.md)
 - [ADR-0004: fronteira de janela injetada pelo host](docs/adr/0004-host-window-boundary.md)
 - [ADR-0005: bridge do core e shell UWP](docs/adr/0005-uwp-core-bridge-and-shell.md)
+- [ADR-0006: acesso USB à biblioteca](docs/adr/0006-uwp-library-folder-access.md)
 
 ## Escopo legal e licença
 

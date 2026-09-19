@@ -11,13 +11,16 @@
 
 #include "core/uwp/core_bridge.h"
 #include "d3d12_status_renderer.h"
+#include "library_folder_access.h"
 #include "memory_pressure_probe.h"
 #include "probes.h"
 
 #include <algorithm>
+#include <cctype>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -194,6 +197,95 @@ WriteCoreBridgeReport(const ::Core::Uwp::BridgeStatus &status) noexcept {
   }
 }
 
+std::string EscapeJson(std::string_view value) {
+  std::string escaped;
+  escaped.reserve(value.size());
+  for (const unsigned char character : value) {
+    switch (character) {
+    case '"':
+      escaped += "\\\"";
+      break;
+    case '\\':
+      escaped += "\\\\";
+      break;
+    case '\n':
+      escaped += "\\n";
+      break;
+    case '\r':
+      escaped += "\\r";
+      break;
+    case '\t':
+      escaped += "\\t";
+      break;
+    default:
+      escaped += character < 0x20U ? '?' : static_cast<char>(character);
+      break;
+    }
+  }
+  return escaped;
+}
+
+std::string CreateFolderLabel(std::string_view name) {
+  std::string label;
+  label.reserve(std::min<std::size_t>(name.size(), 24U));
+  bool previous_was_space = false;
+  for (const unsigned char character : name) {
+    if (label.size() >= 24U) {
+      break;
+    }
+    if (std::isalnum(character) != 0 || character == '-' || character == '.') {
+      label.push_back(static_cast<char>(std::toupper(character)));
+      previous_was_space = false;
+    } else if (!previous_was_space && !label.empty()) {
+      label.push_back(' ');
+      previous_was_space = true;
+    }
+  }
+  while (!label.empty() && label.back() == ' ') {
+    label.pop_back();
+  }
+  return label.empty() ? "SELECTED FOLDER" : label;
+}
+
+std::uint32_t WriteLibraryReport(bool passed, std::string_view state,
+                                 std::uint32_t operation_error,
+                                 std::string_view folder_name,
+                                 std::string_view details) noexcept {
+  try {
+    const StorageFolder folder = ApplicationData::Current().LocalFolder();
+    const std::wstring path =
+        std::wstring(folder.Path().c_str()) + L"\\phase1-library.jsonl";
+    const HANDLE file = CreateFile2FromAppW(
+        path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+      return GetLastError();
+    }
+
+    std::ostringstream output;
+    output << "{\"component\":\"uwp-library-folder\",\"passed\":"
+           << (passed ? "true" : "false") << ",\"state\":\""
+           << EscapeJson(state) << "\",\"win32_error\":" << operation_error
+           << ",\"folder_name\":\"" << EscapeJson(folder_name)
+           << "\",\"details\":\"" << EscapeJson(details) << "\"}\n";
+    const std::string serialized = output.str();
+    DWORD written = 0;
+    const bool succeeded = WriteFile(file, serialized.data(),
+                                     static_cast<DWORD>(serialized.size()),
+                                     &written, nullptr) != FALSE;
+    const bool flushed = succeeded && FlushFileBuffers(file) != FALSE;
+    const std::uint32_t error =
+        flushed && written == serialized.size()
+            ? ERROR_SUCCESS
+            : (succeeded ? ERROR_WRITE_FAULT : GetLastError());
+    CloseHandle(file);
+    return error;
+  } catch (const hresult_error &error) {
+    return static_cast<std::uint32_t>(error.code().value);
+  } catch (...) {
+    return ERROR_GEN_FAILURE;
+  }
+}
+
 class ViewProvider : public implements<ViewProvider, IFrameworkView> {
 public:
   void Initialize(const CoreApplicationView &application_view) {
@@ -251,6 +343,7 @@ public:
     if (presentation_succeeded) {
       shell_state_.probes_passed = passed;
       renderer_->Render(shell_state_);
+      DetectRemovableStorage();
     }
   }
 
@@ -268,6 +361,76 @@ public:
   void Uninitialize() { renderer_.reset(); }
 
 private:
+  void PresentLibraryState(bool passed, std::string_view report_state,
+                           std::uint32_t error, std::string_view folder_name,
+                           std::string_view details) noexcept {
+    const std::uint32_t report_error =
+        WriteLibraryReport(passed, report_state, error, folder_name, details);
+    if (report_error != ERROR_SUCCESS) {
+      shell_state_.library_folder_state = LibraryFolderState::Failed;
+      shell_state_.library_folder_name.clear();
+    }
+    try {
+      if (renderer_) {
+        renderer_->Render(shell_state_);
+      }
+    } catch (...) {
+      shell_state_.library_folder_state = LibraryFolderState::Failed;
+    }
+  }
+
+  void SetLibraryReady(const StorageFolder &folder,
+                       std::string_view report_state) {
+    const std::string folder_name = to_string(folder.Name());
+    shell_state_.library_folder_state = LibraryFolderState::Ready;
+    shell_state_.library_folder_name = CreateFolderLabel(folder_name);
+    PresentLibraryState(true, report_state, ERROR_SUCCESS, folder_name,
+                        "source=KnownFolders.RemovableDevices;device_index=0");
+    AppendLifecycleEvent(session_id_, "library-folder",
+                         "removable storage access ready;device_index=0");
+  }
+
+  fire_and_forget DetectRemovableStorage() {
+    [[maybe_unused]] const auto lifetime = get_strong();
+    if (library_scan_active_) {
+      co_return;
+    }
+
+    try {
+      library_scan_active_ = true;
+      shell_state_.library_folder_state = LibraryFolderState::Restoring;
+      shell_state_.library_folder_name.clear();
+      if (renderer_) {
+        renderer_->Render(shell_state_);
+      }
+
+      const StorageFolder folder =
+          co_await library_folder_access_.FindFirstRemovableDeviceAsync();
+      library_scan_active_ = false;
+      if (!folder) {
+        shell_state_.library_folder_state = LibraryFolderState::NotConfigured;
+        shell_state_.library_folder_name.clear();
+        PresentLibraryState(true, "usb_not_found", ERROR_SUCCESS, {},
+                            "source=KnownFolders.RemovableDevices;devices=0");
+        co_return;
+      }
+      SetLibraryReady(folder, "usb_ready");
+    } catch (const hresult_error &error) {
+      library_scan_active_ = false;
+      shell_state_.library_folder_state = LibraryFolderState::Failed;
+      shell_state_.library_folder_name.clear();
+      PresentLibraryState(false, "usb_access_failed",
+                          static_cast<std::uint32_t>(error.code().value), {},
+                          to_string(error.message()));
+    } catch (...) {
+      library_scan_active_ = false;
+      shell_state_.library_folder_state = LibraryFolderState::Failed;
+      shell_state_.library_folder_name.clear();
+      PresentLibraryState(false, "usb_access_failed", ERROR_GEN_FAILURE, {},
+                          "unknown removable storage failure");
+    }
+  }
+
   void OnKeyDown(const CoreWindow &, const KeyEventArgs &args) noexcept {
     try {
       const VirtualKey key = args.VirtualKey();
@@ -287,6 +450,11 @@ private:
           shell_state_.page = pages[shell_state_.selected_item];
           changed = true;
         }
+      } else if (shell_state_.page == XboxShellPage::Games &&
+                 (key == VirtualKey::GamepadA || key == VirtualKey::Enter)) {
+        args.Handled(true);
+        DetectRemovableStorage();
+        return;
       } else if (key == VirtualKey::GamepadB || key == VirtualKey::Escape) {
         shell_state_.page = XboxShellPage::Home;
         changed = true;
@@ -409,6 +577,8 @@ private:
   std::vector<ProbeResult> results_;
   ::Core::Uwp::BridgeStatus bridge_status_{};
   XboxShellState shell_state_{};
+  LibraryFolderAccess library_folder_access_{};
+  bool library_scan_active_{};
   std::unique_ptr<D3D12StatusRenderer> renderer_;
 };
 

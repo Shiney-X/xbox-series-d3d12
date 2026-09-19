@@ -104,6 +104,21 @@ Se o Xbox encerrar o processo em vez de retomá-lo, o journal mostrará uma nova
 sessão `launch` depois de `suspend`, sem o evento `resume` correspondente. Esse
 resultado deve ser preservado; não é equivalente a uma retomada aprovada.
 
+## Testar o acesso USB da biblioteca
+
+O pacote `0.3.0.1` substitui o `FolderPicker`, que permaneceu carregando sem
+origens no Xbox, por acesso direto e controlado a dispositivos removíveis. Ele
+ainda não navega nas pastas, procura ou executa jogos.
+
+1. Formate um pendrive como armazenamento de mídia reconhecido pelo Xbox.
+2. Conecte o pendrive antes de iniciar o aplicativo.
+3. Abra **Games**. A primeira varredura ocorre automaticamente.
+4. Se necessário, pressione **A** em `SCAN USB` para repetir a detecção.
+5. Confirme que nenhum seletor externo é aberto.
+6. Confirme `USB STORAGE READY` e o nome do dispositivo.
+7. Remova o USB, pressione **A** e confirme `NO USB STORAGE FOUND`.
+8. Reconecte o USB, pressione **A** e confirme que o dispositivo reaparece.
+
 ## Coletar o relatório
 
 1. No Device Portal, abra **File explorer**.
@@ -112,10 +127,11 @@ resultado deve ser preservado; não é equivalente a uma retomada aprovada.
 3. Entre em `LocalState` e baixe `phase0-results.jsonl`.
 4. Baixe também `phase0-lifecycle.jsonl`.
 5. Baixe `phase1-core.jsonl`.
-6. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
+6. Baixe `phase1-library.jsonl`.
+7. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
    Essa é a rota de contingência usada quando o perfil Game recusa a primeira
    gravação.
-7. Não edite os arquivos. Anexe-os a uma issue junto com:
+8. Não edite os arquivos. Anexe-os a uma issue junto com:
    - modelo do console;
    - versão do sistema operacional;
    - data/hora do teste;
@@ -149,6 +165,10 @@ A bridge do core deve produzir em `phase1-core.jsonl`:
 {"component":"shadps4-core-uwp","passed":true,"details":"upstream=v0.18.0;initialized=1;psf_abi=1;endian=1"}
 ```
 
+Com o USB conectado, `phase1-library.jsonl` deve conter `passed:true`, estado
+`usb_ready` e `source=KnownFolders.RemovableDevices`. O relatório guarda o nome
+do dispositivo, mas não persiste seu caminho absoluto.
+
 O probe de pressão registra o limite atual, o limite esperado pelo Xbox, uso
 antes/depois, pico observado e a quantidade efetivamente alocada. O journal usa
 um identificador por processo:
@@ -178,6 +198,6 @@ apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 
 ## Critério para avançar
 
-Avançar para o seletor de pastas somente depois de confirmar no Series S:
-interface visível, três cartões navegáveis, A/B funcionais, retomada estável,
-`SYSTEM PROBES PASS` e `passed:true` em `phase1-core.jsonl`.
+Avançar para a enumeração de jogos somente depois de confirmar no Series S:
+detecção com e sem o pendrive, retorno com `USB STORAGE READY` e
+`state:"usb_ready"` em `phase1-library.jsonl`.

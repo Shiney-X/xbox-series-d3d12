@@ -354,10 +354,31 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
   DrawRectangle(0.065F, 0.20F, 0.87F, 0.55F, Panel);
 
   if (state.page == XboxShellPage::Games) {
-    DrawText("NO GAMES ADDED", 0.105F, 0.31F, 6.0F, PrimaryText);
-    DrawText("LIBRARY IMPORT COMES NEXT", 0.105F, 0.43F, 4.0F, SecondaryText);
-    DrawText("CORE BRIDGE READY", 0.105F, 0.56F, 4.0F,
-             state.core_ready ? Accent : Failure);
+    switch (state.library_folder_state) {
+    case LibraryFolderState::Restoring:
+      DrawText("SCANNING USB STORAGE", 0.105F, 0.31F, 5.0F, PrimaryText);
+      DrawText("CHECKING REMOVABLE DEVICES", 0.105F, 0.43F, 4.0F,
+               SecondaryText);
+      break;
+    case LibraryFolderState::Ready:
+      DrawText("USB STORAGE READY", 0.105F, 0.29F, 5.5F, Accent);
+      DrawText("DEVICE  " + state.library_folder_name, 0.105F, 0.41F, 4.5F,
+               PrimaryText);
+      DrawText("A RESCAN USB", 0.105F, 0.55F, 4.0F, SecondaryText);
+      break;
+    case LibraryFolderState::Failed:
+      DrawText("FOLDER ACCESS FAILED", 0.105F, 0.29F, 5.5F, Failure);
+      DrawText("SEE PHASE1-LIBRARY.JSONL", 0.105F, 0.43F, 4.0F, SecondaryText);
+      DrawText("A TRY AGAIN", 0.105F, 0.56F, 4.0F, PrimaryText);
+      break;
+    case LibraryFolderState::NotConfigured:
+    default:
+      DrawText("NO USB STORAGE FOUND", 0.105F, 0.29F, 5.5F, PrimaryText);
+      DrawText("A SCAN USB", 0.105F, 0.43F, 5.0F, Accent);
+      DrawText("CONNECT A MEDIA USB DEVICE", 0.105F, 0.56F, 3.8F,
+               SecondaryText);
+      break;
+    }
   } else if (state.page == XboxShellPage::Settings) {
     DrawText("APP PROFILE  GAME", 0.105F, 0.31F, 5.0F, PrimaryText);
     DrawText("RENDERER  D3D12", 0.105F, 0.43F, 5.0F, PrimaryText);
@@ -375,7 +396,9 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);
   }
 
-  DrawText("B BACK", 0.065F, 0.865F, 4.0F, SecondaryText);
+  DrawText(state.page == XboxShellPage::Games ? "A SCAN USB   B BACK"
+                                              : "B BACK",
+           0.065F, 0.865F, 4.0F, SecondaryText);
 }
 
 bool D3D12StatusRenderer::TryTrim() {
