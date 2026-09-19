@@ -12,8 +12,9 @@
 | Vulkan nativo | Dependente do driver | Não | Não é o baseline |
 | Filesystem irrestrito | Sim | Não | APIs GDK |
 | Qt desktop | Sim | Não planejado | Não planejado |
-| Limite de memória do alvo | Sistema | Probe implementado com `MemoryManager`; validação pendente | Contratual/NDA |
-| Suspensão e retomada | Processo desktop | Journal e reapresentação D3D12 implementados; validação pendente | Modelo específico da plataforma |
+| Limite de memória do alvo | Sistema | 5 GiB medidos em perfil Game | Contratual/NDA |
+| Suspensão e retomada | Processo desktop | Mesmo processo e nova apresentação D3D12 validados | Modelo específico da plataforma |
+| `IDXGIDevice3::Trim` | Dependente do dispositivo | Não exposto por `SraKmd_arden`; capability opcional | Modelo específico da plataforma |
 | Uso neste repositório | Desenvolvimento e CI | Alvo público | Overlay futuro e autorizado |
 
 Nenhum resultado desktop conta como prova de suporte no Xbox. Cada capability

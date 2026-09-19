@@ -20,7 +20,9 @@
 - [x] Validar DXC/DXIL no Xbox Series S em perfil Game.
 - [x] Implementar medição controlada de pressão de memória.
 - [x] Instrumentar suspensão e retomada com reapresentação D3D12.
-- [ ] Validar pressão de memória, suspensão e retomada no Series S.
+- [x] Validar pressão de memória no Series S em perfil Game.
+- [x] Validar suspensão, retomada no mesmo processo e nova apresentação D3D12.
+- [ ] Confirmar tela verde após tratar `IDXGIDevice3::Trim` como capability opcional.
 
 ### Critério de saída
 

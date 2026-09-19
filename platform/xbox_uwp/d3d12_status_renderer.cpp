@@ -160,10 +160,15 @@ void D3D12StatusRenderer::Render(bool passed) {
     WaitForGpu();
 }
 
-void D3D12StatusRenderer::Trim() {
+bool D3D12StatusRenderer::TryTrim() {
     ComPtr<IDXGIDevice3> dxgi_device;
-    winrt::check_hresult(device_.As(&dxgi_device));
+    const HRESULT result = device_.As(&dxgi_device);
+    if (result == E_NOINTERFACE) {
+        return false;
+    }
+    winrt::check_hresult(result);
     dxgi_device->Trim();
+    return true;
 }
 
 void D3D12StatusRenderer::CreateTrianglePipeline() {

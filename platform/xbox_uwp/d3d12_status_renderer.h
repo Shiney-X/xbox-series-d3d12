@@ -14,7 +14,7 @@ public:
 
     void Initialize(IUnknown* core_window, float width, float height);
     void Render(bool passed);
-    void Trim();
+    [[nodiscard]] bool TryTrim();
 
 private:
     void CreateTrianglePipeline();

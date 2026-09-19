@@ -238,11 +238,16 @@ private:
         const std::uint32_t journal_error = AppendLifecycleEvent(
             session_id_, "suspend", "suspending event observed;report flushed");
         try {
+            bool trim_supported = false;
             if (renderer_) {
-                renderer_->Trim();
+                trim_supported = renderer_->TryTrim();
             }
+            const std::string trim_details =
+                trim_supported ? "dxgi_trim_supported=1;dxgi_trim_called=1"
+                               : "dxgi_trim_supported=0;dxgi_trim_called=0";
             UpsertResult({"lifecycle-suspend", journal_error == ERROR_SUCCESS, journal_error,
-                          "suspending event observed;DXGI Trim called;session=" + session_id_});
+                          "suspending event observed;" + trim_details +
+                              ";session=" + session_id_});
         } catch (const hresult_error& error) {
             UpsertResult({"lifecycle-suspend", false,
                           static_cast<std::uint32_t>(error.code().value),

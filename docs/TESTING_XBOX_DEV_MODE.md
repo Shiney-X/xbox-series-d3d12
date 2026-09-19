@@ -39,7 +39,7 @@ detalhado sempre deve ser coletado.
 1. Abra a execução mais recente do workflow **Windows probes** no GitHub.
 2. Baixe o artefato `xbox-phase0-uwp-sideload`.
 3. Extraia o ZIP. Entre na pasta
-   `AppPackages/xbox_phase0_uwp_0.1.0.7_x64_Test` e localize o `.msix`, o
+   `AppPackages/xbox_phase0_uwp_0.1.0.8_x64_Test` e localize o `.msix`, o
    certificado `.cer` e o pacote em `Dependencies/x64`.
 
 O certificado é efêmero e serve somente para sideload do build correspondente.
@@ -82,6 +82,10 @@ visíveis no Device Portal:
 4. Abra novamente **xbox-series-d3d12 probes**.
 5. Confirme que o triângulo reaparece sem tela vermelha ou encerramento.
 6. Repita o ciclo uma segunda vez para verificar que o comportamento é estável.
+
+O dispositivo D3D12 `SraKmd_arden` medido não expôs `IDXGIDevice3`. O probe
+registra `dxgi_trim_supported=0` sem reprovar a suspensão; a retomada e a nova
+apresentação continuam obrigatórias.
 
 Se o Xbox encerrar o processo em vez de retomá-lo, o journal mostrará uma nova
 sessão `launch` depois de `suspend`, sem o evento `resume` correspondente. Esse

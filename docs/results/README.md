@@ -71,3 +71,25 @@ triângulo DXIL também foi confirmado visualmente, sem regressão na apresenta�
 - SHA-256 do JSONL: `8b7211fa894a4580222b095c3e6f759d461bbd5e41bd5719c1072e3cd40c4dec`;
 - arquivo bruto:
   [`xbox-series-s-game-aliases-10.0.26100.9426.jsonl`](xbox-series-s-game-aliases-10.0.26100.9426.jsonl).
+
+## Xbox Series S — pressão de memória e ciclo de vida
+
+O pacote `0.1.0.7`, executado em perfil **Game**, mediu um limite atual e
+esperado de 5 GiB. O probe comprometeu e tocou 256 MiB, observou o crescimento
+no contador do sistema e retornou ao uso inicial depois de liberar as regiões.
+
+O journal confirmou `launch → suspend → resume` na mesma sessão e no mesmo
+processo. A apresentação do triângulo depois da retomada também passou. A tela
+ficou vermelha porque a consulta de `IDXGIDevice3` no dispositivo D3D12
+`SraKmd_arden` retornou `E_NOINTERFACE` (`0x80004002`); esse resultado passa a
+ser registrado como capability ausente, e não como falha do ciclo de vida.
+
+- limite do sandbox: `5368709120` bytes (5 GiB);
+- carga controlada: `268435456` bytes (256 MiB);
+- uso antes/depois: `8110080` bytes;
+- pico observado: `277069824` bytes;
+- SHA-256 do relatório: `ec822ed27596c8e27ea8f304612a735b7aec19bf1ef096048ec017786b203c77`;
+- SHA-256 do journal: `a3dcadede5eaf1abad020f0723d762258234694e86d6f1a8afb06c7901bd85ae`;
+- arquivos brutos:
+  [`xbox-series-s-game-memory-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-game-memory-lifecycle-10.0.26100.9426.jsonl) e
+  [`xbox-series-s-game-lifecycle-journal-10.0.26100.9426.jsonl`](xbox-series-s-game-lifecycle-journal-10.0.26100.9426.jsonl).
