@@ -108,3 +108,24 @@ sessão e no mesmo processo.
 - arquivos brutos:
   [`xbox-series-s-game-phase0-final-10.0.26100.9426.jsonl`](xbox-series-s-game-phase0-final-10.0.26100.9426.jsonl) e
   [`xbox-series-s-game-phase0-final-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-game-phase0-final-lifecycle-10.0.26100.9426.jsonl).
+
+## Xbox Series S — shell e bridge da Fase 1
+
+O pacote `0.2.0.1`, executado em perfil **Game**, apresentou o shell D3D12,
+validou a bridge compilada contra tipos do upstream `v0.18.0` e permitiu
+navegar entre Games, Settings e Diagnostics. O direcional e **A** funcionaram;
+**B** retornou das páginas para o shell sem propagar o comando ao Dev Home.
+
+O journal registrou doze eventos de navegação com `input_consumed=1` antes da
+única suspensão intencional no final da sessão.
+
+- sistema operacional: `10.0.26100.9426`;
+- resultado da bridge: `initialized=1`, `psf_abi=1`, `endian=1`;
+- validação visual e navegação: aprovadas;
+- SHA-256 da bridge:
+  `e833684e3554eee179a84ba68ade8c735c1a6c979e2cb0ab5809977e4b34e7e6`;
+- SHA-256 do journal:
+  `ac16ef60a4e05c452e48b41eb9a3903b12591be61f569dd79d2139b937d309bf`;
+- arquivos brutos:
+  [`xbox-series-s-game-phase1-core-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-core-10.0.26100.9426.jsonl) e
+  [`xbox-series-s-game-phase1-navigation-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-navigation-10.0.26100.9426.jsonl).

@@ -104,6 +104,25 @@ Se o Xbox encerrar o processo em vez de retomá-lo, o journal mostrará uma nova
 sessão `launch` depois de `suspend`, sem o evento `resume` correspondente. Esse
 resultado deve ser preservado; não é equivalente a uma retomada aprovada.
 
+## Testar a pasta da biblioteca
+
+O pacote `0.3.0.0` adiciona o primeiro fluxo real da tela Games. Ele ainda não
+procura nem executa jogos.
+
+1. Abra **Games** e pressione **A** em `ADD FOLDER`.
+2. Confirme que o seletor de pastas do sistema aparece.
+3. Escolha uma pasta de teste exposta pelo seletor. Se houver armazenamento USB,
+   prefira uma pasta vazia chamada `PS4Games`.
+4. Confirme o retorno ao aplicativo com `GAME FOLDER READY` e o nome da pasta.
+5. Volte ao Dev Home e encerre o aplicativo. Reiniciar o console também serve
+   para garantir um novo processo.
+6. Abra novamente o aplicativo e entre em **Games**.
+7. Confirme que `GAME FOLDER READY` aparece sem abrir novamente o seletor.
+
+Se o seletor não abrir sem um usuário conectado, repita essa parte com um
+usuário de teste. Registre essa condição, pois o token de acesso pode ser
+associado ao usuário do pacote.
+
 ## Coletar o relatório
 
 1. No Device Portal, abra **File explorer**.
@@ -112,10 +131,11 @@ resultado deve ser preservado; não é equivalente a uma retomada aprovada.
 3. Entre em `LocalState` e baixe `phase0-results.jsonl`.
 4. Baixe também `phase0-lifecycle.jsonl`.
 5. Baixe `phase1-core.jsonl`.
-6. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
+6. Baixe `phase1-library.jsonl`.
+7. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
    Essa é a rota de contingência usada quando o perfil Game recusa a primeira
    gravação.
-7. Não edite os arquivos. Anexe-os a uma issue junto com:
+8. Não edite os arquivos. Anexe-os a uma issue junto com:
    - modelo do console;
    - versão do sistema operacional;
    - data/hora do teste;
@@ -149,6 +169,10 @@ A bridge do core deve produzir em `phase1-core.jsonl`:
 {"component":"shadps4-core-uwp","passed":true,"details":"upstream=v0.18.0;initialized=1;psf_abi=1;endian=1"}
 ```
 
+Depois da reabertura, `phase1-library.jsonl` deve conter `passed:true`, estado
+`restored` e `future_access_token=shadps4-game-library`. O relatório guarda o
+nome da pasta, mas não persiste seu caminho absoluto.
+
 O probe de pressão registra o limite atual, o limite esperado pelo Xbox, uso
 antes/depois, pico observado e a quantidade efetivamente alocada. O journal usa
 um identificador por processo:
@@ -178,6 +202,6 @@ apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 
 ## Critério para avançar
 
-Avançar para o seletor de pastas somente depois de confirmar no Series S:
-interface visível, três cartões navegáveis, A/B funcionais, retomada estável,
-`SYSTEM PROBES PASS` e `passed:true` em `phase1-core.jsonl`.
+Avançar para a enumeração de jogos somente depois de confirmar no Series S:
+seletor visível, retorno com `GAME FOLDER READY`, novo processo restaurando o
+token e `state:"restored"` em `phase1-library.jsonl`.

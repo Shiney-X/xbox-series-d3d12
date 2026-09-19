@@ -38,7 +38,8 @@ Consulte [`docs/results`](results/README.md).
 
 ## Fase 1 — Integração do upstream
 
-**Status: integração base concluída; shell Xbox em validação.**
+**Status: integração base e shell Xbox concluídos; acesso à biblioteca em
+validação.**
 
 - [x] Definir estratégia de importação preservando histórico Git.
 - [x] Registrar revisão upstream de referência.
@@ -53,14 +54,22 @@ Consulte [`docs/results`](results/README.md).
 - [x] Adicionar navegação por direcional, A e B.
 - [x] Exibir seções Jogos, Configurações e Diagnósticos.
 - [x] Persistir o resultado da bridge em `LocalState/phase1-core.jsonl`.
-- [ ] Validar desenho, navegação e retomada no Xbox Series S em perfil Game.
-- [ ] Implementar seletor de pasta pela API UWP e token persistente.
+- [x] Validar desenho, navegação e retomada no Xbox Series S em perfil Game.
+
+### Fase 1C — Acesso à biblioteca no Xbox
+
+- [x] Implementar seletor de pasta pela API UWP e token persistente.
+- [x] Restaurar o acesso salvo de forma assíncrona na inicialização.
+- [x] Expor estados de seleção e acesso na tela Games.
+- [x] Persistir diagnóstico em `LocalState/phase1-library.jsonl`.
+- [ ] Validar `FolderPicker` e `FutureAccessList` no Xbox Series S.
+- [ ] Validar o token depois de encerrar e reabrir o processo.
 - [ ] Enumerar uma biblioteca real a partir da pasta escolhida.
 
-Nesta etapa, Jogos e Configurações são telas funcionais de navegação,
-mas ainda não importam conteúdo nem iniciam títulos. A bridge inicial prova
-que o mesmo MSIX compila e executa código da árvore upstream; ela não equivale
-a portar todos os subsistemas do emulador para UWP.
+Nesta etapa, Jogos permite selecionar e restaurar uma pasta, mas ainda não
+enumera conteúdo nem inicia títulos. A bridge inicial prova que o mesmo MSIX
+compila e executa código da árvore upstream; ela não equivale a portar todos os
+subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 

@@ -354,10 +354,39 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
   DrawRectangle(0.065F, 0.20F, 0.87F, 0.55F, Panel);
 
   if (state.page == XboxShellPage::Games) {
-    DrawText("NO GAMES ADDED", 0.105F, 0.31F, 6.0F, PrimaryText);
-    DrawText("LIBRARY IMPORT COMES NEXT", 0.105F, 0.43F, 4.0F, SecondaryText);
-    DrawText("CORE BRIDGE READY", 0.105F, 0.56F, 4.0F,
-             state.core_ready ? Accent : Failure);
+    switch (state.library_folder_state) {
+    case LibraryFolderState::Restoring:
+      DrawText("RESTORING GAME FOLDER", 0.105F, 0.31F, 5.0F, PrimaryText);
+      DrawText("CHECKING SAVED ACCESS TOKEN", 0.105F, 0.43F, 4.0F,
+               SecondaryText);
+      break;
+    case LibraryFolderState::Picking:
+      DrawText("FOLDER PICKER OPEN", 0.105F, 0.31F, 5.0F, PrimaryText);
+      DrawText("CHOOSE A PS4 GAME FOLDER", 0.105F, 0.43F, 4.0F, SecondaryText);
+      break;
+    case LibraryFolderState::Ready:
+      DrawText("GAME FOLDER READY", 0.105F, 0.29F, 5.5F, Accent);
+      DrawText("FOLDER  " + state.library_folder_name, 0.105F, 0.41F, 4.5F,
+               PrimaryText);
+      DrawText("A CHANGE FOLDER", 0.105F, 0.55F, 4.0F, SecondaryText);
+      break;
+    case LibraryFolderState::Failed:
+      DrawText("FOLDER ACCESS FAILED", 0.105F, 0.29F, 5.5F, Failure);
+      DrawText("SEE PHASE1-LIBRARY.JSONL", 0.105F, 0.43F, 4.0F, SecondaryText);
+      DrawText("A TRY AGAIN", 0.105F, 0.56F, 4.0F, PrimaryText);
+      break;
+    case LibraryFolderState::Cancelled:
+      DrawText("FOLDER SELECTION CANCELLED", 0.105F, 0.29F, 5.0F, PrimaryText);
+      DrawText("A TRY AGAIN", 0.105F, 0.46F, 4.5F, SecondaryText);
+      break;
+    case LibraryFolderState::NotConfigured:
+    default:
+      DrawText("NO GAME FOLDER", 0.105F, 0.29F, 5.5F, PrimaryText);
+      DrawText("A ADD FOLDER", 0.105F, 0.43F, 5.0F, Accent);
+      DrawText("SELECT A FOLDER WITH PS4 DUMPS", 0.105F, 0.56F, 3.8F,
+               SecondaryText);
+      break;
+    }
   } else if (state.page == XboxShellPage::Settings) {
     DrawText("APP PROFILE  GAME", 0.105F, 0.31F, 5.0F, PrimaryText);
     DrawText("RENDERER  D3D12", 0.105F, 0.43F, 5.0F, PrimaryText);
@@ -375,7 +404,8 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);
   }
 
-  DrawText("B BACK", 0.065F, 0.865F, 4.0F, SecondaryText);
+  DrawText(state.page == XboxShellPage::Games ? "A FOLDER   B BACK" : "B BACK",
+           0.065F, 0.865F, 4.0F, SecondaryText);
 }
 
 bool D3D12StatusRenderer::TryTrim() {

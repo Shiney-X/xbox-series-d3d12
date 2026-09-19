@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 enum class XboxShellPage : std::uint8_t {
@@ -17,12 +18,23 @@ enum class XboxShellPage : std::uint8_t {
   Diagnostics,
 };
 
+enum class LibraryFolderState : std::uint8_t {
+  NotConfigured,
+  Restoring,
+  Picking,
+  Ready,
+  Cancelled,
+  Failed,
+};
+
 struct XboxShellState {
   XboxShellPage page{XboxShellPage::Home};
   std::uint32_t selected_item{};
   bool core_ready{};
   bool probes_passed{};
   std::string_view upstream_version{"unknown"};
+  LibraryFolderState library_folder_state{LibraryFolderState::NotConfigured};
+  std::string library_folder_name;
 };
 
 class D3D12StatusRenderer final {
