@@ -114,3 +114,38 @@ SPDX-License-Identifier = "MIT"
 path = "src/video_core/host_shaders/fsr/*"
 SPDX-FileCopyrightText = "Copyright (c) 2021 Advanced Micro Devices, Inc. All rights reserved."
 SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [
+    ".github/ISSUE_TEMPLATE/xbox-probe-result.yml",
+    ".github/workflows/windows-probes.yml",
+    "README.md",
+    "docs/ARCHITECTURE.md",
+    "docs/PLATFORM_MATRIX.md",
+    "docs/REFERENCES.md",
+    "docs/ROADMAP.md",
+    "docs/TESTING_XBOX_DEV_MODE.md",
+    "docs/UPSTREAM.md",
+    "docs/adr/0001-uwp-public-baseline.md",
+    "docs/adr/0002-native-d3d12-backend.md",
+    "docs/adr/0003-upstream-history-integration.md",
+    "docs/results/README.md",
+    "docs/results/*.jsonl",
+    "platform/xbox_uwp/GenerateAssets.ps1",
+    "platform/xbox_uwp/Main.cpp",
+    "platform/xbox_uwp/Package.appxmanifest",
+    "platform/xbox_uwp/Package.appxmanifest.in",
+    "platform/xbox_uwp/d3d12_status_renderer.cpp",
+    "platform/xbox_uwp/d3d12_status_renderer.h",
+    "platform/xbox_uwp/memory_pressure_probe.cpp",
+    "platform/xbox_uwp/memory_pressure_probe.h",
+    "platform/xbox_uwp/xbox_phase0_uwp.vcxproj",
+    "scripts/windows/Build-UwpPackage.ps1",
+    "src/phase0/probes.cpp",
+    "src/phase0/probes.h",
+    "tests/probes/CMakeLists.txt",
+    "tests/probes/desktop_main.cpp",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Shiney-X and xbox-series-d3d12 contributors"
+SPDX-License-Identifier = "GPL-2.0-or-later"
