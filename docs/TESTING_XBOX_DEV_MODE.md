@@ -5,16 +5,18 @@ desktop não substitui esta execução.
 
 ## O que o pacote mede
 
-O aplicativo executa quatro probes, uma apresentação e uma verificação de
+O aplicativo executa cinco probes, uma apresentação e uma verificação de
 persistência:
 
 1. arquitetura x64 e políticas de mitigação do processo;
 2. reserva, commit, proteção e realocação no mesmo endereço virtual;
-3. transição de página RW para RX e execução de seis bytes de código x86-64;
-4. criação de um dispositivo D3D12 de hardware e consulta de capabilities;
-5. criação de swapchain para `CoreWindow`, root signature, PSO, compilação
+3. reserva e divisão de placeholders, substituição por duas views fixas da
+   mesma seção e coerência bidirecional entre os aliases;
+4. transição de página RW para RX e execução de seis bytes de código x86-64;
+5. criação de um dispositivo D3D12 de hardware e consulta de capabilities;
+6. criação de swapchain para `CoreWindow`, root signature, PSO, compilação
    HLSL Shader Model 6 para DXIL por DXC, desenho de um triângulo e `Present`.
-6. gravação síncrona do relatório no armazenamento local do pacote.
+7. gravação síncrona do relatório no armazenamento local do pacote.
 
 A tela final fica verde somente quando os probes, a apresentação e a gravação
 passam. Vermelho indica falha em pelo menos uma dessas etapas. O resultado
@@ -34,7 +36,7 @@ detalhado sempre deve ser coletado.
 1. Abra a execução mais recente do workflow **Windows probes** no GitHub.
 2. Baixe o artefato `xbox-phase0-uwp-sideload`.
 3. Extraia o ZIP. Entre na pasta
-   `AppPackages/xbox_phase0_uwp_0.1.0.5_x64_Test` e localize o `.msix`, o
+   `AppPackages/xbox_phase0_uwp_0.1.0.6_x64_Test` e localize o `.msix`, o
    certificado `.cer` e o pacote em `Dependencies/x64`.
 
 O certificado é efêmero e serve somente para sideload do build correspondente.
@@ -96,6 +98,12 @@ execução é:
 {"probe":"executable-memory","passed":true,"win32_error":0,"details":"return_value=42;exception_caught=0"}
 ```
 
+O novo probe de aliases deve produzir uma linha equivalente a:
+
+```json
+{"probe":"memory-aliases","passed":true,"win32_error":0,"details":"view_size=65536;reservation_size=131072;fixed_views=1;forward_alias=1;reverse_alias=1"}
+```
+
 ## Build local opcional
 
 Em um PC Windows com Visual Studio 2022, workload C++ para UWP e Windows SDK
@@ -116,6 +124,6 @@ apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 ## Critério para avançar
 
 Não iniciar a integração do upstream shadPS4 antes de obter o arquivo bruto do
-Series S. Falha em `executable-memory` ou `virtual-memory` exige uma decisão de
-arquitetura; falha apenas em `d3d12-device`/`uwp-presentation` direciona o
-trabalho ao host gráfico.
+Series S. Falha em `executable-memory`, `virtual-memory` ou `memory-aliases`
+exige uma decisão de arquitetura; falha apenas em
+`d3d12-device`/`uwp-presentation` direciona o trabalho ao host gráfico.

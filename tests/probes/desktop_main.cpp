@@ -18,13 +18,15 @@ int main(int argc, char** argv) {
         results.push_back(XboxSeriesD3D12::Phase0::ProbeCapabilities());
     } else if (command == "--memory") {
         results.push_back(XboxSeriesD3D12::Phase0::ProbeVirtualMemory());
+    } else if (command == "--memory-aliases") {
+        results.push_back(XboxSeriesD3D12::Phase0::ProbeMemoryAliases());
     } else if (command == "--execution") {
         results.push_back(XboxSeriesD3D12::Phase0::ProbeExecutableMemory());
     } else if (command == "--d3d12") {
         results.push_back(XboxSeriesD3D12::Phase0::ProbeD3D12Device());
     } else {
         std::cerr << "usage: xbox_phase0_probe "
-                     "[--all|--capabilities|--memory|--execution|--d3d12]\n";
+                     "[--all|--capabilities|--memory|--memory-aliases|--execution|--d3d12]\n";
         return 2;
     }
 

@@ -4,6 +4,7 @@
 |---|---:|---:|---:|
 | Execução x86-64 nativa | Sim | Validada no Series S | Sim, acesso condicionado |
 | `codeGeneration` | Não requerida | Validada com página RW→RX | Modelo diferente |
+| Placeholders e aliases de memória | Disponíveis no Windows 10+ | Probe implementado; validação pendente | Modelo específico da plataforma |
 | Dispositivo D3D12 | CI validado | Validado no `SraKmd_arden` | Sim, API específica |
 | Swapchain D3D12 | Não necessária no runner | `CoreWindow` + `Present` validados | API específica |
 | Graphics PSO + draw | Não necessário no runner | Triângulo validado no Series S | API específica |

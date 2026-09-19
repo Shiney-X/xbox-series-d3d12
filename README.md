@@ -15,7 +15,8 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
   código executável e dispositivo D3D12.
 - [x] Host UWP x64 com pacote de sideload para Xbox Dev Mode.
 - [x] Apresentação D3D12 mínima com indicação visual de sucesso ou falha.
-- [ ] Executar o pacote no Series S e anexar o relatório do console.
+- [x] Execução, DXIL e triângulo validados no Series S em perfil Game.
+- [ ] Validar placeholders e aliases de memória no Series S.
 - [ ] Importação do upstream shadPS4.
 - [ ] Backend D3D12 integrado ao video core.
 

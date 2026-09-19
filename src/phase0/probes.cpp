@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <sstream>
@@ -163,6 +164,85 @@ ProbeResult ProbeVirtualMemory() {
     return {"virtual-memory", fixed_address_succeeded, fixed_address_error, details.str()};
 }
 
+ProbeResult ProbeMemoryAliases() {
+    SYSTEM_INFO system_info{};
+    GetSystemInfo(&system_info);
+    const SIZE_T view_size = system_info.dwAllocationGranularity;
+    const SIZE_T reservation_size = view_size * 2;
+
+    const HANDLE mapping =
+        CreateFileMappingFromApp(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, view_size, nullptr);
+    if (mapping == nullptr) {
+        return {"memory-aliases", false, GetLastError(), "pagefile mapping creation failed"};
+    }
+
+    void* const reservation =
+        VirtualAlloc2FromApp(GetCurrentProcess(), nullptr, reservation_size,
+                             MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0);
+    if (reservation == nullptr) {
+        const DWORD error = GetLastError();
+        CloseHandle(mapping);
+        return {"memory-aliases", false, error, "placeholder reservation failed"};
+    }
+
+    auto* const second_address = static_cast<std::byte*>(reservation) + view_size;
+    if (!VirtualFree(reservation, view_size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER)) {
+        const DWORD error = GetLastError();
+        VirtualFree(reservation, 0, MEM_RELEASE);
+        CloseHandle(mapping);
+        return {"memory-aliases", false, error, "placeholder split failed"};
+    }
+
+    void* first_view = nullptr;
+    void* second_view = nullptr;
+    auto cleanup = [&]() {
+        if (first_view != nullptr) {
+            UnmapViewOfFileEx(first_view, MEM_PRESERVE_PLACEHOLDER);
+        }
+        if (second_view != nullptr) {
+            UnmapViewOfFileEx(second_view, MEM_PRESERVE_PLACEHOLDER);
+        }
+        VirtualFree(reservation, 0, MEM_RELEASE);
+        VirtualFree(second_address, 0, MEM_RELEASE);
+        CloseHandle(mapping);
+    };
+
+    first_view = MapViewOfFile3FromApp(mapping, GetCurrentProcess(), reservation, 0, view_size,
+                                       MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0);
+    if (first_view != reservation) {
+        const DWORD error = GetLastError();
+        cleanup();
+        return {"memory-aliases", false, error, "first placeholder replacement failed"};
+    }
+
+    second_view = MapViewOfFile3FromApp(mapping, GetCurrentProcess(), second_address, 0, view_size,
+                                        MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0);
+    if (second_view != second_address) {
+        const DWORD error = GetLastError();
+        cleanup();
+        return {"memory-aliases", false, error, "second placeholder replacement failed"};
+    }
+
+    constexpr std::uint64_t first_pattern = 0x0123456789ABCDEFull;
+    constexpr std::uint64_t second_pattern = 0xFEDCBA9876543210ull;
+    auto* const first_words = static_cast<std::uint64_t*>(first_view);
+    auto* const second_words = static_cast<std::uint64_t*>(second_view);
+
+    first_words[0] = first_pattern;
+    const bool forward_alias = second_words[0] == first_pattern;
+    second_words[1] = second_pattern;
+    const bool reverse_alias = first_words[1] == second_pattern;
+
+    cleanup();
+
+    std::ostringstream details;
+    details << "view_size=" << view_size << ";reservation_size=" << reservation_size
+            << ";fixed_views=1;forward_alias=" << forward_alias
+            << ";reverse_alias=" << reverse_alias;
+    return {"memory-aliases", forward_alias && reverse_alias,
+            forward_alias && reverse_alias ? ERROR_SUCCESS : ERROR_INVALID_DATA, details.str()};
+}
+
 ProbeResult ProbeExecutableMemory() {
 #if !defined(_M_X64) && !defined(__x86_64__)
     return {"executable-memory", false, ERROR_NOT_SUPPORTED, "x86-64 is required"};
@@ -284,9 +364,10 @@ ProbeResult ProbeD3D12Device() {
 
 std::vector<ProbeResult> RunAllProbes() {
     std::vector<ProbeResult> results;
-    results.reserve(4);
+    results.reserve(5);
     results.push_back(ProbeCapabilities());
     results.push_back(ProbeVirtualMemory());
+    results.push_back(ProbeMemoryAliases());
     results.push_back(ProbeExecutableMemory());
     results.push_back(ProbeD3D12Device());
     return results;

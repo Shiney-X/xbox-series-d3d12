@@ -18,6 +18,7 @@ struct ProbeResult {
 [[nodiscard]] std::vector<ProbeResult> RunAllProbes();
 [[nodiscard]] ProbeResult ProbeCapabilities();
 [[nodiscard]] ProbeResult ProbeVirtualMemory();
+[[nodiscard]] ProbeResult ProbeMemoryAliases();
 [[nodiscard]] ProbeResult ProbeExecutableMemory();
 [[nodiscard]] ProbeResult ProbeD3D12Device();
 [[nodiscard]] bool AllPassed(const std::vector<ProbeResult>& results) noexcept;

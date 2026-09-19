@@ -11,7 +11,8 @@
 - [x] Criar host UWP x64 para executar os mesmos probes.
 - [x] Gerar pacote de sideload assinado no CI.
 - [x] Implantar e executar no Xbox Series S sem debugger.
-- [ ] Implementar aliases e placeholders no probe de memória.
+- [x] Implementar aliases e placeholders no probe de memória.
+- [ ] Validar aliases e placeholders no Xbox Series S em perfil Game.
 - [x] Apresentar um clear D3D12 por swapchain UWP.
 - [x] Implementar triângulo D3D12 com root signature e PSO.
 - [x] Validar o triângulo D3D12 no Xbox Series S em perfil Game.
