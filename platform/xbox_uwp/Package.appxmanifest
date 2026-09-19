@@ -7,7 +7,7 @@
   <Identity
     Name="ShineyX.xbox-series-d3d12"
     Publisher="CN=xbox-series-d3d12-dev"
-    Version="0.3.0.0" />
+    Version="0.3.0.1" />
   <mp:PhoneIdentity PhoneProductId="2d321cd1-304e-4496-b383-78f208531352" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>shadPS4 Xbox Shell</DisplayName>
@@ -32,9 +32,26 @@
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#101820" />
       </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="shadps4gamefiles">
+            <uap:DisplayName>shadPS4 game files</uap:DisplayName>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.sfo</uap:FileType>
+              <uap:FileType>.self</uap:FileType>
+              <uap:FileType>.sprx</uap:FileType>
+              <uap:FileType>.prx</uap:FileType>
+              <uap:FileType>.elf</uap:FileType>
+              <uap:FileType>.bin</uap:FileType>
+              <uap:FileType>.pkg</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
     </Application>
   </Applications>
   <Capabilities>
     <Capability Name="codeGeneration" />
+    <uap:Capability Name="removableStorage" />
   </Capabilities>
 </Package>

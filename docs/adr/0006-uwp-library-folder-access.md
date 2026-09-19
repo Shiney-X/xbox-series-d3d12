@@ -1,4 +1,4 @@
-# ADR-0006: acesso persistente à pasta da biblioteca pelo UWP
+# ADR-0006: acesso USB à biblioteca sem `FolderPicker`
 
 - **Status:** aceito
 - **Data:** 2026-09-19
@@ -6,27 +6,31 @@
 ## Contexto
 
 O host Xbox precisa acessar dumps fornecidos pelo usuário fora do diretório
-privado do pacote. Caminhos arbitrários e capacidades amplas de filesystem não
-são uma base portável ou confiável para o sandbox UWP do Xbox Dev Mode.
+privado do pacote. O protótipo `0.3.0.0` abriu o `FolderPicker`, mas o seletor
+permaneceu carregando sem enumerar qualquer origem. O comportamento foi o mesmo
+sem usuário e com um usuário conectado, mesmo com um pendrive reconhecido pelo
+Xbox como dispositivo de mídia.
+
+`broadFileSystemAccess` não é suportado no Xbox. Manter o seletor bloqueado ou
+tentar caminhos arbitrários não oferece uma base utilizável para o port.
 
 ## Decisão
 
-A tela Games abre `Windows.Storage.Pickers.FolderPicker` por ação explícita do
-usuário. A pasta retornada é registrada em
-`StorageApplicationPermissions::FutureAccessList` com um token estável. Nas
-inicializações seguintes, o host solicita a pasta por esse token em vez de
-persistir ou reabrir diretamente um caminho absoluto.
+O host acessa `KnownFolders::RemovableDevices` com a capability
+`removableStorage`. O manifesto declara inicialmente os tipos necessários para
+descoberta e carregamento controlado de dumps PS4. A tela Games detecta o
+primeiro dispositivo removível de forma assíncrona e mostra o resultado sem
+abrir UI externa.
 
-Seleção e restauração são assíncronas e mantêm o objeto `IFrameworkView`
-vivo durante a operação. Cancelamento é um estado válido; exceções e tokens
-inválidos aparecem como falha controlada na interface e em
-`phase1-library.jsonl`.
+Este primeiro incremento seleciona a raiz do primeiro dispositivo. Depois da
+validação no Series S, o próprio shell implementará navegação por diretórios,
+sem expor o filesystem geral do sistema.
 
 ## Consequências
 
-- O sistema continua responsável pelo consentimento e pelo escopo do acesso.
-- O token pode depender do usuário ativo no Xbox; isso deve ser medido no
-  hardware antes da enumeração dos jogos.
-- Este incremento não interpreta `param.sfo` nem carrega executáveis.
-- O próximo incremento percorrerá a pasta concedida procurando
-  `sce_sys/param.sfo`, sem ampliar as permissões.
+- A biblioteca passa a depender de armazenamento USB para conteýo externo.
+- O acesso continua limitado pelas capabilities e associações de tipos UWP.
+- O aplicativo não persiste caminhos absolutos nem usa capabilities restritas.
+- Arquivos sem extensão e tipos ainda não declarados precisarão de uma etapa
+  de importação para `LocalState` ou de outra estratégia compatível antes do
+  primeiro boot completo.

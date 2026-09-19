@@ -356,34 +356,26 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
   if (state.page == XboxShellPage::Games) {
     switch (state.library_folder_state) {
     case LibraryFolderState::Restoring:
-      DrawText("RESTORING GAME FOLDER", 0.105F, 0.31F, 5.0F, PrimaryText);
-      DrawText("CHECKING SAVED ACCESS TOKEN", 0.105F, 0.43F, 4.0F,
+      DrawText("SCANNING USB STORAGE", 0.105F, 0.31F, 5.0F, PrimaryText);
+      DrawText("CHECKING REMOVABLE DEVICES", 0.105F, 0.43F, 4.0F,
                SecondaryText);
       break;
-    case LibraryFolderState::Picking:
-      DrawText("FOLDER PICKER OPEN", 0.105F, 0.31F, 5.0F, PrimaryText);
-      DrawText("CHOOSE A PS4 GAME FOLDER", 0.105F, 0.43F, 4.0F, SecondaryText);
-      break;
     case LibraryFolderState::Ready:
-      DrawText("GAME FOLDER READY", 0.105F, 0.29F, 5.5F, Accent);
-      DrawText("FOLDER  " + state.library_folder_name, 0.105F, 0.41F, 4.5F,
+      DrawText("USB STORAGE READY", 0.105F, 0.29F, 5.5F, Accent);
+      DrawText("DEVICE  " + state.library_folder_name, 0.105F, 0.41F, 4.5F,
                PrimaryText);
-      DrawText("A CHANGE FOLDER", 0.105F, 0.55F, 4.0F, SecondaryText);
+      DrawText("A RESCAN USB", 0.105F, 0.55F, 4.0F, SecondaryText);
       break;
     case LibraryFolderState::Failed:
       DrawText("FOLDER ACCESS FAILED", 0.105F, 0.29F, 5.5F, Failure);
       DrawText("SEE PHASE1-LIBRARY.JSONL", 0.105F, 0.43F, 4.0F, SecondaryText);
       DrawText("A TRY AGAIN", 0.105F, 0.56F, 4.0F, PrimaryText);
       break;
-    case LibraryFolderState::Cancelled:
-      DrawText("FOLDER SELECTION CANCELLED", 0.105F, 0.29F, 5.0F, PrimaryText);
-      DrawText("A TRY AGAIN", 0.105F, 0.46F, 4.5F, SecondaryText);
-      break;
     case LibraryFolderState::NotConfigured:
     default:
-      DrawText("NO GAME FOLDER", 0.105F, 0.29F, 5.5F, PrimaryText);
-      DrawText("A ADD FOLDER", 0.105F, 0.43F, 5.0F, Accent);
-      DrawText("SELECT A FOLDER WITH PS4 DUMPS", 0.105F, 0.56F, 3.8F,
+      DrawText("NO USB STORAGE FOUND", 0.105F, 0.29F, 5.5F, PrimaryText);
+      DrawText("A SCAN USB", 0.105F, 0.43F, 5.0F, Accent);
+      DrawText("CONNECT A MEDIA USB DEVICE", 0.105F, 0.56F, 3.8F,
                SecondaryText);
       break;
     }
@@ -404,7 +396,8 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);
   }
 
-  DrawText(state.page == XboxShellPage::Games ? "A FOLDER   B BACK" : "B BACK",
+  DrawText(state.page == XboxShellPage::Games ? "A SCAN USB   B BACK"
+                                              : "B BACK",
            0.065F, 0.865F, 4.0F, SecondaryText);
 }
 

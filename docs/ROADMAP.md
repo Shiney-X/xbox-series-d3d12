@@ -38,7 +38,7 @@ Consulte [`docs/results`](results/README.md).
 
 ## Fase 1 — Integração do upstream
 
-**Status: integração base e shell Xbox concluídos; acesso à biblioteca em
+**Status: integração base e shell Xbox concluídos; acesso USB à biblioteca em
 validação.**
 
 - [x] Definir estratégia de importação preservando histórico Git.
@@ -56,20 +56,22 @@ validação.**
 - [x] Persistir o resultado da bridge em `LocalState/phase1-core.jsonl`.
 - [x] Validar desenho, navegação e retomada no Xbox Series S em perfil Game.
 
-### Fase 1C — Acesso à biblioteca no Xbox
+### Fase 1C — Acesso USB à biblioteca no Xbox
 
-- [x] Implementar seletor de pasta pela API UWP e token persistente.
-- [x] Restaurar o acesso salvo de forma assíncrona na inicialização.
-- [x] Expor estados de seleção e acesso na tela Games.
+- [x] Medir `FolderPicker` com e sem usuário e USB no Xbox.
+- [x] Registrar que o seletor abre, mas não enumera nenhuma origem no console.
+- [x] Substituir o seletor por `KnownFolders.RemovableDevices`.
+- [x] Detectar assincronamente o primeiro dispositivo removível.
+- [x] Expor estados de varredura e acesso USB na tela Games.
 - [x] Persistir diagnóstico em `LocalState/phase1-library.jsonl`.
-- [ ] Validar `FolderPicker` e `FutureAccessList` no Xbox Series S.
-- [ ] Validar o token depois de encerrar e reabrir o processo.
+- [ ] Validar `KnownFolders.RemovableDevices` no Xbox Series S.
+- [ ] Criar navegador próprio para as pastas do USB.
 - [ ] Enumerar uma biblioteca real a partir da pasta escolhida.
 
-Nesta etapa, Jogos permite selecionar e restaurar uma pasta, mas ainda não
-enumera conteúdo nem inicia títulos. A bridge inicial prova que o mesmo MSIX
-compila e executa código da árvore upstream; ela não equivale a portar todos os
-subsistemas do emulador para UWP.
+Nesta etapa, Jogos detecta o primeiro dispositivo removível, mas ainda não
+navega por suas pastas, enumera conteúdo ou inicia títulos. A bridge inicial
+prova que o mesmo MSIX compila e executa código da árvore upstream; ela não
+equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 

@@ -21,9 +21,7 @@ enum class XboxShellPage : std::uint8_t {
 enum class LibraryFolderState : std::uint8_t {
   NotConfigured,
   Restoring,
-  Picking,
   Ready,
-  Cancelled,
   Failed,
 };
 

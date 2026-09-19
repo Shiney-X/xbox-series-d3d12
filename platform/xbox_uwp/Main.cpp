@@ -343,7 +343,7 @@ public:
     if (presentation_succeeded) {
       shell_state_.probes_passed = passed;
       renderer_->Render(shell_state_);
-      RestoreLibraryFolder();
+      DetectRemovableStorage();
     }
   }
 
@@ -385,93 +385,49 @@ private:
     shell_state_.library_folder_state = LibraryFolderState::Ready;
     shell_state_.library_folder_name = CreateFolderLabel(folder_name);
     PresentLibraryState(true, report_state, ERROR_SUCCESS, folder_name,
-                        "future_access_token=shadps4-game-library");
+                        "source=KnownFolders.RemovableDevices;device_index=0");
     AppendLifecycleEvent(session_id_, "library-folder",
-                         "folder access ready;token_persisted=1");
+                         "removable storage access ready;device_index=0");
   }
 
-  fire_and_forget RestoreLibraryFolder() {
+  fire_and_forget DetectRemovableStorage() {
     [[maybe_unused]] const auto lifetime = get_strong();
-    try {
-      if (!library_folder_access_.HasSavedFolder()) {
-        shell_state_.library_folder_state = LibraryFolderState::NotConfigured;
-        shell_state_.library_folder_name.clear();
-        PresentLibraryState(true, "not_configured", ERROR_SUCCESS, {},
-                            "saved_token=0");
-        co_return;
-      }
+    if (library_scan_active_) {
+      co_return;
+    }
 
+    try {
+      library_scan_active_ = true;
       shell_state_.library_folder_state = LibraryFolderState::Restoring;
       shell_state_.library_folder_name.clear();
       if (renderer_) {
         renderer_->Render(shell_state_);
       }
+
       const StorageFolder folder =
-          co_await library_folder_access_.RestoreAsync();
+          co_await library_folder_access_.FindFirstRemovableDeviceAsync();
+      library_scan_active_ = false;
       if (!folder) {
-        shell_state_.library_folder_state = LibraryFolderState::Failed;
-        PresentLibraryState(false, "restore_failed", ERROR_FILE_NOT_FOUND, {},
-                            "saved_token=1;folder_returned=0");
+        shell_state_.library_folder_state = LibraryFolderState::NotConfigured;
+        shell_state_.library_folder_name.clear();
+        PresentLibraryState(true, "usb_not_found", ERROR_SUCCESS, {},
+                            "source=KnownFolders.RemovableDevices;devices=0");
         co_return;
       }
-      SetLibraryReady(folder, "restored");
+      SetLibraryReady(folder, "usb_ready");
     } catch (const hresult_error &error) {
+      library_scan_active_ = false;
       shell_state_.library_folder_state = LibraryFolderState::Failed;
       shell_state_.library_folder_name.clear();
-      PresentLibraryState(false, "restore_failed",
+      PresentLibraryState(false, "usb_access_failed",
                           static_cast<std::uint32_t>(error.code().value), {},
                           to_string(error.message()));
     } catch (...) {
+      library_scan_active_ = false;
       shell_state_.library_folder_state = LibraryFolderState::Failed;
       shell_state_.library_folder_name.clear();
-      PresentLibraryState(false, "restore_failed", ERROR_GEN_FAILURE, {},
-                          "unknown restore failure");
-    }
-  }
-
-  fire_and_forget PickLibraryFolder() {
-    [[maybe_unused]] const auto lifetime = get_strong();
-    if (library_picker_active_) {
-      co_return;
-    }
-
-    try {
-      library_picker_active_ = true;
-      shell_state_.library_folder_state = LibraryFolderState::Picking;
-      shell_state_.library_folder_name.clear();
-      PresentLibraryState(true, "picking", ERROR_SUCCESS, {},
-                          "folder_picker_started=1");
-      AppendLifecycleEvent(session_id_, "library-folder",
-                           "folder picker started");
-
-      const StorageFolder folder = co_await library_folder_access_.PickAsync();
-      library_picker_active_ = false;
-      if (!folder) {
-        shell_state_.library_folder_state = LibraryFolderState::Cancelled;
-        PresentLibraryState(true, "cancelled", ERROR_CANCELLED, {},
-                            "folder_picker_cancelled=1");
-        AppendLifecycleEvent(session_id_, "library-folder",
-                             "folder picker cancelled");
-        co_return;
-      }
-      SetLibraryReady(folder, "selected");
-    } catch (const hresult_error &error) {
-      library_picker_active_ = false;
-      shell_state_.library_folder_state = LibraryFolderState::Failed;
-      shell_state_.library_folder_name.clear();
-      PresentLibraryState(false, "picker_failed",
-                          static_cast<std::uint32_t>(error.code().value), {},
-                          to_string(error.message()));
-      AppendLifecycleEvent(session_id_, "library-folder",
-                           "folder picker failed");
-    } catch (...) {
-      library_picker_active_ = false;
-      shell_state_.library_folder_state = LibraryFolderState::Failed;
-      shell_state_.library_folder_name.clear();
-      PresentLibraryState(false, "picker_failed", ERROR_GEN_FAILURE, {},
-                          "unknown picker failure");
-      AppendLifecycleEvent(session_id_, "library-folder",
-                           "folder picker failed");
+      PresentLibraryState(false, "usb_access_failed", ERROR_GEN_FAILURE, {},
+                          "unknown removable storage failure");
     }
   }
 
@@ -497,7 +453,7 @@ private:
       } else if (shell_state_.page == XboxShellPage::Games &&
                  (key == VirtualKey::GamepadA || key == VirtualKey::Enter)) {
         args.Handled(true);
-        PickLibraryFolder();
+        DetectRemovableStorage();
         return;
       } else if (key == VirtualKey::GamepadB || key == VirtualKey::Escape) {
         shell_state_.page = XboxShellPage::Home;
@@ -622,7 +578,7 @@ private:
   ::Core::Uwp::BridgeStatus bridge_status_{};
   XboxShellState shell_state_{};
   LibraryFolderAccess library_folder_access_{};
-  bool library_picker_active_{};
+  bool library_scan_active_{};
   std::unique_ptr<D3D12StatusRenderer> renderer_;
 };
 

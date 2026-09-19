@@ -104,24 +104,20 @@ Se o Xbox encerrar o processo em vez de retomá-lo, o journal mostrará uma nova
 sessão `launch` depois de `suspend`, sem o evento `resume` correspondente. Esse
 resultado deve ser preservado; não é equivalente a uma retomada aprovada.
 
-## Testar a pasta da biblioteca
+## Testar o acesso USB da biblioteca
 
-O pacote `0.3.0.0` adiciona o primeiro fluxo real da tela Games. Ele ainda não
-procura nem executa jogos.
+O pacote `0.3.0.1` substitui o `FolderPicker`, que permaneceu carregando sem
+origens no Xbox, por acesso direto e controlado a dispositivos removíveis. Ele
+ainda não navega nas pastas, procura ou executa jogos.
 
-1. Abra **Games** e pressione **A** em `ADD FOLDER`.
-2. Confirme que o seletor de pastas do sistema aparece.
-3. Escolha uma pasta de teste exposta pelo seletor. Se houver armazenamento USB,
-   prefira uma pasta vazia chamada `PS4Games`.
-4. Confirme o retorno ao aplicativo com `GAME FOLDER READY` e o nome da pasta.
-5. Volte ao Dev Home e encerre o aplicativo. Reiniciar o console também serve
-   para garantir um novo processo.
-6. Abra novamente o aplicativo e entre em **Games**.
-7. Confirme que `GAME FOLDER READY` aparece sem abrir novamente o seletor.
-
-Se o seletor não abrir sem um usuário conectado, repita essa parte com um
-usuário de teste. Registre essa condição, pois o token de acesso pode ser
-associado ao usuário do pacote.
+1. Formate um pendrive como armazenamento de mídia reconhecido pelo Xbox.
+2. Conecte o pendrive antes de iniciar o aplicativo.
+3. Abra **Games**. A primeira varredura ocorre automaticamente.
+4. Se necessário, pressione **A** em `SCAN USB` para repetir a detecção.
+5. Confirme que nenhum seletor externo é aberto.
+6. Confirme `USB STORAGE READY` e o nome do dispositivo.
+7. Remova o USB, pressione **A** e confirme `NO USB STORAGE FOUND`.
+8. Reconecte o USB, pressione **A** e confirme que o dispositivo reaparece.
 
 ## Coletar o relatório
 
@@ -169,9 +165,9 @@ A bridge do core deve produzir em `phase1-core.jsonl`:
 {"component":"shadps4-core-uwp","passed":true,"details":"upstream=v0.18.0;initialized=1;psf_abi=1;endian=1"}
 ```
 
-Depois da reabertura, `phase1-library.jsonl` deve conter `passed:true`, estado
-`restored` e `future_access_token=shadps4-game-library`. O relatório guarda o
-nome da pasta, mas não persiste seu caminho absoluto.
+Com o USB conectado, `phase1-library.jsonl` deve conter `passed:true`, estado
+`usb_ready` e `source=KnownFolders.RemovableDevices`. O relatório guarda o nome
+do dispositivo, mas não persiste seu caminho absoluto.
 
 O probe de pressão registra o limite atual, o limite esperado pelo Xbox, uso
 antes/depois, pico observado e a quantidade efetivamente alocada. O journal usa
@@ -203,5 +199,5 @@ apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 ## Critério para avançar
 
 Avançar para a enumeração de jogos somente depois de confirmar no Series S:
-seletor visível, retorno com `GAME FOLDER READY`, novo processo restaurando o
-token e `state:"restored"` em `phase1-library.jsonl`.
+detecção com e sem o pendrive, retorno com `USB STORAGE READY` e
+`state:"usb_ready"` em `phase1-library.jsonl`.

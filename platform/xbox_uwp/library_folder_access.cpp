@@ -4,34 +4,16 @@
 #include "library_folder_access.h"
 
 #include <winrt/Windows.Foundation.Collections.h>
-#include <winrt/Windows.Storage.AccessCache.h>
-#include <winrt/Windows.Storage.Pickers.h>
 
 using namespace winrt;
 using namespace winrt::Windows::Storage;
-using namespace winrt::Windows::Storage::AccessCache;
-using namespace winrt::Windows::Storage::Pickers;
-
-bool LibraryFolderAccess::HasSavedFolder() const {
-  return StorageApplicationPermissions::FutureAccessList().ContainsItem(Token);
-}
 
 Windows::Foundation::IAsyncOperation<StorageFolder>
-LibraryFolderAccess::RestoreAsync() const {
-  co_return co_await StorageApplicationPermissions::FutureAccessList()
-      .GetFolderAsync(Token);
-}
-
-Windows::Foundation::IAsyncOperation<StorageFolder>
-LibraryFolderAccess::PickAsync() const {
-  FolderPicker picker;
-  picker.SuggestedStartLocation(PickerLocationId::ComputerFolder);
-  picker.FileTypeFilter().Append(L"*");
-
-  StorageFolder folder = co_await picker.PickSingleFolderAsync();
-  if (folder) {
-    StorageApplicationPermissions::FutureAccessList().AddOrReplace(Token,
-                                                                   folder);
+LibraryFolderAccess::FindFirstRemovableDeviceAsync() const {
+  const StorageFolder removable_devices = KnownFolders::RemovableDevices();
+  const auto devices = co_await removable_devices.GetFoldersAsync();
+  if (devices.Size() == 0U) {
+    co_return StorageFolder{nullptr};
   }
-  co_return folder;
+  co_return devices.GetAt(0);
 }
