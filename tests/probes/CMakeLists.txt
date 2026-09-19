@@ -8,6 +8,8 @@ target_compile_definitions(xbox_phase0_probe PRIVATE
     _UNICODE
     _WIN32_WINNT=0x0A00)
 
+target_link_libraries(xbox_phase0_probe PRIVATE WindowsApp)
+
 if(MSVC)
     target_compile_options(xbox_phase0_probe PRIVATE /W4 /permissive- /EHsc)
 endif()
