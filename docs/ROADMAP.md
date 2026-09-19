@@ -18,7 +18,9 @@
 - [x] Validar o triângulo D3D12 no Xbox Series S em perfil Game.
 - [x] Substituir o probe DXBC/Shader Model 5 por DXC/DXIL em runtime.
 - [x] Validar DXC/DXIL no Xbox Series S em perfil Game.
-- [ ] Medir pressão de memória, suspensão e retomada.
+- [x] Implementar medição controlada de pressão de memória.
+- [x] Instrumentar suspensão e retomada com reapresentação D3D12.
+- [ ] Validar pressão de memória, suspensão e retomada no Series S.
 
 ### Critério de saída
 

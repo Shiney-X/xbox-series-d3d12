@@ -10,6 +10,8 @@ Fontes primárias usadas nas decisões iniciais:
 - [Microsoft: `VirtualAlloc2FromApp`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2fromapp)
 - [Microsoft: `MapViewOfFile3FromApp`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile3fromapp)
 - [Microsoft: `UnmapViewOfFileEx`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-unmapviewoffileex)
+- [Microsoft: `Windows.System.MemoryManager`](https://learn.microsoft.com/en-us/uwp/api/windows.system.memorymanager?view=winrt-26100)
+- [Microsoft: suspensão de aplicativo DirectX/UWP em C++](https://learn.microsoft.com/en-us/windows/uwp/gaming/how-to-suspend-an-app-directx-and-cpp)
 - [Microsoft: limitações UWP no Xbox](https://learn.microsoft.com/en-us/uwp/extension-sdks/uwp-limitations-on-xbox)
 - [Microsoft: opções de desenvolvimento UWP no Xbox](https://learn.microsoft.com/en-us/uwp/apps-for-xbox/development-options)
 - [Microsoft: visão geral do Windows Device Portal](https://learn.microsoft.com/en-us/windows/advanced-settings/device-portal)

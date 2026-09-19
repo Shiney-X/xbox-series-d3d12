@@ -160,6 +160,12 @@ void D3D12StatusRenderer::Render(bool passed) {
     WaitForGpu();
 }
 
+void D3D12StatusRenderer::Trim() {
+    ComPtr<IDXGIDevice3> dxgi_device;
+    winrt::check_hresult(device_.As(&dxgi_device));
+    dxgi_device->Trim();
+}
+
 void D3D12StatusRenderer::CreateTrianglePipeline() {
     ComPtr<IDxcLibrary> library;
     ComPtr<IDxcCompiler> compiler;

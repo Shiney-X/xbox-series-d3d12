@@ -12,7 +12,8 @@
 | Vulkan nativo | Dependente do driver | Não | Não é o baseline |
 | Filesystem irrestrito | Sim | Não | APIs GDK |
 | Qt desktop | Sim | Não planejado | Não planejado |
-| Limite de memória do alvo | Sistema | Medir; documentação pública indica até 5 GB para jogos | Contratual/NDA |
+| Limite de memória do alvo | Sistema | Probe implementado com `MemoryManager`; validação pendente | Contratual/NDA |
+| Suspensão e retomada | Processo desktop | Journal e reapresentação D3D12 implementados; validação pendente | Modelo específico da plataforma |
 | Uso neste repositório | Desenvolvimento e CI | Alvo público | Overlay futuro e autorizado |
 
 Nenhum resultado desktop conta como prova de suporte no Xbox. Cada capability

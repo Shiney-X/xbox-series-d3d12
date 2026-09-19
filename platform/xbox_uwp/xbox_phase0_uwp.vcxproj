@@ -77,11 +77,13 @@
 
   <ItemGroup>
     <ClInclude Include="d3d12_status_renderer.h" />
+    <ClInclude Include="memory_pressure_probe.h" />
     <ClInclude Include="..\..\src\phase0\probes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="d3d12_status_renderer.cpp" />
+    <ClCompile Include="memory_pressure_probe.cpp" />
     <ClCompile Include="..\..\src\phase0\probes.cpp" />
   </ItemGroup>
   <ItemGroup>
