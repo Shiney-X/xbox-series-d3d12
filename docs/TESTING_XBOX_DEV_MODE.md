@@ -78,8 +78,9 @@ pacote como **Game antes da primeira abertura**.
    - retorno imediato ao Dev Home: falha de ativação ou crash antes do render.
 3. Use esquerda/direita no direcional para mover o foco entre os cartões.
 4. Pressione **A** em cada cartão e confirme a abertura da página.
-5. Pressione **B** e confirme o retorno ao início.
-6. Anote a versão do sistema operacional exibida no Dev Home e se o app foi
+5. Pressione **B** e confirme o retorno ao início sem sair para o Dev Home.
+6. Na tela inicial, pressione **B** e confirme o retorno normal ao Dev Home.
+7. Anote a versão do sistema operacional exibida no Dev Home e se o app foi
    classificado como App ou Game.
 
 ## Testar suspensão e retomada
