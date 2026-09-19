@@ -97,14 +97,14 @@
     <Image Include="Assets\SplashScreen.png" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="$(WindowsSdkDir)Redist\D3D\x64\dxcompiler.dll">
+    <None Include="$(WindowsSdkDir)Redist\D3D\x64\dxcompiler.dll">
       <Link>dxcompiler.dll</Link>
       <DeploymentContent>true</DeploymentContent>
-    </Content>
-    <Content Include="$(WindowsSdkDir)Redist\D3D\x64\dxil.dll">
+    </None>
+    <None Include="$(WindowsSdkDir)Redist\D3D\x64\dxil.dll">
       <Link>dxil.dll</Link>
       <DeploymentContent>true</DeploymentContent>
-    </Content>
+    </None>
   </ItemGroup>
 
   <Target Name="GenerateProbeAssets" BeforeTargets="PrepareForBuild">

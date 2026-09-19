@@ -59,6 +59,28 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "MSBuild failed with exit code $LASTEXITCODE."
     }
+
+    $package = Get-ChildItem `
+        -Path (Join-Path $OutputDirectory 'AppPackages') `
+        -Filter '*.msix' `
+        -File `
+        -Recurse | Select-Object -First 1
+    if ($null -eq $package) {
+        throw 'MSBuild completed without producing an MSIX package.'
+    }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+    try {
+        $entryNames = @($archive.Entries | ForEach-Object { $_.FullName })
+        foreach ($runtimeDependency in @('dxcompiler.dll', 'dxil.dll')) {
+            if ($entryNames -notcontains $runtimeDependency) {
+                throw "MSIX is missing the DXC runtime dependency '$runtimeDependency'."
+            }
+        }
+    } finally {
+        $archive.Dispose()
+    }
 } finally {
     Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
 }
