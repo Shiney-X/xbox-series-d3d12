@@ -3,6 +3,7 @@
 #pragma once
 
 #include <d3d12.h>
+#include <d3dcompiler.h>
 #include <dxgi1_4.h>
 #include <wrl/client.h>
 
@@ -16,6 +17,7 @@ public:
     void Render(bool passed);
 
 private:
+    void CreateTrianglePipeline();
     void WaitForGpu();
 
     static constexpr UINT FrameCount = 2;
@@ -26,9 +28,13 @@ private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtv_heap_;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator_;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> command_list_;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature_;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline_state_;
     Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, FrameCount> render_targets_;
     HANDLE fence_event_{INVALID_HANDLE_VALUE};
     UINT64 fence_value_{};
     UINT rtv_descriptor_size_{};
+    D3D12_VIEWPORT viewport_{};
+    D3D12_RECT scissor_{};
 };

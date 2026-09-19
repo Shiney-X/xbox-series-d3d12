@@ -71,10 +71,12 @@ Páginas simultaneamente graváveis e executáveis não fazem parte do desenho.
 - apresentação sem debugger;
 - DRED e coleta de logs em falha.
 
-O primeiro degrau do Gate C já cria um dispositivo, uma command queue e uma
-swapchain de `CoreWindow`, faz um clear verde/vermelho e apresenta. Ele ainda
-não contém PSO, shaders ou sincronização de múltiplos frames; esses itens
-pertencem ao probe seguinte.
+O host do Gate C cria dispositivo, command queue, swapchain de `CoreWindow`,
+fence, root signature e graphics PSO. Um shader de probe usa `SV_VertexID` para
+desenhar um triângulo sem vertex buffer. Nesta etapa ele é compilado em runtime
+por `D3DCompile` como Shader Model 5/DXBC, reduzindo as dependências do pacote.
+Esse compilador é apenas um degrau de validação do pipeline; o backend usará
+DXC/DXIL e não deve construir abstrações em torno de DXBC.
 
 ## Fronteira futura do renderer
 

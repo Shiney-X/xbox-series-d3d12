@@ -7,7 +7,7 @@
   <Identity
     Name="ShineyX.xbox-series-d3d12"
     Publisher="CN=xbox-series-d3d12-dev"
-    Version="0.1.0.1" />
+    Version="0.1.0.2" />
   <mp:PhoneIdentity PhoneProductId="2d321cd1-304e-4496-b383-78f208531352" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>xbox-series-d3d12 probes</DisplayName>

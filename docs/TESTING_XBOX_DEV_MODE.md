@@ -12,7 +12,8 @@ persistência:
 2. reserva, commit, proteção e realocação no mesmo endereço virtual;
 3. transição de página RW para RX e execução de seis bytes de código x86-64;
 4. criação de um dispositivo D3D12 de hardware e consulta de capabilities;
-5. criação de swapchain para `CoreWindow`, clear e `Present`.
+5. criação de swapchain para `CoreWindow`, root signature, PSO, compilação
+   HLSL Shader Model 5, desenho de um triângulo e `Present`.
 6. gravação síncrona do relatório no armazenamento local do pacote.
 
 A tela final fica verde somente quando os probes, a apresentação e a gravação
@@ -33,7 +34,7 @@ detalhado sempre deve ser coletado.
 1. Abra a execução mais recente do workflow **Windows probes** no GitHub.
 2. Baixe o artefato `xbox-phase0-uwp-sideload`.
 3. Extraia o ZIP. Entre na pasta
-   `AppPackages/xbox_phase0_uwp_0.1.0.1_x64_Test` e localize o `.msix`, o
+   `AppPackages/xbox_phase0_uwp_0.1.0.2_x64_Test` e localize o `.msix`, o
    certificado `.cer` e o pacote em `Dependencies/x64`.
 
 O certificado é efêmero e serve somente para sideload do build correspondente.
@@ -58,7 +59,8 @@ privada.
 
 1. Inicie **xbox-series-d3d12 probes** pelo Dev Home, sem debugger conectado.
 2. Aguarde a tela estabilizar:
-   - verde: CPU/memória/D3D12, apresentação e persistência passaram;
+   - triângulo colorido sobre fundo escuro: CPU/memória/D3D12, PSO, draw,
+     apresentação e persistência passaram;
    - vermelho: ao menos um probe ou a gravação do relatório falhou;
    - retorno imediato ao Dev Home: falha de ativação ou crash antes do render.
 3. Anote a versão do sistema operacional exibida no Dev Home e se o app foi

@@ -119,7 +119,8 @@ public:
                                   bounds.Height);
             renderer_->Render(passed);
             results_.push_back({"uwp-presentation", true, 0,
-                                "CoreWindow D3D12 swap chain presented"});
+                                "CoreWindow D3D12 triangle presented;shader_compiler=D3DCompile;"
+                                "shader_model=5_0;draw_vertices=3"});
             presentation_succeeded = true;
         } catch (const hresult_error& error) {
             results_.push_back({"uwp-presentation", false,
