@@ -102,12 +102,9 @@ ProbeResult ProbeCapabilities() {
             << ";cfg_policy_available=" << (cfg_policy_available != FALSE)
             << ";cfg_enabled=" << control_flow_guard.EnableControlFlowGuard;
 
-    return {
-        .name = "capabilities",
-        .passed = system_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64,
-        .error = policy_error,
-        .details = details.str(),
-    };
+    return {"capabilities",
+            system_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64, policy_error,
+            details.str()};
 }
 
 ProbeResult ProbeVirtualMemory() {
@@ -163,12 +160,7 @@ ProbeResult ProbeVirtualMemory() {
             << ";type=" << memory_info.Type
             << ";fixed_address_succeeded=" << fixed_address_succeeded;
 
-    return {
-        .name = "virtual-memory",
-        .passed = fixed_address_succeeded,
-        .error = fixed_address_error,
-        .details = details.str(),
-    };
+    return {"virtual-memory", fixed_address_succeeded, fixed_address_error, details.str()};
 }
 
 ProbeResult ProbeExecutableMemory() {
@@ -212,12 +204,9 @@ ProbeResult ProbeExecutableMemory() {
 
     std::ostringstream details;
     details << "return_value=" << return_value << ";exception_caught=" << exception_caught;
-    return {
-        .name = "executable-memory",
-        .passed = !exception_caught && return_value == 42,
-        .error = exception_caught ? static_cast<DWORD>(ERROR_FUNCTION_FAILED) : ERROR_SUCCESS,
-        .details = details.str(),
-    };
+    return {"executable-memory", !exception_caught && return_value == 42,
+            exception_caught ? static_cast<DWORD>(ERROR_FUNCTION_FAILED) : ERROR_SUCCESS,
+            details.str()};
 #endif
 }
 
