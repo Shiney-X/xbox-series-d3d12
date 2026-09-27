@@ -47,8 +47,9 @@ bool IsViewTypeCompatible(AmdGpu::ImageType view_type, AmdGpu::ImageType image_t
     }
 }
 
-ImageViewInfo::ImageViewInfo(const AmdGpu::Image& image, const Shader::ImageResource& desc) noexcept
-    : is_storage{desc.is_written} {
+ImageViewInfo::ImageViewInfo(const AmdGpu::Image& image,
+                             const Shader::ImageResource& desc) noexcept {
+    is_storage = desc.is_written;
     const auto dfmt = image.GetDataFmt();
     auto nfmt = image.GetNumberFmt();
     if (is_storage && nfmt == AmdGpu::NumberFormat::Srgb) {
@@ -67,7 +68,7 @@ ImageViewInfo::ImageViewInfo(const AmdGpu::Image& image, const Shader::ImageReso
     min_lod = static_cast<u32>(image.min_lod);
 
     if (!is_storage) {
-        mapping = Vulkan::LiverpoolToVK::ComponentMapping(image.DstSelect());
+        mapping = image.DstSelect();
     }
 }
 
@@ -122,7 +123,7 @@ ImageView::ImageView(const Vulkan::Instance& instance, const ImageViewInfo& info
         .image = image.GetImage(),
         .viewType = ConvertImageViewType(info.type),
         .format = instance.GetSupportedFormat(format, image.format_features),
-        .components = info.mapping,
+        .components = Vulkan::LiverpoolToVK::ComponentMapping(info.mapping),
         .subresourceRange{
             .aspectMask = aspect,
             .baseMipLevel = info.range.base.level,
