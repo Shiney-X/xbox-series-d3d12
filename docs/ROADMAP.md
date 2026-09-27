@@ -100,7 +100,13 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-- [ ] Introduzir contratos neutros do renderer.
+**Status: em andamento (Fase 2A).**
+
+- [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
+- [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
+- [x] Adicionar teste unitário independente de Vulkan/D3D12 para o contrato.
+- [ ] Separar submissão PM4 de draw/dispatch do rasterizer Vulkan.
+- [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
 - [ ] Criar testes de contrato e trace replay.

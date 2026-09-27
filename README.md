@@ -22,6 +22,7 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] Validar o navegador de pastas USB nativo no Xbox.
 - [x] Validar descoberta de jogos e leitura de `param.sfo` no Xbox.
 - [x] Validar decodificação e apresentação de `icon0.png` no Xbox.
+- [x] Iniciar a Fase 2 com coerência de memória GPU desacoplada do Vulkan.
 - [ ] Backend D3D12 integrado ao video core.
 
 ## Baseline upstream
@@ -88,6 +89,7 @@ O roteiro completo está em
 - [ADR-0006: acesso USB à biblioteca](docs/adr/0006-uwp-library-folder-access.md)
 - [ADR-0007: descoberta de jogos e metadados PSF](docs/adr/0007-uwp-game-library-scan.md)
 - [ADR-0008: texturas de ícone da biblioteca UWP](docs/adr/0008-uwp-library-icon-textures.md)
+- [ADR-0009: coerência de memória GPU neutra](docs/adr/0009-backend-neutral-gpu-memory-tracking.md)
 
 ## Escopo legal e licença
 

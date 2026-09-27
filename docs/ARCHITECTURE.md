@@ -97,6 +97,26 @@ Os contratos neutros deverão cobrir:
 
 Tipos `vk::*` ou `ID3D12*` não poderão atravessar essa fronteira.
 
+### Primeiro corte: coerência de memória
+
+`VideoCore::GpuMemoryTracker` é o primeiro contrato implementado dessa
+fronteira. `Core::MemoryManager` e `PageManager` publicam eventos usando somente
+endereços virtuais e tamanhos do guest. O backend Vulkan implementa o contrato
+em `Vulkan::Rasterizer`; o futuro backend D3D12 implementará a mesma semântica
+com seus próprios caches.
+
+```mermaid
+flowchart LR
+    MM[Core::MemoryManager] --> GMT[GpuMemoryTracker]
+    PM[PageManager / page faults] --> GMT
+    GMT --> VKR[Vulkan::Rasterizer]
+    GMT -. futuro .-> D12R[D3D12 memory tracker]
+```
+
+A interface não recebe recursos nativos e não cobre draw, dispatch ou
+apresentação. Esses limites serão extraídos separadamente para evitar uma
+abstração prematura que apenas replique Vulkan.
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a
