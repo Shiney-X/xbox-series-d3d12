@@ -4,9 +4,8 @@
 #pragma once
 
 #include "video_core/amdgpu/regs_depth.h"
-#include "video_core/amdgpu/resource.h"
 #include "video_core/renderer_vulkan/vk_common.h"
-#include "video_core/texture_cache/types.h"
+#include "video_core/texture_cache/image_view_desc.h"
 
 namespace AmdGpu {
 struct ColorBuffer;
@@ -23,21 +22,16 @@ class Scheduler;
 
 namespace VideoCore {
 
-struct ImageViewInfo {
+struct ImageViewInfo : ImageViewDesc {
     ImageViewInfo() = default;
     ImageViewInfo(const AmdGpu::Image& image, const Shader::ImageResource& desc) noexcept;
     ImageViewInfo(const AmdGpu::ColorBuffer& col_buffer) noexcept;
     ImageViewInfo(const AmdGpu::DepthBuffer& depth_buffer, AmdGpu::DepthView view,
                   AmdGpu::DepthControl ctl);
 
-    AmdGpu::ImageType type = AmdGpu::ImageType::Color2D;
     vk::Format format = vk::Format::eR8G8B8A8Unorm;
-    SubresourceRange range;
-    vk::ComponentMapping mapping{};
-    u32 min_lod = 0;
-    bool is_storage = false;
 
-    auto operator<=>(const ImageViewInfo&) const = default;
+    bool operator==(const ImageViewInfo&) const = default;
 };
 
 struct Image;

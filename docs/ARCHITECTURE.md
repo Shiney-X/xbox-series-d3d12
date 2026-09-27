@@ -156,6 +156,18 @@ deverá traduzir o mesmo descritor para seus recursos e estados, levando em
 conta que algumas capacidades do Vulkan não correspondem a flags de criação
 do D3D12.
 
+### Quinto corte: descrição de image views
+
+`VideoCore::ImageViewDesc` concentra os campos da view que vêm do guest:
+dimensionalidade, subrecursos, swizzle de componentes, LOD mínimo e intenção de
+escrita. `ImageViewInfo` acrescenta apenas o formato Vulkan usado hoje para a
+criação e comparação das views em cache. A conversão de
+`AmdGpu::CompMapping` para `vk::ComponentMapping` ocorre na criação da view.
+
+O mapeamento de formatos de imagem e a compatibilidade entre formatos ainda
+dependem do Vulkan. A futura fronteira de formatos precisará representar essas
+regras sem alterar a interpretação dos recursos do guest.
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a
