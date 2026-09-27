@@ -67,12 +67,22 @@ console; navegador de diretórios em desenvolvimento.**
 - [x] Validar `KnownFolders.RemovableDevices` no Xbox Series S.
 - [x] Implementar navegador próprio para as pastas do USB.
 - [x] Validar navegação e seleção de pasta no Xbox Series S.
-- [ ] Enumerar uma biblioteca real a partir da pasta escolhida.
+- [x] Persistir e restaurar a pasta escolhida por caminho relativo ao USB.
 
-Nesta etapa, Jogos detecta o primeiro dispositivo removível e navega por suas
-pastas, mas ainda não enumera jogos nem inicia títulos. A bridge inicial prova
-que o mesmo MSIX compila e executa código da árvore upstream; ela não equivale
-a portar todos os subsistemas do emulador para UWP.
+### Fase 1D — Descoberta de jogos
+
+- [x] Identificar candidatos por `eboot.bin` e `sce_sys/param.sfo`.
+- [x] Interpretar `TITLE`, `TITLE_ID` e `APP_VER` com estruturas PSF do core.
+- [x] Limitar profundidade, diretórios e quantidade de resultados.
+- [x] Exibir a lista textual de jogos no shell D3D12.
+- [x] Persistir o resultado em `LocalState/phase1-library-scan.jsonl`.
+- [ ] Validar um dump próprio extraído no Xbox Series S.
+- [ ] Decodificar e apresentar `sce_sys/icon0.png` como textura D3D12.
+
+Nesta etapa, Jogos detecta o primeiro dispositivo removível, navega por suas
+pastas e extrai metadados de dumps reconhecidos, mas ainda não inicia títulos.
+A bridge inicial prova que o mesmo MSIX compila e executa código da árvore
+upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 

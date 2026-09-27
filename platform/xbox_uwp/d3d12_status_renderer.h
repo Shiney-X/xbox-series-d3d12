@@ -26,6 +26,20 @@ enum class LibraryFolderState : std::uint8_t {
   Failed,
 };
 
+enum class LibraryScanState : std::uint8_t {
+  Inactive,
+  Scanning,
+  Ready,
+  Empty,
+  Failed,
+};
+
+struct XboxGameListEntry {
+  std::string title;
+  std::string title_id;
+  std::string app_version;
+};
+
 struct XboxShellState {
   XboxShellPage page{XboxShellPage::Home};
   std::uint32_t selected_item{};
@@ -39,6 +53,9 @@ struct XboxShellState {
   std::uint32_t selected_library_entry{};
   bool library_at_device_root{true};
   bool library_selection_confirmed{};
+  LibraryScanState library_scan_state{LibraryScanState::Inactive};
+  std::vector<XboxGameListEntry> games;
+  std::uint32_t selected_game{};
 };
 
 class D3D12StatusRenderer final {

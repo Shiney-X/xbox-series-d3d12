@@ -128,6 +128,30 @@ jogos.
 11. Pressione **B** dentro de uma subpasta para subir; na raiz, **B** retorna
     para a tela inicial sem fechar o aplicativo.
 
+## Testar a descoberta de jogos
+
+O pacote `0.4.0.0` persiste a pasta escolhida e procura metadados de jogos em
+modo somente leitura. Use apenas um dump próprio extraído; não envie arquivos
+do jogo ao repositório ou aos relatórios.
+
+1. No PC, coloque o jogo sob a pasta que será selecionada. O candidato deve
+   conter `eboot.bin` e `sce_sys/param.sfo`.
+2. No Xbox, abra **Games**, navegue até a pasta que contém um ou mais jogos e
+   pressione **X**.
+3. Confirme `SCANNING GAME LIBRARY` sem bloqueio prolongado da interface.
+4. Confirme `PS4 GAME LIBRARY`, o título, Title ID e versão lidos do SFO.
+5. Use o direcional para mover o foco se houver mais de um resultado.
+6. Pressione **B** para retornar ao navegador de pastas e **X** para examinar
+   novamente.
+7. Feche e reabra o aplicativo. A pasta deve ser restaurada e examinada
+   automaticamente enquanto o mesmo USB estiver conectado.
+8. Remova o USB e abra novamente. O aplicativo deve descartar a restauração
+   inválida e permanecer utilizável.
+
+O scanner visita no máximo 128 diretórios, 32 jogos e três níveis abaixo da
+pasta selecionada. `NO PS4 GAMES FOUND` é um resultado válido quando a
+estrutura esperada não existe.
+
 ## Coletar o relatório
 
 1. No Device Portal, abra **File explorer**.
@@ -137,10 +161,11 @@ jogos.
 4. Baixe também `phase0-lifecycle.jsonl`.
 5. Baixe `phase1-core.jsonl`.
 6. Baixe `phase1-library.jsonl`.
-7. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
+7. Baixe `phase1-library-scan.jsonl`, quando o scanner tiver sido executado.
+8. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
    Essa é a rota de contingência usada quando o perfil Game recusa a primeira
    gravação.
-8. Não edite os arquivos. Anexe-os a uma issue junto com:
+9. Não edite os arquivos. Anexe-os a uma issue junto com:
    - modelo do console;
    - versão do sistema operacional;
    - data/hora do teste;
@@ -179,6 +204,11 @@ estado `folder_selected`, `source=KnownFolders.RemovableDevices`, a profundidade
 e o breadcrumb. O relatório guarda os nomes para diagnóstico, mas não persiste
 um caminho absoluto.
 
+`phase1-library-scan.jsonl` começa com um resumo `uwp-library-scan`. Em caso de
+sucesso, ele informa `state:"games_found"`, `games_found` maior que zero e
+erro zero. Cada linha seguinte, do tipo `uwp-library-game`, contém apenas
+título, Title ID, versão e nome da pasta.
+
 O probe de pressão registra o limite atual, o limite esperado pelo Xbox, uso
 antes/depois, pico observado e a quantidade efetivamente alocada. O journal usa
 um identificador por processo:
@@ -208,6 +238,6 @@ apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 
 ## Critério para avançar
 
-Avançar para a enumeração de jogos somente depois de confirmar no Series S:
-listagem, rolagem, entrada e retorno entre diretórios, seleção com **X** e
-`state:"folder_selected"` em `phase1-library.jsonl`.
+Avançar para imagens da biblioteca somente depois de confirmar no Series S:
+restauração da seleção, descoberta de um dump próprio, metadados corretos na
+tela e `state:"games_found"` em `phase1-library-scan.jsonl`.
