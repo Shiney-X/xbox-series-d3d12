@@ -42,7 +42,7 @@ Rasterizer::Rasterizer(const Instance& instance_, Scheduler& scheduler_,
     if (!EmulatorSettings.IsNullGPU()) {
         liverpool->BindRasterizer(this);
     }
-    memory->SetRasterizer(this);
+    memory->SetGpuMemoryTracker(this);
 }
 
 Rasterizer::~Rasterizer() = default;

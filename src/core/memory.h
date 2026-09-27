@@ -14,8 +14,8 @@
 #include "core/address_space.h"
 #include "core/libraries/kernel/memory.h"
 
-namespace Vulkan {
-class Rasterizer;
+namespace VideoCore {
+class GpuMemoryTracker;
 }
 
 namespace Libraries::Kernel {
@@ -167,8 +167,8 @@ public:
     explicit MemoryManager();
     ~MemoryManager();
 
-    void SetRasterizer(Vulkan::Rasterizer* rasterizer_) {
-        rasterizer = rasterizer_;
+    void SetGpuMemoryTracker(VideoCore::GpuMemoryTracker* gpu_memory_tracker_) {
+        gpu_memory_tracker = gpu_memory_tracker_;
     }
 
     AddressSpace& GetAddressSpace() {
@@ -341,7 +341,7 @@ private:
     u64 flexible_usage{};
     u64 pool_budget{};
     s32 sdk_version{};
-    Vulkan::Rasterizer* rasterizer{};
+    VideoCore::GpuMemoryTracker* gpu_memory_tracker{};
 
     struct PrtArea {
         VAddr start;

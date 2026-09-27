@@ -9,8 +9,8 @@
 #include "common/signal_context.h"
 #include "core/memory.h"
 #include "core/signals.h"
+#include "video_core/gpu_memory_tracker.h"
 #include "video_core/page_manager.h"
-#include "video_core/renderer_vulkan/vk_rasterizer.h"
 
 #ifndef _WIN64
 #include <sys/mman.h>
@@ -87,10 +87,10 @@ struct PageManager::Impl {
     static constexpr size_t ADDRESS_BITS = 40;
     static constexpr size_t NUM_ADDRESS_PAGES = 1ULL << (40 - PM_PAGE_BITS);
     static constexpr size_t NUM_ADDRESS_LOCKS = NUM_ADDRESS_PAGES / PAGES_PER_LOCK;
-    inline static Vulkan::Rasterizer* rasterizer;
+    inline static GpuMemoryTracker* gpu_memory_tracker;
 #ifdef ENABLE_USERFAULTFD
-    Impl(Vulkan::Rasterizer* rasterizer_) {
-        rasterizer = rasterizer_;
+    Impl(GpuMemoryTracker* gpu_memory_tracker_) {
+        gpu_memory_tracker = gpu_memory_tracker_;
         uffd = syscall(__NR_userfaultfd, O_CLOEXEC | O_NONBLOCK | UFFD_USER_MODE_ONLY);
         ASSERT_MSG(uffd != -1, "{}", Common::GetLastErrorMsg());
 
@@ -172,17 +172,17 @@ struct PageManager::Impl {
             ASSERT_MSG(readret == sizeof(msg), "Unexpected short read, exiting");
             ASSERT(msg.arg.pagefault.flags & UFFD_PAGEFAULT_FLAG_WP);
 
-            // Notify rasterizer about the fault.
+            // Notify the active graphics backend about the fault.
             const VAddr addr = msg.arg.pagefault.address;
-            rasterizer->InvalidateMemory(addr, 1);
+            gpu_memory_tracker->InvalidateMemory(addr, 1);
         }
     }
 
     std::jthread ufd_thread;
     int uffd;
 #else
-    Impl(Vulkan::Rasterizer* rasterizer_) {
-        rasterizer = rasterizer_;
+    Impl(GpuMemoryTracker* gpu_memory_tracker_) {
+        gpu_memory_tracker = gpu_memory_tracker_;
 
         // Should be called first.
         constexpr auto priority = std::numeric_limits<u32>::min();
@@ -210,9 +210,9 @@ struct PageManager::Impl {
     static bool GuestFaultSignalHandler(void* context, void* fault_address) {
         const auto addr = reinterpret_cast<VAddr>(fault_address);
         if (Common::IsWriteError(context)) {
-            return rasterizer->InvalidateMemory(addr, 8);
+            return gpu_memory_tracker->InvalidateMemory(addr, 8);
         } else {
-            return rasterizer->ReadMemory(addr, 8);
+            return gpu_memory_tracker->ReadMemory(addr, 8);
         }
         return false;
     }
@@ -248,7 +248,7 @@ struct PageManager::Impl {
         // Iterate requested pages
         const u64 aligned_addr = page << PM_PAGE_BITS;
         const u64 aligned_end = page_end << PM_PAGE_BITS;
-        if (!rasterizer->IsMapped(aligned_addr, aligned_end - aligned_addr)) {
+        if (!gpu_memory_tracker->IsMapped(aligned_addr, aligned_end - aligned_addr)) {
             LOG_WARNING(Render,
                         "Tracking memory region {:#x} - {:#x} which is not fully GPU mapped.",
                         aligned_addr, aligned_end);
@@ -364,8 +364,8 @@ struct PageManager::Impl {
     std::array<LockType, NUM_ADDRESS_LOCKS> locks{};
 };
 
-PageManager::PageManager(Vulkan::Rasterizer* rasterizer_)
-    : impl{std::make_unique<Impl>(rasterizer_)} {}
+PageManager::PageManager(GpuMemoryTracker* gpu_memory_tracker_)
+    : impl{std::make_unique<Impl>(gpu_memory_tracker_)} {}
 
 PageManager::~PageManager() = default;
 
