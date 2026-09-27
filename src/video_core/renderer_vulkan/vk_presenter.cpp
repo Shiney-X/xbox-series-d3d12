@@ -147,12 +147,10 @@ struct ScreenshotReadback {
                        std::vector<std::filesystem::path> paths_, const u32 width_,
                        const u32 height_, const vk::Format format_, const bool hdr_encoded_)
         : kind{kind_}, paths{std::move(paths_)},
-          buffer{instance,
-                 scheduler,
-                 VideoCore::MemoryUsage::Download,
-                 0,
-                 vk::BufferUsageFlagBits::eTransferDst,
-                 static_cast<u64>(width_) * static_cast<u64>(height_) * 4},
+          buffer{instance, scheduler,
+                 VideoCore::BufferDesc{VideoCore::MemoryUsage::Download, 0,
+                                       VideoCore::BufferUsage::TransferDestination,
+                                       static_cast<u64>(width_) * static_cast<u64>(height_) * 4}},
           width{width_}, height{height_}, format{format_}, hdr_encoded{hdr_encoded_} {}
 };
 

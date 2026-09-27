@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (Fase 2C).**
+**Status: em andamento (Fase 2D).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -109,6 +109,8 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
       de comandos expresso em valores do guest.
 - [x] Extrair o estado de transição de buffers para um componente neutro,
       mantendo a emissão de barriers no backend Vulkan.
+- [x] Descrever usos e preferências de alocação de buffers sem flags Vulkan,
+      traduzindo-os somente na criação do recurso Vulkan.
 - [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
@@ -123,6 +125,11 @@ Na Fase 2C, `VideoCore::BufferSyncState` acompanha a sequência de acessos a um
 buffer sem tipos Vulkan. O `Buffer` atual converte cada transição para
 `vk::BufferMemoryBarrier2`. Isso ainda não remove handles Vulkan do cache nem
 implementa barriers D3D12.
+
+Na Fase 2D, `VideoCore::BufferDesc` representa endereço do guest, tamanho,
+preferência de memória e usos de buffer de forma independente da API gráfica.
+O buffer Vulkan converte os usos para `vk::BufferUsageFlags` durante a criação.
+Imagens, views e alocação D3D12 ainda estão pendentes.
 
 ## Fase 3 — Backend D3D12
 

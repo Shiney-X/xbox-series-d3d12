@@ -15,6 +15,35 @@ namespace VideoCore {
 
 namespace {
 
+vk::BufferUsageFlags ToVulkanUsage(BufferUsage usage) {
+    vk::BufferUsageFlags flags{};
+    if (HasUsage(usage, BufferUsage::TransferSource)) {
+        flags |= vk::BufferUsageFlagBits::eTransferSrc;
+    }
+    if (HasUsage(usage, BufferUsage::TransferDestination)) {
+        flags |= vk::BufferUsageFlagBits::eTransferDst;
+    }
+    if (HasUsage(usage, BufferUsage::Uniform)) {
+        flags |= vk::BufferUsageFlagBits::eUniformBuffer;
+    }
+    if (HasUsage(usage, BufferUsage::Storage)) {
+        flags |= vk::BufferUsageFlagBits::eStorageBuffer;
+    }
+    if (HasUsage(usage, BufferUsage::Index)) {
+        flags |= vk::BufferUsageFlagBits::eIndexBuffer;
+    }
+    if (HasUsage(usage, BufferUsage::Vertex)) {
+        flags |= vk::BufferUsageFlagBits::eVertexBuffer;
+    }
+    if (HasUsage(usage, BufferUsage::Indirect)) {
+        flags |= vk::BufferUsageFlagBits::eIndirectBuffer;
+    }
+    if (HasUsage(usage, BufferUsage::DeviceAddress)) {
+        flags |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
+    }
+    return flags;
+}
+
 struct VulkanBufferAccess {
     vk::AccessFlags2 access;
     vk::PipelineStageFlagBits2 stage;
@@ -138,17 +167,17 @@ void UniqueBuffer::Create(const vk::BufferCreateInfo& buffer_ci, MemoryUsage usa
     }
 }
 
-Buffer::Buffer(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_, MemoryUsage usage_,
-               VAddr cpu_addr_, vk::BufferUsageFlags flags, u64 size_bytes_)
-    : cpu_addr{cpu_addr_}, size_bytes{size_bytes_}, instance{&instance_}, scheduler{&scheduler_},
-      usage{usage_}, buffer{instance->GetDevice(), instance->GetAllocator()} {
+Buffer::Buffer(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_, BufferDesc desc)
+    : cpu_addr{desc.guest_address}, size_bytes{desc.size_bytes}, instance{&instance_},
+      scheduler{&scheduler_}, usage{desc.memory_usage},
+      buffer{instance->GetDevice(), instance->GetAllocator()} {
     // Create buffer object.
     const vk::BufferCreateInfo buffer_ci = {
         .size = size_bytes,
-        .usage = flags,
+        .usage = ToVulkanUsage(desc.usage),
     };
     VmaAllocationInfo alloc_info{};
-    buffer.Create(buffer_ci, usage, &alloc_info);
+    buffer.Create(buffer_ci, desc.memory_usage, &alloc_info);
 
     const auto device = instance->GetDevice();
     Vulkan::SetObjectName(device, Handle(), "Buffer {:#x}:{:#x}", cpu_addr, size_bytes);
@@ -222,7 +251,7 @@ constexpr u64 WATCHES_RESERVE_CHUNK = 0x1000;
 
 StreamBuffer::StreamBuffer(const Vulkan::Instance& instance, Vulkan::Scheduler& scheduler,
                            MemoryUsage usage, u64 size_bytes)
-    : Buffer{instance, scheduler, usage, 0, AllFlags, size_bytes} {
+    : Buffer{instance, scheduler, BufferDesc{usage, 0, AllFlags, size_bytes}} {
     ReserveWatches(current_watches, WATCHES_INITIAL_RESERVE);
     ReserveWatches(previous_watches, WATCHES_INITIAL_RESERVE);
     const auto device = instance.GetDevice();

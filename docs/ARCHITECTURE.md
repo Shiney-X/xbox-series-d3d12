@@ -142,6 +142,20 @@ as transições para estágios e máscaras de acesso Vulkan ao construir
 antes da extração. O rastreador não resolve hazards de imagem, ownership de
 queues ou residency; esses casos exigem contratos próprios.
 
+### Quarto corte: descrição de buffers
+
+`VideoCore::BufferDesc` descreve o recurso antes de sua criação: endereço do
+guest, tamanho, preferência de memória e usos necessários. `BufferUsage` usa
+flags sem dependência de Vulkan; inclui transferência, uniform/storage,
+vértices, índices, indireto e endereço de dispositivo. Um endereço zero indica
+buffer utilitário sem mapeamento direto para a memória do guest.
+
+Na implementação atual, `VideoCore::Buffer` traduz esses usos para
+`vk::BufferUsageFlags` e continua alocando via VMA. O futuro backend D3D12
+deverá traduzir o mesmo descritor para seus recursos e estados, levando em
+conta que algumas capacidades do Vulkan não correspondem a flags de criação
+do D3D12.
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a
