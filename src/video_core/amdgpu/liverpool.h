@@ -19,10 +19,7 @@
 #include "common/unique_function.h"
 #include "video_core/amdgpu/cb_db_extent.h"
 #include "video_core/amdgpu/regs.h"
-
-namespace Vulkan {
-class Rasterizer;
-}
+#include "video_core/gpu_command_sink.h"
 
 namespace Libraries::VideoOut {
 struct VideoOutPort;
@@ -91,8 +88,8 @@ public:
         vo_port = port;
     }
 
-    void BindRasterizer(Vulkan::Rasterizer* rasterizer_) {
-        rasterizer = rasterizer_;
+    void BindCommandSink(VideoCore::GpuCommandSink* sink) {
+        command_sink = sink;
     }
 
     template <bool wait_done = false>
@@ -220,7 +217,7 @@ private:
         static std::array<u8, 48_KB> constants_heap;
     } cblock{};
 
-    Vulkan::Rasterizer* rasterizer{};
+    VideoCore::GpuCommandSink* command_sink{};
     Libraries::VideoOut::VideoOutPort* vo_port{};
     std::jthread process_thread{};
     std::atomic<u32> num_submits{};

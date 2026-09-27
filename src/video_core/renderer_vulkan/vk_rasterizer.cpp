@@ -40,7 +40,7 @@ Rasterizer::Rasterizer(const Instance& instance_, Scheduler& scheduler_,
       liverpool{liverpool_}, memory{Core::Memory::Instance()},
       pipeline_cache{instance, scheduler, liverpool} {
     if (!EmulatorSettings.IsNullGPU()) {
-        liverpool->BindRasterizer(this);
+        liverpool->BindCommandSink(this);
     }
     memory->SetGpuMemoryTracker(this);
 }
@@ -1400,7 +1400,7 @@ void Rasterizer::UpdateColorBlendingState(const GraphicsPipeline* pipeline) cons
     dynamic_state.SetAttachmentFeedbackLoopEnabled(attachment_feedback_loop);
 }
 
-void Rasterizer::ScopeMarkerBegin(const std::string_view& str, bool from_guest) {
+void Rasterizer::ScopeMarkerBegin(std::string_view str, bool from_guest) {
     if ((from_guest && !EmulatorSettings.IsVkGuestMarkersEnabled()) ||
         (!from_guest && !EmulatorSettings.IsVkHostMarkersEnabled())) {
         return;
@@ -1431,8 +1431,7 @@ void Rasterizer::ScopedMarkerInsert(const std::string_view& str, bool from_guest
     });
 }
 
-void Rasterizer::ScopedMarkerInsertColor(const std::string_view& str, const u32 color,
-                                         bool from_guest) {
+void Rasterizer::ScopedMarkerInsertColor(std::string_view str, u32 color, bool from_guest) {
     if ((from_guest && !EmulatorSettings.IsVkGuestMarkersEnabled()) ||
         (!from_guest && !EmulatorSettings.IsVkHostMarkersEnabled())) {
         return;
