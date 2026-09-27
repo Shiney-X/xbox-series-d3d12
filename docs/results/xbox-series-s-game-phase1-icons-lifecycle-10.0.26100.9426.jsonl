@@ -1,0 +1,13 @@
+{"session":"134350078224630519-852","event":"launch","details":"process started"}
+{"session":"134350078224630519-852","event":"library-folder","details":"USB folder enumerated;input_consumed=1"}
+{"session":"134350078224630519-852","event":"navigation","details":"Xbox Shell navigation event presented;input_consumed=1"}
+{"session":"134350078224630519-852","event":"navigation","details":"Xbox Shell navigation event presented;input_consumed=1"}
+{"session":"134350078224630519-852","event":"library-folder","details":"USB folder enumerated;input_consumed=1"}
+{"session":"134350078224630519-852","event":"navigation","details":"Xbox Shell navigation event presented;input_consumed=1"}
+{"session":"134350078224630519-852","event":"navigation","details":"Xbox Shell navigation event presented;input_consumed=1"}
+{"session":"134350078224630519-852","event":"library-folder","details":"USB folder enumerated;input_consumed=1"}
+{"session":"134350078224630519-852","event":"library-folder-selected","details":"USB library folder selected;input_consumed=1"}
+{"session":"134350078224630519-852","event":"library-scan","details":"scan complete;games=1;directories=2;icons_ready=1;icons_invalid=0;selected_icon_presented=1;icon_report_error=0"}
+{"session":"134350078224630519-852","event":"navigation","details":"Xbox Shell navigation event presented;input_consumed=1"}
+{"session":"134350078224630519-852","event":"suspend","details":"suspending event observed;report flushed"}
+{"session":"134350078224630519-852","event":"resume","details":"resuming event observed"}

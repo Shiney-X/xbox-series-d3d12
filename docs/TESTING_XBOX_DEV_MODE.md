@@ -152,6 +152,23 @@ O scanner visita no máximo 128 diretórios, 32 jogos e três níveis abaixo da
 pasta selecionada. `NO PS4 GAMES FOUND` é um resultado válido quando a
 estrutura esperada não existe.
 
+## Testar os ícones da biblioteca
+
+O pacote `0.5.0.0` procura `sce_sys/icon0.png` depois de validar o jogo. O PNG
+é opcional: sua ausência ou corrupção deve mostrar `NO ICON`, nunca remover o
+jogo nem encerrar o aplicativo.
+
+1. Mantenha o dump próprio que já foi reconhecido pelo pacote `0.4.0.0`.
+2. Confirme que existe `sce_sys/icon0.png` no mesmo diretório do `param.sfo`.
+3. Instale o pacote `0.5.0.0`, classifique-o como **Game** antes de abrir e
+   mantenha o USB conectado.
+4. Abra **Games** e aguarde a restauração e varredura automáticas.
+5. Confirme que o ícone aparece à esquerda do título, sem distorção evidente.
+6. Pressione **X** e confirme que o ícone reaparece depois da nova varredura.
+7. Volte ao Dev Home e reabra; confirme novamente título, metadados e ícone.
+8. Como teste de fallback, use uma pasta de teste sem `icon0.png` e confirme
+   `NO ICON`. Não altere o dump original apenas para provocar esse caso.
+
 ## Coletar o relatório
 
 1. No Device Portal, abra **File explorer**.
@@ -162,7 +179,8 @@ estrutura esperada não existe.
 5. Baixe `phase1-core.jsonl`.
 6. Baixe `phase1-library.jsonl`.
 7. Baixe `phase1-library-scan.jsonl`, quando o scanner tiver sido executado.
-8. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
+8. Baixe `phase1-library-icons.jsonl` no pacote `0.5.0.0`.
+9. Se `LocalState` estiver vazio, procure o relatório da Fase 0 em `LocalCache`.
    Essa é a rota de contingência usada quando o perfil Game recusa a primeira
    gravação.
 9. Não edite os arquivos. Anexe-os a uma issue junto com:
@@ -209,6 +227,13 @@ sucesso, ele informa `state:"games_found"`, `games_found` maior que zero e
 erro zero. Cada linha seguinte, do tipo `uwp-library-game`, contém apenas
 título, Title ID, versão e nome da pasta.
 
+`phase1-library-icons.jsonl` deve conter `state:"icons_ready"` e
+`icons_ready` maior que zero quando o PNG for decodificado. Para o primeiro
+jogo selecionado, `selected_icon_presented:true` confirma também o upload e a
+vinculação da SRV D3D12. A linha do jogo registra `state:"ready"`, dimensões
+limitadas a 256×256 e erro zero. Estados `missing` e `invalid` são recuperáveis
+e devem corresponder ao fallback visual.
+
 O probe de pressão registra o limite atual, o limite esperado pelo Xbox, uso
 antes/depois, pico observado e a quantidade efetivamente alocada. O journal usa
 um identificador por processo:
@@ -238,6 +263,6 @@ apenas no build para obter os headers C++/WinRT compatíveis com C++20.
 
 ## Critério para avançar
 
-Avançar para imagens da biblioteca somente depois de confirmar no Series S:
-restauração da seleção, descoberta de um dump próprio, metadados corretos na
-tela e `state:"games_found"` em `phase1-library-scan.jsonl`.
+Avançar para o próximo bloco somente depois de confirmar no Series S: imagem
+visível, nova varredura, restauração após reabrir e
+`state:"icons_ready"` em `phase1-library-icons.jsonl`.

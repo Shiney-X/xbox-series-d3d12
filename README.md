@@ -20,7 +20,8 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] Navegação da interface validada no Xbox Series S em perfil Game.
 - [x] Validar acesso direto ao armazenamento USB no Xbox.
 - [x] Validar o navegador de pastas USB nativo no Xbox.
-- [ ] Validar descoberta de jogos e leitura de `param.sfo` no Xbox.
+- [x] Validar descoberta de jogos e leitura de `param.sfo` no Xbox.
+- [x] Validar decodificação e apresentação de `icon0.png` no Xbox.
 - [ ] Backend D3D12 integrado ao video core.
 
 ## Baseline upstream
@@ -65,6 +66,9 @@ Essa interface é renderizada diretamente por D3D12 no host UWP do console;
 não é um mock desktop. Na tela Jogos, o direcional percorre as pastas do
 USB, **A** abre a pasta, **B** sobe um nível e **X** seleciona e examina a
 pasta atual em busca de jogos PS4.
+O pacote `0.5.0.0` também decodifica `sce_sys/icon0.png`, limita a imagem a
+256×256 e envia somente o ícone selecionado para uma textura D3D12. Jogos sem
+ícone continuam aparecendo com um fallback textual.
 O roteiro completo está em
 [Teste no Xbox Dev Mode](docs/TESTING_XBOX_DEV_MODE.md).
 
@@ -83,6 +87,7 @@ O roteiro completo está em
 - [ADR-0005: bridge do core e shell UWP](docs/adr/0005-uwp-core-bridge-and-shell.md)
 - [ADR-0006: acesso USB à biblioteca](docs/adr/0006-uwp-library-folder-access.md)
 - [ADR-0007: descoberta de jogos e metadados PSF](docs/adr/0007-uwp-game-library-scan.md)
+- [ADR-0008: texturas de ícone da biblioteca UWP](docs/adr/0008-uwp-library-icon-textures.md)
 
 ## Escopo legal e licença
 

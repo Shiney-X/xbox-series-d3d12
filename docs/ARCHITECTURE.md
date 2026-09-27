@@ -124,9 +124,19 @@ KnownFolders.RemovableDevices
   -> enumeração StorageFolder limitada
   -> eboot.bin + sce_sys/param.sfo
   -> parser PSF limitado da bridge do core
-  -> modelo textual do shell D3D12
+  -> sce_sys/icon0.png opcional
+  -> Windows.Graphics.Imaging (BGRA8, máximo 256x256)
+  -> upload sob demanda da seleção para SRV D3D12
+  -> modelo visual do shell D3D12
 ```
 
 O parser recebe bytes lidos por `FileIO`, usa os layouts PSF do upstream e não
 confia em offsets, contagens ou terminação NUL vindos do arquivo. Essa fronteira
 mantém as APIs WinRT no host e os detalhes do formato Orbis na bridge do core.
+
+O PNG nunca é interpretado pelo parser PSF. O host limita o arquivo codificado
+a 8 MiB, rejeita dimensões de origem acima de 4096 e pede ao decoder WinRT uma
+saída BGRA8 de no máximo 256×256. Os pixels permanecem em memória de CPU no
+modelo da biblioteca; o renderer mantém apenas uma textura GPU, correspondente
+ao jogo selecionado. A troca aguarda a fence existente antes de substituir o
+SRV. Ausência, PNG inválido ou falha de upload não remove o jogo da lista.

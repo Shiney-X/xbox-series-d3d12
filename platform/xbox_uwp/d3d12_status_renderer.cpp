@@ -17,11 +17,16 @@ constexpr char ShellShader[] = R"(
 cbuffer DrawConstants : register(b0) {
     float4 rect;
     float4 draw_color;
+    float4 draw_options;
 };
+
+Texture2D<float4> game_icon : register(t0);
+SamplerState icon_sampler : register(s0);
 
 struct VertexOutput {
     float4 position : SV_Position;
     float4 color : COLOR0;
+    float2 uv : TEXCOORD0;
 };
 
 VertexOutput VSMain(uint vertex_id : SV_VertexID) {
@@ -35,10 +40,14 @@ VertexOutput VSMain(uint vertex_id : SV_VertexID) {
     output.position = float4(position.x * 2.0 - 1.0,
                              1.0 - position.y * 2.0, 0.0, 1.0);
     output.color = draw_color;
+    output.uv = corners[vertex_id];
     return output;
 }
 
 float4 PSMain(VertexOutput input) : SV_Target {
+    if (draw_options.x > 0.5) {
+        return game_icon.Sample(icon_sampler, input.uv) * input.color;
+    }
     return input.color;
 }
 )";
@@ -194,6 +203,15 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
   rtv_descriptor_size_ =
       device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+  D3D12_DESCRIPTOR_HEAP_DESC icon_heap_description{};
+  icon_heap_description.NumDescriptors = 1;
+  icon_heap_description.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+  icon_heap_description.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+  winrt::check_hresult(device_->CreateDescriptorHeap(
+      &icon_heap_description,
+      IID_PPV_ARGS(icon_srv_heap_.ReleaseAndGetAddressOf())));
+  ResetGameIcon();
+
   auto rtv_handle = rtv_heap_->GetCPUDescriptorHandleForHeapStart();
   for (UINT index = 0; index < FrameCount; ++index) {
     winrt::check_hresult(swap_chain_->GetBuffer(
@@ -223,6 +241,7 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
 }
 
 void D3D12StatusRenderer::Render(const XboxShellState &state) {
+  EnsureSelectedGameIcon(state);
   winrt::check_hresult(command_allocator_->Reset());
   winrt::check_hresult(
       command_list_->Reset(command_allocator_.Get(), pipeline_state_.Get()));
@@ -242,6 +261,10 @@ void D3D12StatusRenderer::Render(const XboxShellState &state) {
   constexpr float background[] = {0.012F, 0.022F, 0.042F, 1.0F};
   command_list_->ClearRenderTargetView(rtv_handle, background, 0, nullptr);
   command_list_->SetGraphicsRootSignature(root_signature_.Get());
+  ID3D12DescriptorHeap *descriptor_heaps[]{icon_srv_heap_.Get()};
+  command_list_->SetDescriptorHeaps(1, descriptor_heaps);
+  command_list_->SetGraphicsRootDescriptorTable(
+      1, icon_srv_heap_->GetGPUDescriptorHandleForHeapStart());
   command_list_->RSSetViewports(1, &viewport_);
   command_list_->RSSetScissorRects(1, &scissor_);
   command_list_->OMSetRenderTargets(1, &rtv_handle, FALSE, nullptr);
@@ -269,8 +292,18 @@ void D3D12StatusRenderer::Render(const XboxShellState &state) {
 void D3D12StatusRenderer::DrawRectangle(float x, float y, float width,
                                         float height,
                                         const std::array<float, 4> &color) {
-  const std::array<float, 8> constants{x,        y,        width,    height,
-                                       color[0], color[1], color[2], color[3]};
+  const std::array<float, 12> constants{x,        y,        width,    height,
+                                        color[0], color[1], color[2], color[3],
+                                        0.0F,     0.0F,     0.0F,     0.0F};
+  command_list_->SetGraphicsRoot32BitConstants(
+      0, static_cast<UINT>(constants.size()), constants.data(), 0);
+  command_list_->DrawInstanced(6, 1, 0, 0);
+}
+
+void D3D12StatusRenderer::DrawGameIcon(float x, float y, float width,
+                                       float height) {
+  const std::array<float, 12> constants{x,    y,    width, height, 1.0F, 1.0F,
+                                        1.0F, 1.0F, 1.0F,  0.0F,   0.0F, 0.0F};
   command_list_->SetGraphicsRoot32BitConstants(
       0, static_cast<UINT>(constants.size()), constants.data(), 0);
   command_list_->DrawInstanced(6, 1, 0, 0);
@@ -388,15 +421,21 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
           const float y = 0.365F + static_cast<float>(index - first) * 0.067F;
           const bool focused = index == selected;
           if (focused) {
-            DrawRectangle(0.09F, y - 0.012F, 0.74F, 0.056F, PanelSelected);
-            DrawRectangle(0.09F, y - 0.012F, 0.006F, 0.056F, Focus);
+            DrawRectangle(0.32F, y - 0.012F, 0.51F, 0.056F, PanelSelected);
+            DrawRectangle(0.32F, y - 0.012F, 0.006F, 0.056F, Focus);
           }
-          DrawText(state.games[index].title, 0.11F, y, 3.8F,
+          DrawText(state.games[index].title, 0.34F, y, 3.8F,
                    focused ? PrimaryText : SecondaryText);
         }
-        DrawText("TITLE ID  " + state.games[selected].title_id, 0.105F, 0.66F,
+        DrawRectangle(0.095F, 0.355F, 0.185F, 0.329F, PanelSelected);
+        if (selected_icon_ready_) {
+          DrawGameIcon(0.10F, 0.364F, 0.175F, 0.311F);
+        } else {
+          DrawText("NO ICON", 0.125F, 0.50F, 4.0F, SecondaryText);
+        }
+        DrawText("TITLE ID  " + state.games[selected].title_id, 0.33F, 0.66F,
                  3.4F, PrimaryText);
-        DrawText("VERSION  " + state.games[selected].app_version, 0.56F, 0.66F,
+        DrawText("VERSION  " + state.games[selected].app_version, 0.65F, 0.66F,
                  3.4F, SecondaryText);
       } else {
         DrawText(state.library_selection_confirmed ? "LIBRARY FOLDER SELECTED"
@@ -483,6 +522,167 @@ bool D3D12StatusRenderer::TryTrim() {
   return true;
 }
 
+void D3D12StatusRenderer::ResetGameIcon() noexcept {
+  selected_icon_texture_.Reset();
+  selected_icon_hash_ = 0U;
+  selected_icon_ready_ = false;
+  if (!device_ || !icon_srv_heap_) {
+    return;
+  }
+
+  D3D12_SHADER_RESOURCE_VIEW_DESC null_view{};
+  null_view.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  null_view.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+  null_view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  null_view.Texture2D.MipLevels = 1;
+  device_->CreateShaderResourceView(
+      nullptr, &null_view,
+      icon_srv_heap_->GetCPUDescriptorHandleForHeapStart());
+}
+
+void D3D12StatusRenderer::EnsureSelectedGameIcon(
+    const XboxShellState &state) noexcept {
+  try {
+    if (state.page != XboxShellPage::Games ||
+        state.library_scan_state != LibraryScanState::Ready ||
+        state.games.empty()) {
+      if (selected_icon_ready_) {
+        ResetGameIcon();
+      }
+      return;
+    }
+
+    const std::size_t selected =
+        std::min<std::size_t>(state.selected_game, state.games.size() - 1U);
+    const XboxGameListEntry &game = state.games[selected];
+    if (game.icon_state != GameIconState::Ready || game.icon_hash == 0U ||
+        game.icon_width == 0U || game.icon_height == 0U ||
+        game.icon_bgra8.size() !=
+            static_cast<std::size_t>(game.icon_width) * game.icon_height * 4U) {
+      if (selected_icon_ready_) {
+        ResetGameIcon();
+      }
+      return;
+    }
+    if (selected_icon_ready_ && selected_icon_hash_ == game.icon_hash) {
+      return;
+    }
+
+    ResetGameIcon();
+    selected_icon_ready_ = UploadGameIcon(game);
+    selected_icon_hash_ = selected_icon_ready_ ? game.icon_hash : 0U;
+  } catch (...) {
+    ResetGameIcon();
+  }
+}
+
+bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
+  D3D12_HEAP_PROPERTIES default_heap{};
+  default_heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+  D3D12_RESOURCE_DESC texture_description{};
+  texture_description.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+  texture_description.Width = game.icon_width;
+  texture_description.Height = game.icon_height;
+  texture_description.DepthOrArraySize = 1;
+  texture_description.MipLevels = 1;
+  texture_description.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  texture_description.SampleDesc.Count = 1;
+  texture_description.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+  ComPtr<ID3D12Resource> texture;
+  winrt::check_hresult(device_->CreateCommittedResource(
+      &default_heap, D3D12_HEAP_FLAG_NONE, &texture_description,
+      D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+      IID_PPV_ARGS(texture.ReleaseAndGetAddressOf())));
+
+  D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+  UINT row_count = 0;
+  UINT64 row_size = 0;
+  UINT64 upload_size = 0;
+  device_->GetCopyableFootprints(&texture_description, 0, 1, 0, &footprint,
+                                 &row_count, &row_size, &upload_size);
+  if (row_count != game.icon_height ||
+      row_size < static_cast<UINT64>(game.icon_width) * 4U) {
+    return false;
+  }
+
+  D3D12_HEAP_PROPERTIES upload_heap{};
+  upload_heap.Type = D3D12_HEAP_TYPE_UPLOAD;
+  D3D12_RESOURCE_DESC upload_description{};
+  upload_description.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+  upload_description.Width = upload_size;
+  upload_description.Height = 1;
+  upload_description.DepthOrArraySize = 1;
+  upload_description.MipLevels = 1;
+  upload_description.Format = DXGI_FORMAT_UNKNOWN;
+  upload_description.SampleDesc.Count = 1;
+  upload_description.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+  ComPtr<ID3D12Resource> upload;
+  winrt::check_hresult(device_->CreateCommittedResource(
+      &upload_heap, D3D12_HEAP_FLAG_NONE, &upload_description,
+      D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+      IID_PPV_ARGS(upload.ReleaseAndGetAddressOf())));
+
+  std::uint8_t *mapped = nullptr;
+  const D3D12_RANGE no_read{0, 0};
+  winrt::check_hresult(
+      upload->Map(0, &no_read, reinterpret_cast<void **>(&mapped)));
+  const std::size_t source_pitch =
+      static_cast<std::size_t>(game.icon_width) * 4U;
+  for (std::uint32_t row = 0; row < game.icon_height; ++row) {
+    std::memcpy(
+        mapped + footprint.Offset +
+            static_cast<std::size_t>(row) * footprint.Footprint.RowPitch,
+        game.icon_bgra8.data() + static_cast<std::size_t>(row) * source_pitch,
+        source_pitch);
+  }
+  const D3D12_RANGE written_range{0, static_cast<SIZE_T>(upload_size)};
+  upload->Unmap(0, &written_range);
+
+  ComPtr<ID3D12CommandAllocator> upload_allocator;
+  winrt::check_hresult(device_->CreateCommandAllocator(
+      D3D12_COMMAND_LIST_TYPE_DIRECT,
+      IID_PPV_ARGS(upload_allocator.ReleaseAndGetAddressOf())));
+  ComPtr<ID3D12GraphicsCommandList> upload_commands;
+  winrt::check_hresult(device_->CreateCommandList(
+      0, D3D12_COMMAND_LIST_TYPE_DIRECT, upload_allocator.Get(), nullptr,
+      IID_PPV_ARGS(upload_commands.ReleaseAndGetAddressOf())));
+
+  D3D12_TEXTURE_COPY_LOCATION destination{};
+  destination.pResource = texture.Get();
+  destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  D3D12_TEXTURE_COPY_LOCATION source{};
+  source.pResource = upload.Get();
+  source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+  source.PlacedFootprint = footprint;
+  upload_commands->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
+
+  D3D12_RESOURCE_BARRIER barrier{};
+  barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+  barrier.Transition.pResource = texture.Get();
+  barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+  barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+  barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+  upload_commands->ResourceBarrier(1, &barrier);
+  winrt::check_hresult(upload_commands->Close());
+  ID3D12CommandList *lists[]{upload_commands.Get()};
+  command_queue_->ExecuteCommandLists(1, lists);
+  WaitForGpu();
+
+  D3D12_SHADER_RESOURCE_VIEW_DESC icon_view{};
+  icon_view.Format = texture_description.Format;
+  icon_view.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+  icon_view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  icon_view.Texture2D.MipLevels = 1;
+  device_->CreateShaderResourceView(
+      texture.Get(), &icon_view,
+      icon_srv_heap_->GetCPUDescriptorHandleForHeapStart());
+  selected_icon_texture_ = std::move(texture);
+  return true;
+}
+
 void D3D12StatusRenderer::CreateShellPipeline() {
   ComPtr<IDxcLibrary> library;
   ComPtr<IDxcCompiler> compiler;
@@ -514,15 +714,39 @@ void D3D12StatusRenderer::CreateShellPipeline() {
   const ComPtr<IDxcBlob> vertex_shader = compile_shader(L"VSMain", L"vs_6_0");
   const ComPtr<IDxcBlob> pixel_shader = compile_shader(L"PSMain", L"ps_6_0");
 
+  D3D12_DESCRIPTOR_RANGE icon_range{};
+  icon_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+  icon_range.NumDescriptors = 1;
+  icon_range.BaseShaderRegister = 0;
+  icon_range.OffsetInDescriptorsFromTableStart =
+      D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+  std::array<D3D12_ROOT_PARAMETER, 2> root_parameters{};
+  root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+  root_parameters[0].Constants.ShaderRegister = 0;
+  root_parameters[0].Constants.RegisterSpace = 0;
+  root_parameters[0].Constants.Num32BitValues = 12;
+  root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+  root_parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+  root_parameters[1].DescriptorTable.NumDescriptorRanges = 1;
+  root_parameters[1].DescriptorTable.pDescriptorRanges = &icon_range;
+  root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+  D3D12_STATIC_SAMPLER_DESC icon_sampler{};
+  icon_sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+  icon_sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  icon_sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  icon_sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  icon_sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+  icon_sampler.MaxLOD = D3D12_FLOAT32_MAX;
+  icon_sampler.ShaderRegister = 0;
+  icon_sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
   D3D12_ROOT_SIGNATURE_DESC root_description{};
-  D3D12_ROOT_PARAMETER root_parameter{};
-  root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-  root_parameter.Constants.ShaderRegister = 0;
-  root_parameter.Constants.RegisterSpace = 0;
-  root_parameter.Constants.Num32BitValues = 8;
-  root_parameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-  root_description.NumParameters = 1;
-  root_description.pParameters = &root_parameter;
+  root_description.NumParameters = static_cast<UINT>(root_parameters.size());
+  root_description.pParameters = root_parameters.data();
+  root_description.NumStaticSamplers = 1;
+  root_description.pStaticSamplers = &icon_sampler;
   root_description.Flags =
       D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
   ComPtr<ID3DBlob> serialized_root;
@@ -536,11 +760,12 @@ void D3D12StatusRenderer::CreateShellPipeline() {
       IID_PPV_ARGS(root_signature_.ReleaseAndGetAddressOf())));
 
   D3D12_BLEND_DESC blend{};
+  blend.RenderTarget[0].BlendEnable = TRUE;
   blend.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
-  blend.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+  blend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
   blend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
   blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-  blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+  blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
   blend.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
   blend.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
   blend.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;

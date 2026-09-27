@@ -6,6 +6,8 @@
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Graphics.Imaging.h>
+#include <winrt/Windows.Storage.FileProperties.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.System.h>
@@ -31,6 +33,7 @@ using namespace winrt;
 using namespace winrt::Windows::ApplicationModel;
 using namespace winrt::Windows::ApplicationModel::Activation;
 using namespace winrt::Windows::ApplicationModel::Core;
+using namespace winrt::Windows::Graphics::Imaging;
 using namespace winrt::Windows::Storage;
 using namespace winrt::Windows::Storage::Streams;
 using namespace winrt::Windows::System;
@@ -295,6 +298,31 @@ struct DiscoveredGame {
   std::string folder_name;
 };
 
+std::string_view IconStateName(GameIconState state) noexcept {
+  switch (state) {
+  case GameIconState::Ready:
+    return "ready";
+  case GameIconState::Invalid:
+    return "invalid";
+  case GameIconState::Missing:
+  default:
+    return "missing";
+  }
+}
+
+std::uint64_t HashIcon(const std::vector<std::uint8_t> &pixels,
+                       std::uint32_t width, std::uint32_t height) noexcept {
+  constexpr std::uint64_t offset_basis = 14695981039346656037ULL;
+  constexpr std::uint64_t prime = 1099511628211ULL;
+  std::uint64_t hash = offset_basis;
+  for (const std::uint8_t value : pixels) {
+    hash = (hash ^ value) * prime;
+  }
+  hash = (hash ^ width) * prime;
+  hash = (hash ^ height) * prime;
+  return hash == 0U ? 1U : hash;
+}
+
 std::uint32_t WriteLibraryScanReport(
     bool passed, std::string_view state, std::uint32_t operation_error,
     std::size_t directories_scanned, std::size_t invalid_metadata,
@@ -325,6 +353,67 @@ std::uint32_t WriteLibraryScanReport(
              << "\",\"folder_name\":\"" << EscapeJson(game.folder_name)
              << "\"}\n";
     }
+    const std::string serialized = output.str();
+    DWORD written = 0;
+    const bool succeeded = WriteFile(file, serialized.data(),
+                                     static_cast<DWORD>(serialized.size()),
+                                     &written, nullptr) != FALSE;
+    const bool flushed = succeeded && FlushFileBuffers(file) != FALSE;
+    const std::uint32_t error =
+        flushed && written == serialized.size()
+            ? ERROR_SUCCESS
+            : (succeeded ? ERROR_WRITE_FAULT : GetLastError());
+    CloseHandle(file);
+    return error;
+  } catch (const hresult_error &error) {
+    return static_cast<std::uint32_t>(error.code().value);
+  } catch (...) {
+    return ERROR_GEN_FAILURE;
+  }
+}
+
+std::uint32_t WriteLibraryIconReport(bool passed, std::string_view state,
+                                     std::uint32_t operation_error,
+                                     const std::vector<DiscoveredGame> &games,
+                                     bool selected_icon_presented) noexcept {
+  try {
+    const StorageFolder folder = ApplicationData::Current().LocalFolder();
+    const std::wstring path =
+        std::wstring(folder.Path().c_str()) + L"\\phase1-library-icons.jsonl";
+    const HANDLE file = CreateFile2FromAppW(
+        path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+      return GetLastError();
+    }
+
+    const auto count_state = [&games](GameIconState state_value) {
+      return std::count_if(games.begin(), games.end(),
+                           [state_value](const DiscoveredGame &game) {
+                             return game.display.icon_state == state_value;
+                           });
+    };
+    const std::size_t ready = count_state(GameIconState::Ready);
+    const std::size_t missing = count_state(GameIconState::Missing);
+    const std::size_t invalid = count_state(GameIconState::Invalid);
+
+    std::ostringstream output;
+    output << "{\"component\":\"uwp-library-icons\",\"passed\":"
+           << (passed ? "true" : "false") << ",\"state\":\""
+           << EscapeJson(state) << "\",\"win32_error\":" << operation_error
+           << ",\"icons_ready\":" << ready << ",\"icons_missing\":" << missing
+           << ",\"icons_invalid\":" << invalid
+           << ",\"selected_icon_presented\":"
+           << (selected_icon_presented ? "true" : "false") << "}\n";
+    for (std::size_t index = 0; index < games.size(); ++index) {
+      const XboxGameListEntry &game = games[index].display;
+      output << "{\"component\":\"uwp-library-icon\",\"index\":" << index
+             << ",\"title_id\":\"" << EscapeJson(game.title_id)
+             << "\",\"state\":\"" << IconStateName(game.icon_state)
+             << "\",\"width\":" << game.icon_width
+             << ",\"height\":" << game.icon_height
+             << ",\"win32_error\":" << game.icon_error << "}\n";
+    }
+
     const std::string serialized = output.str();
     DWORD written = 0;
     const bool succeeded = WriteFile(file, serialized.data(),
@@ -764,6 +853,100 @@ private:
                   game.display.app_version =
                       CreateFolderLabel(metadata.app_version);
                   game.folder_name = to_string(candidate.folder.Name());
+
+                  try {
+                    const IStorageItem icon_item =
+                        co_await sce_system.TryGetItemAsync(L"icon0.png");
+                    const StorageFile icon_file =
+                        icon_item ? icon_item.try_as<StorageFile>() : nullptr;
+                    if (icon_file) {
+                      game.display.icon_state = GameIconState::Invalid;
+                      try {
+                        constexpr std::uint64_t maximum_encoded_icon_size =
+                            8ULL * 1024ULL * 1024ULL;
+                        constexpr std::uint32_t maximum_source_dimension =
+                            4096U;
+                        constexpr std::uint32_t maximum_decoded_dimension =
+                            256U;
+                        const auto properties =
+                            co_await icon_file.GetBasicPropertiesAsync();
+                        if (properties.Size() == 0U ||
+                            properties.Size() > maximum_encoded_icon_size) {
+                          game.display.icon_error = ERROR_FILE_TOO_LARGE;
+                        } else {
+                          const auto stream =
+                              co_await icon_file.OpenReadAsync();
+                          const BitmapDecoder decoder =
+                              co_await BitmapDecoder::CreateAsync(stream);
+                          const std::uint32_t source_width =
+                              decoder.PixelWidth();
+                          const std::uint32_t source_height =
+                              decoder.PixelHeight();
+                          if (source_width == 0U || source_height == 0U ||
+                              source_width > maximum_source_dimension ||
+                              source_height > maximum_source_dimension) {
+                            game.display.icon_error = ERROR_INVALID_DATA;
+                          } else {
+                            const std::uint32_t largest_dimension =
+                                std::max(source_width, source_height);
+                            const std::uint32_t target_width =
+                                largest_dimension <= maximum_decoded_dimension
+                                    ? source_width
+                                    : std::max(1U,
+                                               source_width *
+                                                   maximum_decoded_dimension /
+                                                   largest_dimension);
+                            const std::uint32_t target_height =
+                                largest_dimension <= maximum_decoded_dimension
+                                    ? source_height
+                                    : std::max(1U,
+                                               source_height *
+                                                   maximum_decoded_dimension /
+                                                   largest_dimension);
+                            BitmapTransform transform;
+                            transform.ScaledWidth(target_width);
+                            transform.ScaledHeight(target_height);
+                            const PixelDataProvider pixels =
+                                co_await decoder.GetPixelDataAsync(
+                                    BitmapPixelFormat::Bgra8,
+                                    BitmapAlphaMode::Premultiplied, transform,
+                                    ExifOrientationMode::IgnoreExifOrientation,
+                                    ColorManagementMode::ColorManageToSRgb);
+                            const com_array<std::uint8_t> detached =
+                                pixels.DetachPixelData();
+                            std::vector<std::uint8_t> decoded(detached.begin(),
+                                                              detached.end());
+                            const std::size_t expected_size =
+                                static_cast<std::size_t>(target_width) *
+                                target_height * 4U;
+                            if (decoded.size() != expected_size) {
+                              game.display.icon_error = ERROR_INVALID_DATA;
+                            } else {
+                              game.display.icon_width = target_width;
+                              game.display.icon_height = target_height;
+                              game.display.icon_hash = HashIcon(
+                                  decoded, target_width, target_height);
+                              game.display.icon_bgra8 = std::move(decoded);
+                              game.display.icon_state = GameIconState::Ready;
+                              game.display.icon_error = ERROR_SUCCESS;
+                            }
+                          }
+                        }
+                      } catch (const hresult_error &error) {
+                        game.display.icon_error =
+                            static_cast<std::uint32_t>(error.code().value);
+                      } catch (...) {
+                        game.display.icon_error = ERROR_GEN_FAILURE;
+                      }
+                    }
+                  } catch (const hresult_error &error) {
+                    game.display.icon_state = GameIconState::Invalid;
+                    game.display.icon_error =
+                        static_cast<std::uint32_t>(error.code().value);
+                  } catch (...) {
+                    game.display.icon_state = GameIconState::Invalid;
+                    game.display.icon_error = ERROR_GEN_FAILURE;
+                  }
                   discovered.push_back(std::move(game));
                   is_game = true;
                 } else {
@@ -803,15 +986,39 @@ private:
       const std::uint32_t report_error = WriteLibraryScanReport(
           true, discovered.empty() ? "no_games_found" : "games_found",
           ERROR_SUCCESS, directories_scanned, invalid_metadata, discovered);
+      const std::size_t icons_ready = std::count_if(
+          discovered.begin(), discovered.end(), [](const DiscoveredGame &game) {
+            return game.display.icon_state == GameIconState::Ready;
+          });
+      const std::size_t icons_invalid = std::count_if(
+          discovered.begin(), discovered.end(), [](const DiscoveredGame &game) {
+            return game.display.icon_state == GameIconState::Invalid;
+          });
+      const std::string_view icon_report_state =
+          discovered.empty() ? "no_games"
+                             : (icons_ready == discovered.size()
+                                    ? "icons_ready"
+                                    : (icons_ready == 0U ? "fallback_only"
+                                                         : "partial_fallback"));
       if (report_error != ERROR_SUCCESS) {
         shell_state_.library_scan_state = LibraryScanState::Failed;
       }
       if (renderer_) {
         renderer_->Render(shell_state_);
       }
+      const bool selected_icon_presented =
+          renderer_ && renderer_->SelectedGameIconReady();
+      const std::uint32_t icon_report_error =
+          WriteLibraryIconReport(true, icon_report_state, ERROR_SUCCESS,
+                                 discovered, selected_icon_presented);
       const std::string lifecycle_details =
           "scan complete;games=" + std::to_string(discovered.size()) +
-          ";directories=" + std::to_string(directories_scanned);
+          ";directories=" + std::to_string(directories_scanned) +
+          ";icons_ready=" + std::to_string(icons_ready) +
+          ";icons_invalid=" + std::to_string(icons_invalid) +
+          ";selected_icon_presented=" +
+          std::to_string(selected_icon_presented ? 1U : 0U) +
+          ";icon_report_error=" + std::to_string(icon_report_error);
       AppendLifecycleEvent(session_id_, "library-scan",
                            lifecycle_details.c_str());
     } catch (const hresult_error &error) {
@@ -820,6 +1027,9 @@ private:
       WriteLibraryScanReport(false, "scan_failed",
                              static_cast<std::uint32_t>(error.code().value),
                              directories_scanned, invalid_metadata, discovered);
+      WriteLibraryIconReport(false, "scan_failed",
+                             static_cast<std::uint32_t>(error.code().value),
+                             discovered, false);
       if (renderer_) {
         renderer_->Render(shell_state_);
       }
@@ -828,6 +1038,8 @@ private:
       shell_state_.library_scan_state = LibraryScanState::Failed;
       WriteLibraryScanReport(false, "scan_failed", ERROR_GEN_FAILURE,
                              directories_scanned, invalid_metadata, discovered);
+      WriteLibraryIconReport(false, "scan_failed", ERROR_GEN_FAILURE,
+                             discovered, false);
       if (renderer_) {
         renderer_->Render(shell_state_);
       }
