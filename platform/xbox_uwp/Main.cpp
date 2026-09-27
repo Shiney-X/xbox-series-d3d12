@@ -854,83 +854,98 @@ private:
                       CreateFolderLabel(metadata.app_version);
                   game.folder_name = to_string(candidate.folder.Name());
 
-                  const IStorageItem icon_item =
-                      co_await sce_system.TryGetItemAsync(L"icon0.png");
-                  const StorageFile icon_file =
-                      icon_item ? icon_item.try_as<StorageFile>() : nullptr;
-                  if (icon_file) {
-                    game.display.icon_state = GameIconState::Invalid;
-                    try {
-                      constexpr std::uint64_t maximum_encoded_icon_size =
-                          8ULL * 1024ULL * 1024ULL;
-                      constexpr std::uint32_t maximum_source_dimension = 4096U;
-                      constexpr std::uint32_t maximum_decoded_dimension = 256U;
-                      const auto properties =
-                          co_await icon_file.GetBasicPropertiesAsync();
-                      if (properties.Size() == 0U ||
-                          properties.Size() > maximum_encoded_icon_size) {
-                        game.display.icon_error = ERROR_FILE_TOO_LARGE;
-                      } else {
-                        const auto stream = co_await icon_file.OpenReadAsync();
-                        const BitmapDecoder decoder =
-                            co_await BitmapDecoder::CreateAsync(stream);
-                        const std::uint32_t source_width = decoder.PixelWidth();
-                        const std::uint32_t source_height =
-                            decoder.PixelHeight();
-                        if (source_width == 0U || source_height == 0U ||
-                            source_width > maximum_source_dimension ||
-                            source_height > maximum_source_dimension) {
-                          game.display.icon_error = ERROR_INVALID_DATA;
+                  try {
+                    const IStorageItem icon_item =
+                        co_await sce_system.TryGetItemAsync(L"icon0.png");
+                    const StorageFile icon_file =
+                        icon_item ? icon_item.try_as<StorageFile>() : nullptr;
+                    if (icon_file) {
+                      game.display.icon_state = GameIconState::Invalid;
+                      try {
+                        constexpr std::uint64_t maximum_encoded_icon_size =
+                            8ULL * 1024ULL * 1024ULL;
+                        constexpr std::uint32_t maximum_source_dimension =
+                            4096U;
+                        constexpr std::uint32_t maximum_decoded_dimension =
+                            256U;
+                        const auto properties =
+                            co_await icon_file.GetBasicPropertiesAsync();
+                        if (properties.Size() == 0U ||
+                            properties.Size() > maximum_encoded_icon_size) {
+                          game.display.icon_error = ERROR_FILE_TOO_LARGE;
                         } else {
-                          const std::uint32_t largest_dimension =
-                              std::max(source_width, source_height);
-                          const std::uint32_t target_width =
-                              largest_dimension <= maximum_decoded_dimension
-                                  ? source_width
-                                  : std::max(1U, source_width *
-                                                     maximum_decoded_dimension /
-                                                     largest_dimension);
-                          const std::uint32_t target_height =
-                              largest_dimension <= maximum_decoded_dimension
-                                  ? source_height
-                                  : std::max(1U, source_height *
-                                                     maximum_decoded_dimension /
-                                                     largest_dimension);
-                          BitmapTransform transform;
-                          transform.ScaledWidth(target_width);
-                          transform.ScaledHeight(target_height);
-                          const PixelDataProvider pixels =
-                              co_await decoder.GetPixelDataAsync(
-                                  BitmapPixelFormat::Bgra8,
-                                  BitmapAlphaMode::Premultiplied, transform,
-                                  ExifOrientationMode::IgnoreExifOrientation,
-                                  ColorManagementMode::ColorManageToSRgb);
-                          const com_array<std::uint8_t> detached =
-                              pixels.DetachPixelData();
-                          std::vector<std::uint8_t> decoded(detached.begin(),
-                                                            detached.end());
-                          const std::size_t expected_size =
-                              static_cast<std::size_t>(target_width) *
-                              target_height * 4U;
-                          if (decoded.size() != expected_size) {
+                          const auto stream =
+                              co_await icon_file.OpenReadAsync();
+                          const BitmapDecoder decoder =
+                              co_await BitmapDecoder::CreateAsync(stream);
+                          const std::uint32_t source_width =
+                              decoder.PixelWidth();
+                          const std::uint32_t source_height =
+                              decoder.PixelHeight();
+                          if (source_width == 0U || source_height == 0U ||
+                              source_width > maximum_source_dimension ||
+                              source_height > maximum_source_dimension) {
                             game.display.icon_error = ERROR_INVALID_DATA;
                           } else {
-                            game.display.icon_width = target_width;
-                            game.display.icon_height = target_height;
-                            game.display.icon_hash =
-                                HashIcon(decoded, target_width, target_height);
-                            game.display.icon_bgra8 = std::move(decoded);
-                            game.display.icon_state = GameIconState::Ready;
-                            game.display.icon_error = ERROR_SUCCESS;
+                            const std::uint32_t largest_dimension =
+                                std::max(source_width, source_height);
+                            const std::uint32_t target_width =
+                                largest_dimension <= maximum_decoded_dimension
+                                    ? source_width
+                                    : std::max(1U,
+                                               source_width *
+                                                   maximum_decoded_dimension /
+                                                   largest_dimension);
+                            const std::uint32_t target_height =
+                                largest_dimension <= maximum_decoded_dimension
+                                    ? source_height
+                                    : std::max(1U,
+                                               source_height *
+                                                   maximum_decoded_dimension /
+                                                   largest_dimension);
+                            BitmapTransform transform;
+                            transform.ScaledWidth(target_width);
+                            transform.ScaledHeight(target_height);
+                            const PixelDataProvider pixels =
+                                co_await decoder.GetPixelDataAsync(
+                                    BitmapPixelFormat::Bgra8,
+                                    BitmapAlphaMode::Premultiplied, transform,
+                                    ExifOrientationMode::IgnoreExifOrientation,
+                                    ColorManagementMode::ColorManageToSRgb);
+                            const com_array<std::uint8_t> detached =
+                                pixels.DetachPixelData();
+                            std::vector<std::uint8_t> decoded(detached.begin(),
+                                                              detached.end());
+                            const std::size_t expected_size =
+                                static_cast<std::size_t>(target_width) *
+                                target_height * 4U;
+                            if (decoded.size() != expected_size) {
+                              game.display.icon_error = ERROR_INVALID_DATA;
+                            } else {
+                              game.display.icon_width = target_width;
+                              game.display.icon_height = target_height;
+                              game.display.icon_hash = HashIcon(
+                                  decoded, target_width, target_height);
+                              game.display.icon_bgra8 = std::move(decoded);
+                              game.display.icon_state = GameIconState::Ready;
+                              game.display.icon_error = ERROR_SUCCESS;
+                            }
                           }
                         }
+                      } catch (const hresult_error &error) {
+                        game.display.icon_error =
+                            static_cast<std::uint32_t>(error.code().value);
+                      } catch (...) {
+                        game.display.icon_error = ERROR_GEN_FAILURE;
                       }
-                    } catch (const hresult_error &error) {
-                      game.display.icon_error =
-                          static_cast<std::uint32_t>(error.code().value);
-                    } catch (...) {
-                      game.display.icon_error = ERROR_GEN_FAILURE;
                     }
+                  } catch (const hresult_error &error) {
+                    game.display.icon_state = GameIconState::Invalid;
+                    game.display.icon_error =
+                        static_cast<std::uint32_t>(error.code().value);
+                  } catch (...) {
+                    game.display.icon_state = GameIconState::Invalid;
+                    game.display.icon_error = ERROR_GEN_FAILURE;
                   }
                   discovered.push_back(std::move(game));
                   is_game = true;
@@ -980,9 +995,11 @@ private:
             return game.display.icon_state == GameIconState::Invalid;
           });
       const std::string_view icon_report_state =
-          icons_ready == discovered.size() && !discovered.empty()
-              ? "icons_ready"
-              : (icons_ready == 0U ? "fallback_only" : "partial_fallback");
+          discovered.empty() ? "no_games"
+                             : (icons_ready == discovered.size()
+                                    ? "icons_ready"
+                                    : (icons_ready == 0U ? "fallback_only"
+                                                         : "partial_fallback"));
       if (report_error != ERROR_SUCCESS) {
         shell_state_.library_scan_state = LibraryScanState::Failed;
       }
