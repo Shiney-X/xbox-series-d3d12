@@ -1167,6 +1167,7 @@ set(VIDEO_CORE src/video_core/amdgpu/cb_db_extent.h
                src/video_core/cache_storage.h
                src/video_core/gpu_memory_tracker.h
                src/video_core/gpu_command_sink.h
+               src/video_core/buffer_cache/buffer_sync_state.h
                src/video_core/page_manager.cpp
                src/video_core/page_manager.h
                src/video_core/multi_level_page_table.h

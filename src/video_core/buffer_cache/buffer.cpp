@@ -13,6 +13,44 @@
 
 namespace VideoCore {
 
+namespace {
+
+struct VulkanBufferAccess {
+    vk::AccessFlags2 access;
+    vk::PipelineStageFlagBits2 stage;
+};
+
+constexpr VulkanBufferAccess ToVulkanAccess(BufferAccess access) {
+    switch (access) {
+    case BufferAccess::Initial:
+        return {vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite |
+                    vk::AccessFlagBits2::eTransferRead | vk::AccessFlagBits2::eTransferWrite,
+                vk::PipelineStageFlagBits2::eAllCommands};
+    case BufferAccess::General:
+        return {vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                vk::PipelineStageFlagBits2::eAllCommands};
+    case BufferAccess::VertexRead:
+        return {vk::AccessFlagBits2::eVertexAttributeRead,
+                vk::PipelineStageFlagBits2::eVertexAttributeInput};
+    case BufferAccess::IndexRead:
+        return {vk::AccessFlagBits2::eIndexRead, vk::PipelineStageFlagBits2::eIndexInput};
+    case BufferAccess::IndirectRead:
+        return {vk::AccessFlagBits2::eIndirectCommandRead,
+                vk::PipelineStageFlagBits2::eDrawIndirect};
+    case BufferAccess::ShaderRead:
+        return {vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eAllCommands};
+    case BufferAccess::ShaderWrite:
+        return {vk::AccessFlagBits2::eShaderWrite, vk::PipelineStageFlagBits2::eAllCommands};
+    case BufferAccess::TransferRead:
+        return {vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eTransfer};
+    case BufferAccess::TransferWrite:
+        return {vk::AccessFlagBits2::eTransferWrite, vk::PipelineStageFlagBits2::eTransfer};
+    }
+    UNREACHABLE();
+}
+
+} // namespace
+
 std::string_view BufferTypeName(MemoryUsage type) {
     switch (type) {
     case MemoryUsage::Upload:
@@ -122,6 +160,25 @@ Buffer::Buffer(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
         mapped_data = std::span<u8>{std::bit_cast<u8*>(alloc_info.pMappedData), size_bytes};
     }
     is_coherent = property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+}
+
+std::optional<vk::BufferMemoryBarrier2> Buffer::GetBarrier(BufferAccess next, u32 offset) {
+    const auto transition = sync_state.Transition(next, offset, size_bytes);
+    if (!transition) {
+        return std::nullopt;
+    }
+
+    const auto source = ToVulkanAccess(transition->before);
+    const auto destination = ToVulkanAccess(transition->after);
+    return vk::BufferMemoryBarrier2{
+        .srcStageMask = source.stage,
+        .srcAccessMask = source.access,
+        .dstStageMask = destination.stage,
+        .dstAccessMask = destination.access,
+        .buffer = buffer.buffer,
+        .offset = transition->offset,
+        .size = transition->size,
+    };
 }
 
 void Buffer::Fill(u64 offset, u32 num_bytes, u32 value) {
