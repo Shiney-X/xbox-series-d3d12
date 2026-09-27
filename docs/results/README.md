@@ -192,3 +192,26 @@ registraram erro.
 - arquivos brutos:
   [`xbox-series-s-game-phase1-library-folder-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-library-folder-10.0.26100.9426.jsonl) e
   [`xbox-series-s-game-phase1-library-scan-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-library-scan-10.0.26100.9426.jsonl).
+
+## Xbox Series S — ícone D3D12 da biblioteca
+
+O pacote `0.5.0.0`, em perfil **Game**, leu `sce_sys/icon0.png` do dump próprio
+de Sonic Mania, decodificou-o em BGRA8 256×256 e apresentou a imagem em uma
+SRV D3D12 ao lado dos metadados. A captura visual confirmou cores e geometria;
+o diagnóstico registrou `selected_icon_presented=true`. O mesmo processo foi
+suspenso e retomado sem erro.
+
+- sistema operacional: `10.0.26100.9426`;
+- jogo: `SONIC MANIA`, `CUSA07023`, versão `01.00` neste dump;
+- ícones prontos/ausentes/inválidos: `1/0/0`;
+- dimensões decodificadas: `256×256`;
+- SHA-256 do relatório de ícones:
+  `59d4652921a2ca926055bdb45e83de6281ec1d00f1901e3f0d78fc2be79a1027`;
+- SHA-256 do relatório do scanner:
+  `4e75d55e10744ac404dda9f040d7eac31eedf05eb8f71b3a0c49049c4ef2764f`;
+- SHA-256 do journal:
+  `97398fa007c16e4bae666e1a2c79fc8c9a04afe7a3c301c3fd51ad6bda026c87`;
+- arquivos brutos:
+  [`xbox-series-s-game-phase1-icons-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-icons-10.0.26100.9426.jsonl),
+  [`xbox-series-s-game-phase1-icons-scan-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-icons-scan-10.0.26100.9426.jsonl) e
+  [`xbox-series-s-game-phase1-icons-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-icons-lifecycle-10.0.26100.9426.jsonl).

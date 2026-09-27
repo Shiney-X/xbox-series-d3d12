@@ -21,7 +21,7 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] Validar acesso direto ao armazenamento USB no Xbox.
 - [x] Validar o navegador de pastas USB nativo no Xbox.
 - [x] Validar descoberta de jogos e leitura de `param.sfo` no Xbox.
-- [ ] Validar decodificação e apresentação de `icon0.png` no Xbox.
+- [x] Validar decodificação e apresentação de `icon0.png` no Xbox.
 - [ ] Backend D3D12 integrado ao video core.
 
 ## Baseline upstream

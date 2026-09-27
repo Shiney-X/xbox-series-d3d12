@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceito para validação no Xbox Series S.
+Aceito e validado no Xbox Series S em 27 de setembro de 2026.
 
 ## Contexto
 
@@ -34,4 +34,5 @@ jogo.
 - O custo de CPU por varredura cresce, mas fica limitado a 32 saídas pequenas.
 - A residência incremental de GPU é uma textura mais um upload temporário.
 - O decoder e o acesso a `StorageFile` permanecem fora do core do emulador.
-- O caminho ainda precisa ser validado com o `icon0.png` real no Series S.
+- O caminho foi validado com `icon0.png` real: decoder, upload, SRV e
+  apresentação retornaram sucesso, inclusive após suspensão e retomada.

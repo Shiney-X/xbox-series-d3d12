@@ -86,7 +86,12 @@ validados no console; imagens da biblioteca em desenvolvimento.**
 - [x] Criar SRV, upload buffer e textura D3D12 para o jogo selecionado.
 - [x] Apresentar fallback quando o ícone estiver ausente ou inválido.
 - [x] Persistir diagnóstico em `LocalState/phase1-library-icons.jsonl`.
-- [ ] Validar o ícone de um dump próprio no Xbox Series S.
+- [x] Validar o ícone de um dump próprio no Xbox Series S.
+
+A Fase 1E foi validada em 27 de setembro de 2026 no Series S em perfil
+**Game**. O `icon0.png` de Sonic Mania foi reduzido para 256×256, enviado para
+a textura selecionada e apresentado com `selected_icon_presented=true`. O
+journal confirmou suspensão e retomada sem falha.
 
 Nesta etapa, Jogos detecta o primeiro dispositivo removível, navega por suas
 pastas e extrai metadados de dumps reconhecidos, mas ainda não inicia títulos.
