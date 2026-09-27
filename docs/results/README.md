@@ -172,3 +172,23 @@ emulador.
 - arquivos brutos:
   [`xbox-series-s-phase1-usb-browser-10.0.26100.9426.jsonl`](xbox-series-s-phase1-usb-browser-10.0.26100.9426.jsonl) e
   [`xbox-series-s-phase1-usb-browser-lifecycle-10.0.26100.9426.jsonl`](xbox-series-s-phase1-usb-browser-lifecycle-10.0.26100.9426.jsonl).
+
+## Xbox Series S — descoberta de jogos da Fase 1
+
+O pacote `0.4.0.0`, em perfil **Game**, restaurou automaticamente a biblioteca
+USB depois de uma nova inicialização. O scanner encontrou um dump próprio de
+Sonic Mania, validou `eboot.bin` e `sce_sys/param.sfo` e apresentou os
+metadados no shell D3D12. Varreduras repetidas, suspensão e retomada não
+registraram erro.
+
+- sistema operacional: `10.0.26100.9426`;
+- pasta selecionada: `E / GAMES / SONY - PLAYSTATION 4`;
+- jogo: `SONIC MANIA`, `CUSA07023`, versão `01.03`;
+- diretórios examinados: 2; jogos encontrados: 1; metadados inválidos: 0;
+- SHA-256 do relatório de pasta:
+  `fcbb04eaa09a5ec417d6d7cbcb1888dae2f09a9559930dcd93ff5a525808c4b3`;
+- SHA-256 do relatório do scanner:
+  `99003bde390fdae2d5c735414048d74e9d4ffc5acb42c3e335aad859e275a79a`;
+- arquivos brutos:
+  [`xbox-series-s-game-phase1-library-folder-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-library-folder-10.0.26100.9426.jsonl) e
+  [`xbox-series-s-game-phase1-library-scan-10.0.26100.9426.jsonl`](xbox-series-s-game-phase1-library-scan-10.0.26100.9426.jsonl).

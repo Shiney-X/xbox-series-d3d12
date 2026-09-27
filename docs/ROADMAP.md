@@ -38,8 +38,8 @@ Consulte [`docs/results`](results/README.md).
 
 ## Fase 1 — Integração do upstream
 
-**Status: integração base, shell Xbox e acesso inicial ao USB validados no
-console; navegador de diretórios em desenvolvimento.**
+**Status: integração base, shell Xbox, biblioteca USB e metadados de jogo
+validados no console; imagens da biblioteca em desenvolvimento.**
 
 - [x] Definir estratégia de importação preservando histórico Git.
 - [x] Registrar revisão upstream de referência.
@@ -76,8 +76,17 @@ console; navegador de diretórios em desenvolvimento.**
 - [x] Limitar profundidade, diretórios e quantidade de resultados.
 - [x] Exibir a lista textual de jogos no shell D3D12.
 - [x] Persistir o resultado em `LocalState/phase1-library-scan.jsonl`.
-- [ ] Validar um dump próprio extraído no Xbox Series S.
-- [ ] Decodificar e apresentar `sce_sys/icon0.png` como textura D3D12.
+- [x] Validar um dump próprio extraído no Xbox Series S.
+
+### Fase 1E — Imagens da biblioteca
+
+- [x] Localizar `sce_sys/icon0.png` sem tornar o arquivo obrigatório.
+- [x] Limitar o PNG codificado, dimensões de origem e saída BGRA8.
+- [x] Decodificar com `Windows.Graphics.Imaging` para no máximo 256×256.
+- [x] Criar SRV, upload buffer e textura D3D12 para o jogo selecionado.
+- [x] Apresentar fallback quando o ícone estiver ausente ou inválido.
+- [x] Persistir diagnóstico em `LocalState/phase1-library-icons.jsonl`.
+- [ ] Validar o ícone de um dump próprio no Xbox Series S.
 
 Nesta etapa, Jogos detecta o primeiro dispositivo removível, navega por suas
 pastas e extrai metadados de dumps reconhecidos, mas ainda não inicia títulos.

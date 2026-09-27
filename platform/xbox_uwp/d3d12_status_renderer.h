@@ -34,10 +34,22 @@ enum class LibraryScanState : std::uint8_t {
   Failed,
 };
 
+enum class GameIconState : std::uint8_t {
+  Missing,
+  Ready,
+  Invalid,
+};
+
 struct XboxGameListEntry {
   std::string title;
   std::string title_id;
   std::string app_version;
+  GameIconState icon_state{GameIconState::Missing};
+  std::uint32_t icon_width{};
+  std::uint32_t icon_height{};
+  std::uint32_t icon_error{};
+  std::uint64_t icon_hash{};
+  std::vector<std::uint8_t> icon_bgra8;
 };
 
 struct XboxShellState {
@@ -65,15 +77,22 @@ public:
   void Initialize(IUnknown *core_window, float width, float height);
   void Render(const XboxShellState &state);
   [[nodiscard]] bool TryTrim();
+  [[nodiscard]] bool SelectedGameIconReady() const noexcept {
+    return selected_icon_ready_;
+  }
 
 private:
   void CreateShellPipeline();
   void DrawRectangle(float x, float y, float width, float height,
                      const std::array<float, 4> &color);
+  void DrawGameIcon(float x, float y, float width, float height);
   void DrawText(std::string_view text, float x, float y, float pixel_size,
                 const std::array<float, 4> &color);
   void DrawHome(const XboxShellState &state);
   void DrawPage(const XboxShellState &state);
+  void EnsureSelectedGameIcon(const XboxShellState &state) noexcept;
+  void ResetGameIcon() noexcept;
+  [[nodiscard]] bool UploadGameIcon(const XboxGameListEntry &game);
   void WaitForGpu();
 
   static constexpr UINT FrameCount = 2;
@@ -82,6 +101,7 @@ private:
   Microsoft::WRL::ComPtr<ID3D12CommandQueue> command_queue_;
   Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain_;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtv_heap_;
+  Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> icon_srv_heap_;
   Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator_;
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> command_list_;
   Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature_;
@@ -89,8 +109,11 @@ private:
   Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
   std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, FrameCount>
       render_targets_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> selected_icon_texture_;
   HANDLE fence_event_{INVALID_HANDLE_VALUE};
   UINT64 fence_value_{};
+  std::uint64_t selected_icon_hash_{};
+  bool selected_icon_ready_{};
   UINT rtv_descriptor_size_{};
   D3D12_VIEWPORT viewport_{};
   D3D12_RECT scissor_{};
