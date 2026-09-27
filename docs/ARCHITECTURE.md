@@ -129,6 +129,19 @@ swapchain. A configuração `IsVkHostMarkersEnabled` continua controlando os
 marcadores de diagnóstico existentes até a migração das preferências do
 renderer.
 
+### Terceiro corte: estado de acesso a buffers
+
+`VideoCore::BufferSyncState` armazena a última intenção de acesso ao buffer
+(vértices, índices, indireto, shader, transferência ou uso geral) e emite uma
+transição com estado anterior, próximo estado e faixa afetada. A lógica não
+conhece `vk::*` nem `ID3D12*`.
+
+O `VideoCore::Buffer` existente continua sendo um recurso Vulkan. Ele traduz
+as transições para estágios e máscaras de acesso Vulkan ao construir
+`vk::BufferMemoryBarrier2`. A transição inicial mantém a máscara ampla usada
+antes da extração. O rastreador não resolve hazards de imagem, ownership de
+queues ou residency; esses casos exigem contratos próprios.
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a

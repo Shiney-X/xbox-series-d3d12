@@ -211,9 +211,7 @@ void BufferCache::BindVertexBuffers(
         range.vk_buffer = buffer->buffer;
         range.offset = offset;
         if (IsRegionGpuModified(range.base_address, size)) {
-            if (auto barrier =
-                    buffer->GetBarrier(vk::AccessFlagBits2::eVertexAttributeRead,
-                                       vk::PipelineStageFlagBits2::eVertexAttributeInput)) {
+            if (auto barrier = buffer->GetBarrier(BufferAccess::VertexRead)) {
                 barriers.emplace_back(*barrier);
             }
         }
@@ -268,8 +266,7 @@ void BufferCache::BindIndexBuffer(
     const u32 index_buffer_size = regs.num_indices * index_size;
     const auto [vk_buffer, offset] = ObtainBuffer(index_address, index_buffer_size, false);
     if (IsRegionGpuModified(index_address, index_buffer_size)) {
-        if (auto barrier = vk_buffer->GetBarrier(vk::AccessFlagBits2::eIndexRead,
-                                                 vk::PipelineStageFlagBits2::eIndexInput)) {
+        if (auto barrier = vk_buffer->GetBarrier(BufferAccess::IndexRead)) {
             barriers.emplace_back(*barrier);
         }
     }
@@ -546,13 +543,10 @@ void BufferCache::JoinOverlap(BufferId new_buffer_id, BufferId overlap_id,
     const auto cmdbuf = scheduler.CommandBuffer();
 
     boost::container::static_vector<vk::BufferMemoryBarrier2, 2> pre_barriers{};
-    if (auto src_barrier = overlap.GetBarrier(vk::AccessFlagBits2::eTransferRead,
-                                              vk::PipelineStageFlagBits2::eTransfer)) {
+    if (auto src_barrier = overlap.GetBarrier(BufferAccess::TransferRead)) {
         pre_barriers.push_back(*src_barrier);
     }
-    if (auto dst_barrier =
-            new_buffer.GetBarrier(vk::AccessFlagBits2::eTransferWrite,
-                                  vk::PipelineStageFlagBits2::eTransfer, dst_base_offset)) {
+    if (auto dst_barrier = new_buffer.GetBarrier(BufferAccess::TransferWrite, dst_base_offset)) {
         pre_barriers.push_back(*dst_barrier);
     }
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
@@ -564,14 +558,10 @@ void BufferCache::JoinOverlap(BufferId new_buffer_id, BufferId overlap_id,
     cmdbuf.copyBuffer(overlap.Handle(), new_buffer.Handle(), copy);
 
     boost::container::static_vector<vk::BufferMemoryBarrier2, 2> post_barriers{};
-    if (auto src_barrier =
-            overlap.GetBarrier(vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-                               vk::PipelineStageFlagBits2::eAllCommands)) {
+    if (auto src_barrier = overlap.GetBarrier(BufferAccess::General)) {
         post_barriers.push_back(*src_barrier);
     }
-    if (auto dst_barrier = new_buffer.GetBarrier(
-            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-            vk::PipelineStageFlagBits2::eAllCommands, dst_base_offset)) {
+    if (auto dst_barrier = new_buffer.GetBarrier(BufferAccess::General, dst_base_offset)) {
         post_barriers.push_back(*dst_barrier);
     }
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
