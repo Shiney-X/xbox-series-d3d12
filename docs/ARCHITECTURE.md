@@ -168,6 +168,20 @@ O mapeamento de formatos de imagem e a compatibilidade entre formatos ainda
 dependem do Vulkan. A futura fronteira de formatos precisará representar essas
 regras sem alterar a interpretação dos recursos do guest.
 
+### Sexto corte: identidade do formato de imagem
+
+`VideoCore::ImageFormatDesc` preserva o formato informado pelo guest como um
+dos três casos: surface (data/number format e intenção de depth), depth/stencil
+ou VideoOut. O descritor não contém formatos Vulkan nem D3D12. Para imagens
+auxiliares sem formato identificado, usa-se o estado vazio.
+
+`ImageInfo` mantém `guest_format` e o campo `pixel_format` legado. O segundo é
+resolvido a partir do primeiro pela conversão Liverpool→Vulkan existente.
+`IsCompatible`, `ImageViewInfo`, criação/alocação e interpretação de formatos
+continuam específicas do Vulkan. O descritor evita perder a identidade original
+em conversões não injetivas (por exemplo, dois formatos VideoOut que resultam
+no mesmo `vk::Format`), mas não promete uma equivalência direta com `DXGI_FORMAT`.
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a
