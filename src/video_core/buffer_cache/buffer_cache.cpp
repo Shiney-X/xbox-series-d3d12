@@ -32,9 +32,10 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
       stream_buffer{instance, scheduler, MemoryUsage::Stream, UboStreamBufferSize},
       download_buffer{instance, scheduler, MemoryUsage::Download, DownloadBufferSize},
       device_buffer{instance, scheduler, MemoryUsage::DeviceLocal, DeviceBufferSize},
-      gds_buffer{instance, scheduler, MemoryUsage::Stream, 0, AllFlags, DataShareBufferSize},
-      bda_pagetable_buffer{instance, scheduler, MemoryUsage::DeviceLocal,
-                           0,        AllFlags,  BDA_PAGETABLE_SIZE} {
+      gds_buffer{instance, scheduler,
+                 BufferDesc{MemoryUsage::Stream, 0, AllFlags, DataShareBufferSize}},
+      bda_pagetable_buffer{instance, scheduler,
+                           BufferDesc{MemoryUsage::DeviceLocal, 0, AllFlags, BDA_PAGETABLE_SIZE}} {
     Vulkan::SetObjectName(instance.GetDevice(), gds_buffer.Handle(), "GDS Buffer");
     Vulkan::SetObjectName(instance.GetDevice(), bda_pagetable_buffer.Handle(),
                           "BDA Page Table Buffer");
@@ -579,8 +580,9 @@ BufferId BufferCache::CreateBuffer(VAddr device_addr, u32 wanted_size) {
     const OverlapResult overlap = ResolveOverlaps(device_addr, wanted_size);
     const u32 size = static_cast<u32>(overlap.end - overlap.begin);
     const BufferId new_buffer_id =
-        slot_buffers.insert(instance, scheduler, MemoryUsage::DeviceLocal, overlap.begin,
-                            AllFlags | vk::BufferUsageFlagBits::eShaderDeviceAddress, size);
+        slot_buffers.insert(instance, scheduler,
+                            BufferDesc{MemoryUsage::DeviceLocal, overlap.begin,
+                                       AllFlags | BufferUsage::DeviceAddress, size});
     auto& new_buffer = slot_buffers[new_buffer_id];
     for (const BufferId overlap_id : overlap.ids) {
         JoinOverlap(new_buffer_id, overlap_id, !overlap.has_stream_leap);
@@ -712,9 +714,9 @@ vk::Buffer BufferCache::UploadCopies(Buffer& buffer, std::span<vk::BufferCopy> c
         return staging_buffer.Handle();
     } else {
         // For large one time transfers use a temporary host buffer.
-        auto temp_buffer =
-            std::make_unique<Buffer>(instance, scheduler, MemoryUsage::Upload, 0,
-                                     vk::BufferUsageFlagBits::eTransferSrc, total_size_bytes);
+        auto temp_buffer = std::make_unique<Buffer>(
+            instance, scheduler,
+            BufferDesc{MemoryUsage::Upload, 0, BufferUsage::TransferSource, total_size_bytes});
         const vk::Buffer src_buffer = temp_buffer->Handle();
         u8* const staging = temp_buffer->mapped_data.data();
         for (const auto& copy : copies) {
@@ -797,8 +799,8 @@ void BufferCache::WriteDataBuffer(Buffer& buffer, VAddr address, const void* val
         // For large one time transfers use a temporary host buffer.
         // RenderDoc can lag quite a bit if the stream buffer is too large.
         Buffer temp_buffer{
-            instance, scheduler, MemoryUsage::Upload, 0, vk::BufferUsageFlagBits::eTransferSrc,
-            num_bytes};
+            instance, scheduler,
+            BufferDesc{MemoryUsage::Upload, 0, BufferUsage::TransferSource, num_bytes}};
         src_buffer = temp_buffer.Handle();
         u8* const staging = temp_buffer.mapped_data.data();
         std::memcpy(staging, value, num_bytes);

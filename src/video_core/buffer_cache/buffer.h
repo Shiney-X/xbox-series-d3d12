@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "core/memory.h"
 #include "video_core/amdgpu/resource.h"
+#include "video_core/buffer_cache/buffer_desc.h"
 #include "video_core/buffer_cache/buffer_sync_state.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 
@@ -24,22 +25,6 @@ VK_DEFINE_HANDLE(VmaAllocator)
 struct VmaAllocationInfo;
 
 namespace VideoCore {
-
-/// Hints and requirements for the backing memory type of a commit
-enum class MemoryUsage {
-    DeviceLocal, ///< Requests device local buffer.
-    Upload,      ///< Requires a host visible memory type optimized for CPU to GPU uploads
-    Download,    ///< Requires a host visible memory type optimized for GPU to CPU readbacks
-    Stream,      ///< Requests device local host visible buffer, falling back host memory.
-};
-
-constexpr vk::BufferUsageFlags ReadFlags =
-    vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eUniformBuffer |
-    vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer |
-    vk::BufferUsageFlagBits::eIndirectBuffer;
-
-constexpr vk::BufferUsageFlags AllFlags =
-    ReadFlags | vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer;
 
 struct UniqueBuffer {
     explicit UniqueBuffer(vk::Device device, VmaAllocator allocator);
@@ -76,8 +61,7 @@ struct UniqueBuffer {
 class Buffer {
 public:
     explicit Buffer(const Vulkan::Instance& instance, Vulkan::Scheduler& scheduler,
-                    MemoryUsage usage, VAddr cpu_addr_, vk::BufferUsageFlags flags,
-                    u64 size_bytes_);
+                    BufferDesc desc);
 
     Buffer& operator=(const Buffer&) = delete;
     Buffer(const Buffer&) = delete;
