@@ -117,6 +117,18 @@ A interface não recebe recursos nativos e não cobre draw, dispatch ou
 apresentação. Esses limites serão extraídos separadamente para evitar uma
 abstração prematura que apenas replique Vulkan.
 
+### Segundo corte: comandos PM4
+
+`AmdGpu::Liverpool` decodifica os pacotes PM4 e envia operações ao
+`VideoCore::GpuCommandSink`. A interface transporta valores do guest para draw,
+dispatch, DMA/GDS, sincronização e marcadores; `Vulkan::Rasterizer` permanece
+como implementação ativa. `Liverpool` não inclui tipos do renderer Vulkan.
+
+Este corte não define ainda buffers/imagens nativos, descriptors, pipelines ou
+swapchain. A configuração `IsVkHostMarkersEnabled` continua controlando os
+marcadores de diagnóstico existentes até a migração das preferências do
+renderer.
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a

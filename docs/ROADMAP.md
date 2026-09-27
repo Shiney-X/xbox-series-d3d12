@@ -100,16 +100,22 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (Fase 2A).**
+**Status: em andamento (Fase 2B).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
 - [x] Adicionar teste unitário independente de Vulkan/D3D12 para o contrato.
-- [ ] Separar submissão PM4 de draw/dispatch do rasterizer Vulkan.
+- [x] Separar submissão PM4 de draw/dispatch do rasterizer Vulkan por um contrato
+      de comandos expresso em valores do guest.
 - [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
 - [ ] Criar testes de contrato e trace replay.
+
+Na Fase 2B, `AmdGpu::Liverpool` entrega draw, dispatch, cópias, sincronização
+e marcadores ao `VideoCore::GpuCommandSink`. O rasterizer Vulkan implementa o
+contrato atual. A interface ainda não fornece descritores de recursos nem
+pipelines para D3D12; esses elementos continuam como trabalho da Fase 2.
 
 ## Fase 3 — Backend D3D12
 
