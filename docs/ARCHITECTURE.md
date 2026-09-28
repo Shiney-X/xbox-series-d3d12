@@ -209,6 +209,26 @@ Na criação Vulkan, `ToVulkanUsage` traduz essas capacidades para
 quando suportada pelo dispositivo. Recursos, views, layout e barriers permanecem
 no backend Vulkan; `ImageUsage` não é uma enumeração de estados D3D12.
 
+### Nono corte: transições de imagens
+
+`VideoCore::ImageSyncState` rastreia um estado sem tipos Vulkan para cada
+backing image. O estado contém layout semântico, classe de acesso e estágio de
+execução. Uma transição total pode gerar uma única descrição; uma transição
+parcial mantém estados por mip/layer e gera descrições para os subrecursos que
+precisam de barrier. A lista curta usa armazenamento inline para evitar uma
+alocação no caminho comum.
+
+O adaptador em `Image::GetBarriers` converte layouts/acessos/estágios recebidos
+dos chamadores Vulkan para o rastreador, depois produz os
+`vk::ImageMemoryBarrier2`. `Image::CurrentLayout()` fornece o layout nativo
+necessário a operações Vulkan existentes. A política de hazard foi preservada:
+escritas de transferência, shader e memória forçam barrier mesmo quando o
+estado seguinte é idêntico; alterar apenas o estágio não força barrier.
+
+Isso não define ainda uma API neutra para os comandos de transição vindos do
+rasterizer, nem traduz essas transições para D3D12. Essas interfaces pertencem
+ao próximo corte de fronteira dos caches.
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a

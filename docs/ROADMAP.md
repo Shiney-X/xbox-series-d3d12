@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (Fase 2H).**
+**Status: em andamento (Fase 2I).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -115,6 +115,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 - [x] Preservar a identidade de formato das imagens do guest antes da conversão Vulkan.
 - [x] Preservar o formato original das image views e centralizar sua conversão Vulkan.
 - [x] Descrever capacidades de uso das imagens sem flags Vulkan.
+- [x] Separar o rastreamento de transições de imagens da emissão de barriers Vulkan.
 - [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
@@ -157,6 +158,19 @@ storage sem tipos nativos. `CachedImageUsage` mantém a política atual do cache
 para imagens coloridas, depth e comprimidas. A criação converte essas
 capacidades para `vk::ImageUsageFlags`; o feedback loop continua condicionado
 ao suporte do dispositivo Vulkan. Estado de recurso e barriers ainda são Vulkan.
+
+Na Fase 2I, `ImageSyncState` acompanha estado de layout, acesso e estágio de
+imagens inteiras ou subrecursos em termos neutros. Ele decide quando uma
+transição é necessária; `Image::GetBarriers` traduz o resultado para
+`vk::ImageMemoryBarrier2`. Chamadores Vulkan ainda passam layouts e máscaras
+nativos na API atual de `Image::Transit`; o contrato completo de backend segue
+para a Fase 2J. O rastreador mantém a regra anterior para escritas repetidas e
+tem testes de transição total, parcial e mudança apenas de estágio.
+
+Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
+recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)
+e **2L** (testes de contrato, trace replay e regressão do renderer Vulkan).
+Esses nomes agrupam trabalho técnico; um marco pode precisar de mais de uma PR.
 
 ## Fase 3 — Backend D3D12
 
