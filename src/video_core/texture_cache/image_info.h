@@ -7,6 +7,7 @@
 #include "video_core/amdgpu/cb_db_extent.h"
 #include "video_core/amdgpu/tiling.h"
 #include "video_core/renderer_vulkan/vk_common.h"
+#include "video_core/texture_cache/image_format_desc.h"
 #include "video_core/texture_cache/types.h"
 
 namespace AmdGpu {
@@ -66,6 +67,7 @@ struct ImageInfo {
     } meta_info{};
 
     ImageProperties props{};
+    ImageFormatDesc guest_format{};
     vk::Format pixel_format = vk::Format::eUndefined;
     AmdGpu::ImageType type;
     SubresourceExtent resources;
