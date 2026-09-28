@@ -96,8 +96,7 @@ void TextureCache::DownloadImageMemory(ImageId image_id, bool sync) {
     };
     scheduler.EndRendering();
     const auto cmdbuf = scheduler.CommandBuffer();
-    image.Transit({ImageLayout::TransferSource, ImageAccess::TransferRead, ImageStage::Transfer},
-                  {});
+    image.Transit(ImageStates::TransferSource, {});
     cmdbuf.copyImageToBuffer(image.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
                              download_buffer.Handle(), image_download);
 
@@ -249,9 +248,7 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
         } else if (cache_image.info.num_samples == 1 && new_info.props.is_depth &&
                    new_info.num_samples > 1) {
             // Perform a rendering pass to transfer the channels of source as samples in dest.
-            cache_image.Transit({ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead,
-                                 ImageStage::GraphicsAndCompute},
-                                {});
+            cache_image.Transit(ImageStates::ShaderReadOnly, {});
             new_image.Transit({ImageLayout::DepthAttachment, ImageAccess::DepthStencilWrite,
                                ImageStage::GraphicsAndCompute},
                               {});

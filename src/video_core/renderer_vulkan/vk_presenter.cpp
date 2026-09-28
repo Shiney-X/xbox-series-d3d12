@@ -749,15 +749,13 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
         auto& readback = pending_screenshots.back();
 
         // Capture the guest output before any host-side scaling (FSR/PP) is applied.
-        image.Transit(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead, {},
-                      cmdbuf);
+        image.Transit(VideoCore::ImageStates::TransferSource, {}, cmdbuf);
         CopyImageToReadback(cmdbuf, image.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
                             readback);
     }
 
     // Continue with host-side passes that draw the displayed (scaled) frame.
-    image.Transit(vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderRead, {},
-                  cmdbuf);
+    image.Transit(VideoCore::ImageStates::ShaderReadOnly, {}, cmdbuf);
 
     image_view = fsr_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
                                  fsr_settings, frame->is_hdr);

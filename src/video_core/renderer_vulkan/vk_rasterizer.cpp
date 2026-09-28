@@ -775,27 +775,29 @@ void Rasterizer::BindTextures(const Shader::Info& stage, Shader::Backend::Bindin
             // storage and feedback loop doesn't make sense for them
             if ((image.binding.force_general || image.binding.is_target) &&
                 !image.info.props.is_depth) {
-                image.Transit(instance.IsAttachmentFeedbackLoopLayoutSupported() &&
-                                      image.binding.is_target
-                                  ? vk::ImageLayout::eAttachmentFeedbackLoopOptimalEXT
-                                  : vk::ImageLayout::eGeneral,
-                              vk::AccessFlagBits2::eShaderRead |
-                                  (image.info.props.is_depth
-                                       ? vk::AccessFlagBits2::eDepthStencilAttachmentWrite
-                                       : vk::AccessFlagBits2::eColorAttachmentWrite |
-                                             vk::AccessFlagBits2::eColorAttachmentRead),
+                const auto layout =
+                    instance.IsAttachmentFeedbackLoopLayoutSupported() && image.binding.is_target
+                        ? VideoCore::ImageLayout::AttachmentFeedbackLoop
+                        : VideoCore::ImageLayout::General;
+                image.Transit({layout,
+                               VideoCore::ImageAccess::ShaderRead |
+                                   VideoCore::ImageAccess::ColorAttachmentWrite |
+                                   VideoCore::ImageAccess::ColorAttachmentRead,
+                               VideoCore::ImageStage::GraphicsAndCompute},
                               {});
             } else {
                 if (is_storage) {
-                    image.Transit(vk::ImageLayout::eGeneral,
-                                  vk::AccessFlagBits2::eShaderRead |
-                                      vk::AccessFlagBits2::eShaderWrite,
-                                  desc.view_info.range);
+                    image.Transit(
+                        {VideoCore::ImageLayout::General,
+                         VideoCore::ImageAccess::ShaderRead | VideoCore::ImageAccess::ShaderWrite,
+                         VideoCore::ImageStage::GraphicsAndCompute},
+                        desc.view_info.range);
                 } else {
                     const auto new_layout = image.info.props.is_depth
-                                                ? vk::ImageLayout::eDepthStencilReadOnlyOptimal
-                                                : vk::ImageLayout::eShaderReadOnlyOptimal;
-                    image.Transit(new_layout, vk::AccessFlagBits2::eShaderRead,
+                                                ? VideoCore::ImageLayout::DepthStencilReadOnly
+                                                : VideoCore::ImageLayout::ShaderReadOnly;
+                    image.Transit({new_layout, VideoCore::ImageAccess::ShaderRead,
+                                   VideoCore::ImageStage::GraphicsAndCompute},
                                   desc.view_info.range);
                 }
             }
@@ -878,15 +880,18 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
         if (image->binding.is_bound) {
             ASSERT_MSG(!image->binding.force_general,
                        "Having image both as storage and render target is unsupported");
-            image->Transit(instance.IsAttachmentFeedbackLoopLayoutSupported()
-                               ? vk::ImageLayout::eAttachmentFeedbackLoopOptimalEXT
-                               : vk::ImageLayout::eGeneral,
-                           vk::AccessFlagBits2::eColorAttachmentWrite, {});
+            const auto layout = instance.IsAttachmentFeedbackLoopLayoutSupported()
+                                    ? VideoCore::ImageLayout::AttachmentFeedbackLoop
+                                    : VideoCore::ImageLayout::General;
+            image->Transit({layout, VideoCore::ImageAccess::ColorAttachmentWrite,
+                            VideoCore::ImageStage::GraphicsAndCompute},
+                           {});
             attachment_feedback_loop = true;
         } else {
-            image->Transit(vk::ImageLayout::eColorAttachmentOptimal,
-                           vk::AccessFlagBits2::eColorAttachmentWrite |
-                               vk::AccessFlagBits2::eColorAttachmentRead,
+            image->Transit({VideoCore::ImageLayout::ColorAttachment,
+                            VideoCore::ImageAccess::ColorAttachmentWrite |
+                                VideoCore::ImageAccess::ColorAttachmentRead,
+                            VideoCore::ImageStage::GraphicsAndCompute},
                            desc.view_info.range);
         }
 
@@ -927,17 +932,17 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
         // Stencil writes can be enabled while depth writes are off.
         const bool stencil_write =
             has_stencil && regs.depth_control.stencil_enable && !desc.view_info.is_storage;
-        const auto new_layout = desc.view_info.is_storage
-                                    ? has_stencil ? vk::ImageLayout::eDepthStencilAttachmentOptimal
-                                                  : vk::ImageLayout::eDepthAttachmentOptimal
-                                : stencil_write
-                                    ? vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal
-                                : has_stencil ? vk::ImageLayout::eDepthStencilReadOnlyOptimal
-                                              : vk::ImageLayout::eDepthReadOnlyOptimal;
-        image.Transit(new_layout,
-                      vk::AccessFlagBits2::eDepthStencilAttachmentWrite |
-                          vk::AccessFlagBits2::eDepthStencilAttachmentRead,
-                      desc.view_info.range);
+        const auto new_layout =
+            desc.view_info.is_storage ? has_stencil ? VideoCore::ImageLayout::DepthStencilAttachment
+                                                    : VideoCore::ImageLayout::DepthAttachment
+            : stencil_write           ? VideoCore::ImageLayout::DepthReadOnlyStencilAttachment
+            : has_stencil             ? VideoCore::ImageLayout::DepthStencilReadOnly
+                                      : VideoCore::ImageLayout::DepthReadOnly;
+        image.Transit(
+            {new_layout,
+             VideoCore::ImageAccess::DepthStencilWrite | VideoCore::ImageAccess::DepthStencilRead,
+             VideoCore::ImageStage::GraphicsAndCompute},
+            desc.view_info.range);
 
         state.width = std::min<u32>(state.width, image.info.size.width);
         state.height = std::min<u32>(state.height, image.info.size.height);
@@ -1008,10 +1013,8 @@ void Rasterizer::DepthStencilCopy(bool is_depth, bool is_stencil) {
         regs.depth_buffer.StencilAddress(), regs.depth_buffer.DepthWriteAddress(),
         regs.depth_buffer.StencilWriteAddress()));
 
-    read_image.Transit(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead,
-                       sub_range);
-    write_image.Transit(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite,
-                        sub_range);
+    read_image.Transit(VideoCore::ImageStates::TransferSource, sub_range);
+    write_image.Transit(VideoCore::ImageStates::TransferDestination, sub_range);
 
     auto aspect_mask = vk::ImageAspectFlags(0);
     if (is_depth) {

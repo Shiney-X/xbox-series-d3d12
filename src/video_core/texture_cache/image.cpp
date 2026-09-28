@@ -21,37 +21,6 @@ Common::IncrementalIdProvider<u64> Image::global_image_uid{};
 
 namespace {
 
-ImageLayout ToNeutralLayout(vk::ImageLayout layout) {
-    switch (layout) {
-    case vk::ImageLayout::eUndefined:
-        return ImageLayout::Undefined;
-    case vk::ImageLayout::eGeneral:
-        return ImageLayout::General;
-    case vk::ImageLayout::eTransferSrcOptimal:
-        return ImageLayout::TransferSource;
-    case vk::ImageLayout::eTransferDstOptimal:
-        return ImageLayout::TransferDestination;
-    case vk::ImageLayout::eShaderReadOnlyOptimal:
-        return ImageLayout::ShaderReadOnly;
-    case vk::ImageLayout::eColorAttachmentOptimal:
-        return ImageLayout::ColorAttachment;
-    case vk::ImageLayout::eDepthAttachmentOptimal:
-        return ImageLayout::DepthAttachment;
-    case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-        return ImageLayout::DepthStencilAttachment;
-    case vk::ImageLayout::eDepthReadOnlyOptimal:
-        return ImageLayout::DepthReadOnly;
-    case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
-        return ImageLayout::DepthStencilReadOnly;
-    case vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal:
-        return ImageLayout::DepthReadOnlyStencilAttachment;
-    case vk::ImageLayout::eAttachmentFeedbackLoopOptimalEXT:
-        return ImageLayout::AttachmentFeedbackLoop;
-    default:
-        UNREACHABLE_MSG("Unsupported image layout {}", vk::to_string(layout));
-    }
-}
-
 vk::ImageLayout ToVulkanLayout(ImageLayout layout) {
     switch (layout) {
     case ImageLayout::Undefined:
@@ -95,18 +64,6 @@ constexpr std::array AccessMappings{
     std::pair{vk::AccessFlagBits2::eDepthStencilAttachmentWrite, ImageAccess::DepthStencilWrite},
 };
 
-ImageAccess ToNeutralAccess(vk::AccessFlags2 access) {
-    ImageAccess result = ImageAccess::None;
-    for (const auto& [native, semantic] : AccessMappings) {
-        if (access & native) {
-            result = result | semantic;
-            access &= ~vk::AccessFlags2{native};
-        }
-    }
-    ASSERT_MSG(!access, "Unsupported image access mask {}", vk::to_string(access));
-    return result;
-}
-
 vk::AccessFlags2 ToVulkanAccess(ImageAccess access) {
     vk::AccessFlags2 result{};
     for (const auto& [native, semantic] : AccessMappings) {
@@ -115,29 +72,6 @@ vk::AccessFlags2 ToVulkanAccess(ImageAccess access) {
         }
     }
     return result;
-}
-
-ImageStage ToNeutralStage(vk::PipelineStageFlags2 stage) {
-    if (stage == vk::PipelineStageFlagBits2::eAllCommands) {
-        return ImageStage::AllCommands;
-    }
-    if (stage == vk::PipelineStageFlagBits2::eTransfer) {
-        return ImageStage::Transfer;
-    }
-    if (stage ==
-        (vk::PipelineStageFlagBits2::eAllGraphics | vk::PipelineStageFlagBits2::eComputeShader)) {
-        return ImageStage::GraphicsAndCompute;
-    }
-    if (stage == vk::PipelineStageFlagBits2::eFragmentShader) {
-        return ImageStage::FragmentShader;
-    }
-    if (stage == vk::PipelineStageFlagBits2::eColorAttachmentOutput) {
-        return ImageStage::ColorAttachmentOutput;
-    }
-    if (stage == vk::PipelineStageFlagBits2::eCopy) {
-        return ImageStage::Copy;
-    }
-    UNREACHABLE_MSG("Unsupported image stage mask {}", vk::to_string(stage));
 }
 
 vk::PipelineStageFlags2 ToVulkanStage(ImageStage stage) {
@@ -365,14 +299,6 @@ vk::ImageLayout Image::CurrentLayout() const {
     return ToVulkanLayout(backing->sync_state.Current().layout);
 }
 
-Image::Barriers Image::GetBarriers(vk::ImageLayout dst_layout, vk::AccessFlags2 dst_mask,
-                                   vk::PipelineStageFlags2 dst_stage,
-                                   std::optional<SubresourceRange> subres_range) {
-    const ImageResourceState next{ToNeutralLayout(dst_layout), ToNeutralAccess(dst_mask),
-                                  ToNeutralStage(dst_stage)};
-    return GetBarriers(next, subres_range);
-}
-
 Image::Barriers Image::GetBarriers(ImageResourceState next,
                                    std::optional<SubresourceRange> subres_range) {
     const auto transitions = backing->sync_state.Transition(next, subres_range);
@@ -400,19 +326,6 @@ Image::Barriers Image::GetBarriers(ImageResourceState next,
         });
     }
     return barriers;
-}
-
-void Image::Transit(vk::ImageLayout dst_layout, vk::AccessFlags2 dst_mask,
-                    std::optional<SubresourceRange> range, vk::CommandBuffer cmdbuf /*= {}*/) {
-    // Adjust pipeline stage
-    const vk::PipelineStageFlags2 dst_pl_stage =
-        (dst_mask == vk::AccessFlagBits2::eTransferRead ||
-         dst_mask == vk::AccessFlagBits2::eTransferWrite)
-            ? vk::PipelineStageFlagBits2::eTransfer
-            : vk::PipelineStageFlagBits2::eAllGraphics | vk::PipelineStageFlagBits2::eComputeShader;
-
-    Transit({ToNeutralLayout(dst_layout), ToNeutralAccess(dst_mask), ToNeutralStage(dst_pl_stage)},
-            range, cmdbuf);
 }
 
 void Image::Transit(ImageResourceState next, std::optional<SubresourceRange> range,
@@ -456,9 +369,8 @@ void Image::Upload(std::span<const vk::BufferImageCopy> upload_copies, vk::Buffe
         .offset = offset,
         .size = info.guest_size,
     };
-    const auto image_barriers =
-        GetBarriers(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite,
-                    vk::PipelineStageFlagBits2::eCopy, {});
+    const auto image_barriers = GetBarriers(
+        {ImageLayout::TransferDestination, ImageAccess::TransferWrite, ImageStage::Copy}, {});
     const auto cmdbuf = scheduler->CommandBuffer();
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -474,8 +386,7 @@ void Image::Upload(std::span<const vk::BufferImageCopy> upload_copies, vk::Buffe
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &post_barrier,
     });
-    Transit(vk::ImageLayout::eGeneral,
-            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferRead, {});
+    Transit(ImageStates::GeneralShaderTransferRead, {});
     flags &= ~ImageFlagBits::Dirty;
 }
 
@@ -503,8 +414,7 @@ void Image::Download(std::span<const vk::BufferImageCopy> download_copies, vk::B
         .size = download_size,
     };
     const auto image_barriers =
-        GetBarriers(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead,
-                    vk::PipelineStageFlagBits2::eCopy, {});
+        GetBarriers({ImageLayout::TransferSource, ImageAccess::TransferRead, ImageStage::Copy}, {});
     auto cmdbuf = scheduler->CommandBuffer();
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -656,9 +566,9 @@ void Image::CopyImage(Image& src_image) {
 
     scheduler->EndRendering();
 
-    src_image.Transit(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead, {});
+    src_image.Transit(ImageStates::TransferSource, {});
 
-    Transit(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite, {});
+    Transit(ImageStates::TransferDestination, {});
 
     auto cmdbuf = scheduler->CommandBuffer();
 
@@ -667,8 +577,7 @@ void Image::CopyImage(Image& src_image) {
                          CurrentLayout(), regions);
     }
 
-    Transit(vk::ImageLayout::eGeneral,
-            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferRead, {});
+    Transit(ImageStates::GeneralShaderTransferRead, {});
 }
 void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset) {
     const auto& src_info = src_image.info;
@@ -721,8 +630,8 @@ void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset)
     };
 
     scheduler->EndRendering();
-    src_image.Transit(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead, {});
-    Transit(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite, {});
+    src_image.Transit(ImageStates::TransferSource, {});
+    Transit(ImageStates::TransferDestination, {});
 
     auto cmdbuf = scheduler->CommandBuffer();
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
@@ -746,8 +655,7 @@ void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset)
 
     cmdbuf.copyBufferToImage(buffer, GetImage(), vk::ImageLayout::eTransferDstOptimal,
                              buffer_copies);
-    Transit(vk::ImageLayout::eGeneral,
-            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferRead, {});
+    Transit(ImageStates::GeneralShaderTransferRead, {});
 }
 
 void Image::CopyMip(Image& src_image, u32 mip, u32 slice) {
@@ -785,14 +693,13 @@ void Image::CopyMip(Image& src_image, u32 mip, u32 slice) {
     src_image.SetBackingSamples(src_info.num_samples);
 
     scheduler->EndRendering();
-    Transit(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite, {});
-    src_image.Transit(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead, {});
+    Transit(ImageStates::TransferDestination, {});
+    src_image.Transit(ImageStates::TransferSource, {});
 
     const auto cmdbuf = scheduler->CommandBuffer();
     cmdbuf.copyImage(src_image.GetImage(), src_image.CurrentLayout(), GetImage(), CurrentLayout(),
                      image_copy);
-    Transit(vk::ImageLayout::eGeneral,
-            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferRead, {});
+    Transit(ImageStates::GeneralShaderTransferRead, {});
 }
 
 void Image::Resolve(Image& src_image, const VideoCore::SubresourceRange& mrt0_range,
@@ -800,9 +707,8 @@ void Image::Resolve(Image& src_image, const VideoCore::SubresourceRange& mrt0_ra
     SetBackingSamples(1, false);
     scheduler->EndRendering();
 
-    src_image.Transit(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead,
-                      mrt0_range);
-    Transit(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite, mrt1_range);
+    src_image.Transit(ImageStates::TransferSource, mrt0_range);
+    Transit(ImageStates::TransferDestination, mrt1_range);
 
     const auto [src_layers, dst_layers] = SanitizeCopyLayers(src_image.info, info, 1);
     if (src_image.backing->num_samples == 1) {
@@ -862,7 +768,7 @@ void Image::Clear(const vk::ClearValue& clear_value, const VideoCore::Subresourc
         .layerCount = range.extent.layers,
     };
     scheduler->EndRendering();
-    Transit(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite, {});
+    Transit(ImageStates::TransferDestination, {});
     const auto cmdbuf = scheduler->CommandBuffer();
     cmdbuf.clearColorImage(GetImage(), vk::ImageLayout::eTransferDstOptimal, clear_value.color,
                            vk_range);
@@ -900,9 +806,9 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
         ASSERT(info.resources.levels == 1 && info.resources.layers == 1);
 
         // Transition current backing to shader read layout
-        auto barriers =
-            GetBarriers(vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderRead,
-                        vk::PipelineStageFlagBits2::eFragmentShader, std::nullopt);
+        auto barriers = GetBarriers(
+            {ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead, ImageStage::FragmentShader},
+            std::nullopt);
 
         // Transition dest backing to color attachment layout, not caring of previous contents
         constexpr auto dst_stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
@@ -938,8 +844,9 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
             backing->num_samples > 1, backing->image, new_backing->image);
 
         // Update current layout in tracker to new backings layout
-        new_backing->sync_state.SetCurrent(
-            {ToNeutralLayout(dst_layout), ToNeutralAccess(dst_access), ToNeutralStage(dst_stage)});
+        new_backing->sync_state.SetCurrent({ImageLayout::ColorAttachment,
+                                            ImageAccess::ColorAttachmentWrite,
+                                            ImageStage::ColorAttachmentOutput});
     }
 
     backing = new_backing;
