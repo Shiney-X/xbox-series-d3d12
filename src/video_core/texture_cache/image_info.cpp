@@ -18,39 +18,6 @@ using namespace Vulkan;
 using Libraries::VideoOut::TilingMode;
 using VideoOutFormat = Libraries::VideoOut::PixelFormat;
 
-static vk::Format ConvertPixelFormat(const VideoOutFormat format) {
-    switch (format) {
-    case VideoOutFormat::A8B8G8R8Srgb:
-    // Remaining formats are mapped to RGBA for internal consistency and changed to BGRA in the
-    // frame image view.
-    case VideoOutFormat::A8R8G8B8Srgb:
-        return vk::Format::eR8G8B8A8Srgb;
-    case VideoOutFormat::A2R10G10B10:
-    case VideoOutFormat::A2R10G10B10Srgb:
-    case VideoOutFormat::A2R10G10B10Bt2020Pq:
-        return vk::Format::eA2B10G10R10UnormPack32;
-    default:
-        break;
-    }
-    UNREACHABLE_MSG("Unknown format={}", static_cast<u32>(format));
-    return {};
-}
-
-static vk::Format ResolveVulkanFormat(const ImageFormatDesc& format) {
-    if (const auto* surface = std::get_if<SurfaceImageFormat>(&format)) {
-        auto resolved = LiverpoolToVK::SurfaceFormat(surface->data, surface->number);
-        return surface->reinterpret_as_depth ? LiverpoolToVK::PromoteFormatToDepth(resolved)
-                                             : resolved;
-    }
-    if (const auto* depth = std::get_if<DepthImageFormat>(&format)) {
-        return LiverpoolToVK::DepthFormat(depth->depth, depth->stencil);
-    }
-    if (const auto* video_out = std::get_if<VideoOutImageFormat>(&format)) {
-        return ConvertPixelFormat(video_out->pixel);
-    }
-    return vk::Format::eUndefined;
-}
-
 ImageInfo::ImageInfo(const Libraries::VideoOut::BufferAttributeGroup& group,
                      VAddr cpu_address) noexcept {
     const auto& attrib = group.attrib;
@@ -59,7 +26,7 @@ ImageInfo::ImageInfo(const Libraries::VideoOut::BufferAttributeGroup& group,
         props.is_tiled ? AmdGpu::TileMode::Display2DThin : AmdGpu::TileMode::DisplayLinearAligned;
     array_mode = AmdGpu::GetArrayMode(tile_mode);
     guest_format = VideoOutImageFormat{attrib.pixel_format};
-    pixel_format = ResolveVulkanFormat(guest_format);
+    pixel_format = LiverpoolToVK::ImageFormat(guest_format);
     type = AmdGpu::ImageType::Color2D;
     size.width = attrib.width;
     size.height = attrib.height;
@@ -76,7 +43,7 @@ ImageInfo::ImageInfo(const AmdGpu::ColorBuffer& buffer, AmdGpu::CbDbExtent hint)
     tile_mode = buffer.GetTileMode();
     array_mode = AmdGpu::GetArrayMode(tile_mode);
     guest_format = SurfaceImageFormat{buffer.GetDataFmt(), buffer.GetNumberFmt()};
-    pixel_format = ResolveVulkanFormat(guest_format);
+    pixel_format = LiverpoolToVK::ImageFormat(guest_format);
     num_samples = buffer.NumSamples();
     num_bits = NumBitsPerBlock(buffer.GetDataFmt());
     type = AmdGpu::ImageType::Color2D;
@@ -106,7 +73,7 @@ ImageInfo::ImageInfo(const AmdGpu::DepthBuffer& buffer, u32 num_slices, VAddr ht
     tile_mode = buffer.GetTileMode();
     array_mode = AmdGpu::GetArrayMode(tile_mode);
     guest_format = DepthImageFormat{buffer.z_info.format, buffer.stencil_info.format};
-    pixel_format = ResolveVulkanFormat(guest_format);
+    pixel_format = LiverpoolToVK::ImageFormat(guest_format);
     type = AmdGpu::ImageType::Color2D;
     props.is_tiled = buffer.IsTiled();
     props.is_depth = true;
@@ -139,7 +106,7 @@ ImageInfo::ImageInfo(const AmdGpu::Image& image, const Shader::ImageResource& de
     tile_mode = image.GetTileMode();
     array_mode = AmdGpu::GetArrayMode(tile_mode);
     guest_format = SurfaceImageFormat{image.GetDataFmt(), image.GetNumberFmt(), desc.is_depth};
-    pixel_format = ResolveVulkanFormat(guest_format);
+    pixel_format = LiverpoolToVK::ImageFormat(guest_format);
     if (desc.is_depth) {
         props.is_depth = true;
     }

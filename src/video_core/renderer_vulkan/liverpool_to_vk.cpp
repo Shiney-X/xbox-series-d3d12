@@ -822,6 +822,37 @@ vk::Format DepthFormat(DepthBuffer::ZFormat z_format, DepthBuffer::StencilFormat
     return format->vk_format;
 }
 
+vk::Format ImageFormat(const VideoCore::ImageFormatDesc& format, bool storage_view) {
+    if (const auto* surface = std::get_if<VideoCore::SurfaceImageFormat>(&format)) {
+        // Storage views cannot use sRGB. Keep the guest's original number format in the desc.
+        const auto number = storage_view && surface->number == AmdGpu::NumberFormat::Srgb
+                                ? AmdGpu::NumberFormat::Unorm
+                                : surface->number;
+        auto resolved = SurfaceFormat(surface->data, number);
+        return surface->reinterpret_as_depth ? PromoteFormatToDepth(resolved) : resolved;
+    }
+    if (const auto* depth = std::get_if<VideoCore::DepthImageFormat>(&format)) {
+        return DepthFormat(depth->depth, depth->stencil);
+    }
+    if (const auto* video_out = std::get_if<VideoCore::VideoOutImageFormat>(&format)) {
+        using PixelFormat = Libraries::VideoOut::PixelFormat;
+        switch (video_out->pixel) {
+        case PixelFormat::A8B8G8R8Srgb:
+        // Both sRGB formats are represented as RGBA internally; the frame view handles BGRA.
+        case PixelFormat::A8R8G8B8Srgb:
+            return vk::Format::eR8G8B8A8Srgb;
+        case PixelFormat::A2R10G10B10:
+        case PixelFormat::A2R10G10B10Srgb:
+        case PixelFormat::A2R10G10B10Bt2020Pq:
+            return vk::Format::eA2B10G10R10UnormPack32;
+        default:
+            UNREACHABLE_MSG("Unknown format={}", static_cast<u32>(video_out->pixel));
+            return vk::Format::eUndefined;
+        }
+    }
+    return vk::Format::eUndefined;
+}
+
 vk::ClearValue ColorBufferClearValue(const AmdGpu::ColorBuffer& color_buffer) {
     const auto comp_swizzle = color_buffer.Swizzle();
     const auto format = AmdGpu::DataFormat(color_buffer.info.format);

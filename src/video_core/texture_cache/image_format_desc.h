@@ -16,15 +16,21 @@ struct SurfaceImageFormat {
     AmdGpu::DataFormat data;
     AmdGpu::NumberFormat number;
     bool reinterpret_as_depth = false;
+
+    bool operator==(const SurfaceImageFormat&) const = default;
 };
 
 struct DepthImageFormat {
     AmdGpu::DepthBuffer::ZFormat depth;
     AmdGpu::DepthBuffer::StencilFormat stencil;
+
+    bool operator==(const DepthImageFormat&) const = default;
 };
 
 struct VideoOutImageFormat {
     Libraries::VideoOut::PixelFormat pixel;
+
+    bool operator==(const VideoOutImageFormat&) const = default;
 };
 
 // monostate covers default-constructed auxiliary images without a guest format.
