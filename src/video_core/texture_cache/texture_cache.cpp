@@ -249,14 +249,12 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
         } else if (cache_image.info.num_samples == 1 && new_info.props.is_depth &&
                    new_info.num_samples > 1) {
             // Perform a rendering pass to transfer the channels of source as samples in dest.
-            cache_image.Transit(
-                {ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead,
-                 ImageStage::GraphicsAndCompute},
-                {});
-            new_image.Transit(
-                {ImageLayout::DepthAttachment, ImageAccess::DepthStencilWrite,
-                 ImageStage::GraphicsAndCompute},
-                {});
+            cache_image.Transit({ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead,
+                                 ImageStage::GraphicsAndCompute},
+                                {});
+            new_image.Transit({ImageLayout::DepthAttachment, ImageAccess::DepthStencilWrite,
+                               ImageStage::GraphicsAndCompute},
+                              {});
             blit_helper.ReinterpretColorAsMsDepth(
                 new_info.size.width, new_info.size.height, new_info.num_samples,
                 cache_image.info.pixel_format, new_info.pixel_format, cache_image.GetImage(),
