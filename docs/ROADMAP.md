@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (terceiro corte da Fase 2J).**
+**Status: em andamento (quarto corte da Fase 2J).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -189,6 +189,12 @@ guest, dimensões, subrecursos, usos e amostras. O adaptador Vulkan resolve o
 formato e as flags nativas na criação. `ImageInfo` ainda circula nessa
 fronteira para metadados e ainda contém `vk::Format`; não é isolamento completo
 de recursos nem implementação D3D12.
+
+No quarto corte do 2J, upload e download de imagens passam regiões
+`ImageBufferCopy` sem tipos Vulkan pelos caches de textura, buffer e tiling.
+O adaptador `Image` traduz as regiões para `vk::BufferImageCopy` ao emitir os
+comandos. Cópias entre imagens, clears e handles de buffers ainda usam Vulkan;
+o 2J permanece em andamento.
 
 Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)

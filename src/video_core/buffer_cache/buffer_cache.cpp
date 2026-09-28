@@ -739,7 +739,7 @@ bool BufferCache::SynchronizeBufferFromImage(Buffer& buffer, VAddr device_addr, 
                "Texel buffer aliases image subresources {:x} : {:x}", device_addr,
                image.info.guest_address);
     const u32 buf_offset = buffer.Offset(image.info.guest_address);
-    boost::container::small_vector<vk::BufferImageCopy, 8> buffer_copies;
+    boost::container::small_vector<ImageBufferCopy, 8> buffer_copies;
     u32 copy_size = 0;
     for (u32 mip = 0; mip < image.info.resources.levels; mip++) {
         const auto& mip_info = image.info.mips_layout[mip];
@@ -749,18 +749,13 @@ bool BufferCache::SynchronizeBufferFromImage(Buffer& buffer, VAddr device_addr, 
         if (buf_offset + mip_info.offset + mip_info.size > buffer.SizeBytes()) {
             break;
         }
-        buffer_copies.push_back(vk::BufferImageCopy{
-            .bufferOffset = mip_info.offset,
-            .bufferRowLength = mip_info.pitch,
-            .bufferImageHeight = mip_info.height,
-            .imageSubresource{
-                .aspectMask = image.aspect_mask & ~vk::ImageAspectFlagBits::eStencil,
-                .mipLevel = mip,
-                .baseArrayLayer = 0,
-                .layerCount = image.info.resources.layers,
-            },
-            .imageOffset = {0, 0, 0},
-            .imageExtent = {width, height, depth},
+        buffer_copies.push_back(ImageBufferCopy{
+            .buffer_offset = mip_info.offset,
+            .buffer_row_length = mip_info.pitch,
+            .buffer_image_height = mip_info.height,
+            .mip_level = mip,
+            .layer_count = image.info.resources.layers,
+            .image_extent = {width, height, depth},
         });
         copy_size += mip_info.size;
     }
