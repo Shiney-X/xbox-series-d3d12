@@ -127,7 +127,7 @@ path = [
     "docs/TESTING_XBOX_DEV_MODE.md",
     "docs/UPSTREAM.md",
     "docs/adr/*.md",
-    "docs/results/README.md",
+    "docs/results/*.md",
     "docs/results/*.jsonl",
     "platform/xbox_uwp/GenerateAssets.ps1",
     "platform/xbox_uwp/Main.cpp",
