@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (Fase 2G).**
+**Status: em andamento (Fase 2H).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -114,6 +114,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 - [x] Separar geometria e swizzle das image views em um descritor neutro.
 - [x] Preservar a identidade de formato das imagens do guest antes da conversão Vulkan.
 - [x] Preservar o formato original das image views e centralizar sua conversão Vulkan.
+- [x] Descrever capacidades de uso das imagens sem flags Vulkan.
 - [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
@@ -150,6 +151,12 @@ Na Fase 2G, `ImageViewDesc` também preserva o formato original do guest.
 incluindo a regra atual de views storage sRGB→UNORM. A chave do cache Vulkan
 continua baseada no formato nativo e na geometria, para não duplicar views
 equivalentes. Alocação e sincronização de imagens continuam específicas do Vulkan.
+
+Na Fase 2H, `ImageUsage` descreve transferências, sampling, attachments e
+storage sem tipos nativos. `CachedImageUsage` mantém a política atual do cache
+para imagens coloridas, depth e comprimidas. A criação converte essas
+capacidades para `vk::ImageUsageFlags`; o feedback loop continua condicionado
+ao suporte do dispositivo Vulkan. Estado de recurso e barriers ainda são Vulkan.
 
 ## Fase 3 — Backend D3D12
 

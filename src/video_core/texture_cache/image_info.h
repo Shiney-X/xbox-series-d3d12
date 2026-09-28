@@ -8,6 +8,7 @@
 #include "video_core/amdgpu/tiling.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_format_desc.h"
+#include "video_core/texture_cache/image_usage.h"
 #include "video_core/texture_cache/types.h"
 
 namespace AmdGpu {
@@ -46,6 +47,10 @@ struct ImageInfo {
 
     bool IsTiled() const {
         return tile_mode != AmdGpu::TileMode::DisplayLinearAligned;
+    }
+
+    ImageUsage Usage() const noexcept {
+        return CachedImageUsage(props.is_block, props.is_depth);
     }
 
     Extent2D BlockDim() const {

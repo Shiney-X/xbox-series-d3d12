@@ -195,6 +195,20 @@ swizzle, intenção storage e formato Vulkan. Dois descritores do guest que
 produzam a mesma view nativa podem reutilizá-la. Um cache D3D12 deverá definir
 sua própria chave conforme as regras de compatibilidade e formatos DXGI.
 
+### Oitavo corte: capacidades de uso das imagens
+
+`VideoCore::ImageUsage` descreve as capacidades que o cache solicita para uma
+imagem: cópia de/para, sampling, attachment color/depth-stencil e storage.
+`CachedImageUsage` preserva a política existente: imagens coloridas recebem
+storage para evitar recriação posterior, e imagens comprimidas mantêm essa
+capacidade para permitir views não comprimidas. A função é independente de API
+e coberta por teste unitário.
+
+Na criação Vulkan, `ToVulkanUsage` traduz essas capacidades para
+`vk::ImageUsageFlags`. A extensão de attachment feedback loop só é acrescentada
+quando suportada pelo dispositivo. Recursos, views, layout e barriers permanecem
+no backend Vulkan; `ImageUsage` não é uma enumeração de estados D3D12.
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a
