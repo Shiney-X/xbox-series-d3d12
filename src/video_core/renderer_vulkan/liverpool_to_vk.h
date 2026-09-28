@@ -12,6 +12,7 @@
 #include "video_core/amdgpu/regs_vertex.h"
 #include "video_core/amdgpu/resource.h"
 #include "video_core/renderer_vulkan/vk_common.h"
+#include "video_core/texture_cache/image_format_desc.h"
 
 namespace Vulkan::LiverpoolToVK {
 
@@ -73,6 +74,8 @@ std::span<const DepthFormatInfo> DepthFormats();
 
 vk::Format DepthFormat(AmdGpu::DepthBuffer::ZFormat z_format,
                        AmdGpu::DepthBuffer::StencilFormat stencil_format);
+
+vk::Format ImageFormat(const VideoCore::ImageFormatDesc& format, bool storage_view = false);
 
 vk::ClearValue ColorBufferClearValue(const AmdGpu::ColorBuffer& color_buffer);
 

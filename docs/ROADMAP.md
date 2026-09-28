@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (Fase 2F).**
+**Status: em andamento (Fase 2G).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -113,6 +113,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
       traduzindo-os somente na criação do recurso Vulkan.
 - [x] Separar geometria e swizzle das image views em um descritor neutro.
 - [x] Preservar a identidade de formato das imagens do guest antes da conversão Vulkan.
+- [x] Preservar o formato original das image views e centralizar sua conversão Vulkan.
 - [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
@@ -143,6 +144,12 @@ depth/stencil ou VideoOut, inclusive a intenção de reinterpretar uma surface
 como depth. `ImageInfo` ainda conserva `vk::Format` para o backend atual e o
 resolve a partir desse descritor. Compatibilidade, views e alocação de imagens
 continuam dependentes do Vulkan; nenhum formato D3D12 foi implementado.
+
+Na Fase 2G, `ImageViewDesc` também preserva o formato original do guest.
+`LiverpoolToVK::ImageFormat` é o ponto comum de conversão para imagens e views,
+incluindo a regra atual de views storage sRGB→UNORM. A chave do cache Vulkan
+continua baseada no formato nativo e na geometria, para não duplicar views
+equivalentes. Alocação e sincronização de imagens continuam específicas do Vulkan.
 
 ## Fase 3 — Backend D3D12
 

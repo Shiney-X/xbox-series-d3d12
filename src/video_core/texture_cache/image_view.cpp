@@ -50,15 +50,8 @@ bool IsViewTypeCompatible(AmdGpu::ImageType view_type, AmdGpu::ImageType image_t
 ImageViewInfo::ImageViewInfo(const AmdGpu::Image& image,
                              const Shader::ImageResource& desc) noexcept {
     is_storage = desc.is_written;
-    const auto dfmt = image.GetDataFmt();
-    auto nfmt = image.GetNumberFmt();
-    if (is_storage && nfmt == AmdGpu::NumberFormat::Srgb) {
-        nfmt = AmdGpu::NumberFormat::Unorm;
-    }
-    format = Vulkan::LiverpoolToVK::SurfaceFormat(dfmt, nfmt);
-    if (desc.is_depth) {
-        format = Vulkan::LiverpoolToVK::PromoteFormatToDepth(format);
-    }
+    guest_format = SurfaceImageFormat{image.GetDataFmt(), image.GetNumberFmt(), desc.is_depth};
+    format = Vulkan::LiverpoolToVK::ImageFormat(guest_format, is_storage);
 
     range.base.level = image.base_level;
     range.base.layer = image.base_array;
@@ -76,14 +69,14 @@ ImageViewInfo::ImageViewInfo(const AmdGpu::ColorBuffer& col_buffer) noexcept {
     range.base.layer = col_buffer.BaseSlice();
     range.extent.layers = col_buffer.NumSlices() - range.base.layer;
     type = range.extent.layers > 1 ? AmdGpu::ImageType::Color2DArray : AmdGpu::ImageType::Color2D;
-    format =
-        Vulkan::LiverpoolToVK::SurfaceFormat(col_buffer.GetDataFmt(), col_buffer.GetNumberFmt());
+    guest_format = SurfaceImageFormat{col_buffer.GetDataFmt(), col_buffer.GetNumberFmt()};
+    format = Vulkan::LiverpoolToVK::ImageFormat(guest_format);
 }
 
 ImageViewInfo::ImageViewInfo(const AmdGpu::DepthBuffer& depth_buffer, AmdGpu::DepthView view,
                              AmdGpu::DepthControl ctl) {
-    format = Vulkan::LiverpoolToVK::DepthFormat(depth_buffer.z_info.format,
-                                                depth_buffer.stencil_info.format);
+    guest_format = DepthImageFormat{depth_buffer.z_info.format, depth_buffer.stencil_info.format};
+    format = Vulkan::LiverpoolToVK::ImageFormat(guest_format);
     is_storage = ctl.depth_write_enable;
     range.base.layer = view.slice_start;
     range.extent.layers = view.NumSlices() - range.base.layer;

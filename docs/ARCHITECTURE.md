@@ -159,14 +159,14 @@ do D3D12.
 ### Quinto corte: descrição de image views
 
 `VideoCore::ImageViewDesc` concentra os campos da view que vêm do guest:
-dimensionalidade, subrecursos, swizzle de componentes, LOD mínimo e intenção de
-escrita. `ImageViewInfo` acrescenta apenas o formato Vulkan usado hoje para a
-criação e comparação das views em cache. A conversão de
+dimensionalidade, subrecursos, swizzle de componentes, LOD mínimo, intenção de
+escrita e formato original. `ImageViewInfo` acrescenta o formato Vulkan usado
+hoje para a criação e comparação das views em cache. A conversão de
 `AmdGpu::CompMapping` para `vk::ComponentMapping` ocorre na criação da view.
 
-O mapeamento de formatos de imagem e a compatibilidade entre formatos ainda
-dependem do Vulkan. A futura fronteira de formatos precisará representar essas
-regras sem alterar a interpretação dos recursos do guest.
+O mapeamento de formatos e a compatibilidade entre formatos ainda dependem do
+Vulkan. A futura fronteira de formatos precisará representar essas regras sem
+alterar a interpretação dos recursos do guest.
 
 ### Sexto corte: identidade do formato de imagem
 
@@ -177,10 +177,23 @@ auxiliares sem formato identificado, usa-se o estado vazio.
 
 `ImageInfo` mantém `guest_format` e o campo `pixel_format` legado. O segundo é
 resolvido a partir do primeiro pela conversão Liverpool→Vulkan existente.
-`IsCompatible`, `ImageViewInfo`, criação/alocação e interpretação de formatos
-continuam específicas do Vulkan. O descritor evita perder a identidade original
+`IsCompatible`, criação/alocação e interpretação de formatos continuam
+específicas do Vulkan. O descritor evita perder a identidade original
 em conversões não injetivas (por exemplo, dois formatos VideoOut que resultam
 no mesmo `vk::Format`), mas não promete uma equivalência direta com `DXGI_FORMAT`.
+
+### Sétimo corte: formato das image views
+
+`ImageViewDesc` também carrega `guest_format`; a view preserva o formato original
+mesmo quando Vulkan exige um ajuste na representação nativa. Por exemplo, uma
+view storage com formato sRGB do guest é convertida para UNORM apenas ao chamar
+`LiverpoolToVK::ImageFormat`. A mesma função resolve o formato de `ImageInfo` e
+das views, evitando regras duplicadas no cache de texturas.
+
+`ImageViewInfo::operator==` mantém a chave de cache Vulkan anterior: geometria,
+swizzle, intenção storage e formato Vulkan. Dois descritores do guest que
+produzam a mesma view nativa podem reutilizá-la. Um cache D3D12 deverá definir
+sua própria chave conforme as regras de compatibilidade e formatos DXGI.
 
 ## Fronteira do host
 

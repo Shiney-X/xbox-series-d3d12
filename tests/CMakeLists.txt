@@ -16,6 +16,7 @@ set(TEST_TARGETS
     shadps4_frontend_window_test
     shadps4_gpu_memory_tracker_test
     shadps4_buffer_sync_state_test
+    shadps4_image_view_desc_test
     shadps4_uwp_core_bridge_test
 )
 
@@ -167,6 +168,7 @@ add_executable(shadps4_gcn_test ${GCN_TEST_SOURCES})
 add_executable(shadps4_frontend_window_test test_frontend_window.cpp)
 add_executable(shadps4_gpu_memory_tracker_test test_gpu_memory_tracker.cpp)
 add_executable(shadps4_buffer_sync_state_test test_buffer_sync_state.cpp)
+add_executable(shadps4_image_view_desc_test test_image_view_desc.cpp)
 add_executable(shadps4_uwp_core_bridge_test
     ${CMAKE_SOURCE_DIR}/src/core/uwp/core_bridge.cpp
     test_uwp_core_bridge.cpp
@@ -213,6 +215,12 @@ target_link_libraries(shadps4_gcn_test PRIVATE
 target_link_libraries(shadps4_frontend_window_test PRIVATE GTest::gtest_main)
 target_link_libraries(shadps4_gpu_memory_tracker_test PRIVATE GTest::gtest_main)
 target_link_libraries(shadps4_buffer_sync_state_test PRIVATE GTest::gtest_main)
+target_link_libraries(shadps4_image_view_desc_test PRIVATE
+    GTest::gtest_main
+    Vulkan::Headers
+    fmt::fmt
+    spdlog::spdlog
+)
 target_link_libraries(shadps4_uwp_core_bridge_test PRIVATE GTest::gtest_main)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR

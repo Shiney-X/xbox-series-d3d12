@@ -31,7 +31,12 @@ struct ImageViewInfo : ImageViewDesc {
 
     vk::Format format = vk::Format::eR8G8B8A8Unorm;
 
-    bool operator==(const ImageViewInfo&) const = default;
+    // The current Vulkan cache key remains native format + geometry. Guest formats that
+    // resolve to the same Vulkan view may still reuse that view.
+    bool operator==(const ImageViewInfo& other) const {
+        return type == other.type && range == other.range && mapping == other.mapping &&
+               min_lod == other.min_lod && is_storage == other.is_storage && format == other.format;
+    }
 };
 
 struct Image;
