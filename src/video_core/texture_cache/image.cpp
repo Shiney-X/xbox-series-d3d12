@@ -21,6 +21,23 @@ Common::IncrementalIdProvider<u64> Image::global_image_uid{};
 
 namespace {
 
+vk::BufferImageCopy ToVulkanCopy(const ImageBufferCopy& copy, vk::ImageAspectFlags aspect) {
+    ASSERT(copy.Valid());
+    return {
+        .bufferOffset = copy.buffer_offset,
+        .bufferRowLength = copy.buffer_row_length,
+        .bufferImageHeight = copy.buffer_image_height,
+        .imageSubresource{
+            .aspectMask = aspect,
+            .mipLevel = copy.mip_level,
+            .baseArrayLayer = copy.base_layer,
+            .layerCount = copy.layer_count,
+        },
+        .imageOffset = {copy.image_offset.x, copy.image_offset.y, copy.image_offset.z},
+        .imageExtent = {copy.image_extent.width, copy.image_extent.height, copy.image_extent.depth},
+    };
+}
+
 vk::ImageLayout ToVulkanLayout(ImageLayout layout) {
     switch (layout) {
     case ImageLayout::Undefined:
@@ -352,8 +369,7 @@ void Image::Transit(ImageResourceState next, std::optional<SubresourceRange> ran
     });
 }
 
-void Image::Upload(std::span<const vk::BufferImageCopy> upload_copies, vk::Buffer buffer,
-                   u64 offset) {
+void Image::Upload(std::span<const ImageBufferCopy> upload_copies, vk::Buffer buffer, u64 offset) {
     SetBackingSamples(info.num_samples, false);
     scheduler->EndRendering();
 
@@ -385,8 +401,13 @@ void Image::Upload(std::span<const vk::BufferImageCopy> upload_copies, vk::Buffe
         .imageMemoryBarrierCount = static_cast<u32>(image_barriers.size()),
         .pImageMemoryBarriers = image_barriers.data(),
     });
+    boost::container::small_vector<vk::BufferImageCopy, 14> native_copies;
+    for (const auto& copy : upload_copies) {
+        native_copies.push_back(
+            ToVulkanCopy(copy, aspect_mask & ~vk::ImageAspectFlagBits::eStencil));
+    }
     cmdbuf.copyBufferToImage(buffer, GetImage(), vk::ImageLayout::eTransferDstOptimal,
-                             upload_copies);
+                             native_copies);
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
@@ -396,7 +417,7 @@ void Image::Upload(std::span<const vk::BufferImageCopy> upload_copies, vk::Buffe
     flags &= ~ImageFlagBits::Dirty;
 }
 
-void Image::Download(std::span<const vk::BufferImageCopy> download_copies, vk::Buffer buffer,
+void Image::Download(std::span<const ImageBufferCopy> download_copies, vk::Buffer buffer,
                      u64 offset, u64 download_size) {
     SetBackingSamples(info.num_samples);
     scheduler->EndRendering();
@@ -429,8 +450,13 @@ void Image::Download(std::span<const vk::BufferImageCopy> download_copies, vk::B
         .imageMemoryBarrierCount = static_cast<u32>(image_barriers.size()),
         .pImageMemoryBarriers = image_barriers.data(),
     });
+    boost::container::small_vector<vk::BufferImageCopy, 8> native_copies;
+    for (const auto& copy : download_copies) {
+        native_copies.push_back(
+            ToVulkanCopy(copy, aspect_mask & ~vk::ImageAspectFlagBits::eStencil));
+    }
     cmdbuf.copyImageToBuffer(GetImage(), vk::ImageLayout::eTransferSrcOptimal, buffer,
-                             download_copies);
+                             native_copies);
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,

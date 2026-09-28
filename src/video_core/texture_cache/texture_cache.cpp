@@ -79,26 +79,14 @@ void TextureCache::DownloadImageMemory(ImageId image_id, bool sync) {
     ASSERT(download_size <= image.info.guest_size);
     const auto [download, offset] = download_buffer.Map(download_size);
     download_buffer.Commit();
-    const vk::BufferImageCopy image_download = {
-        .bufferOffset = offset,
-        .bufferRowLength = image.info.pitch,
-        .bufferImageHeight = image.info.size.height,
-        .imageSubresource =
-            {
-                .aspectMask = image.info.props.is_depth ? vk::ImageAspectFlagBits::eDepth
-                                                        : vk::ImageAspectFlagBits::eColor,
-                .mipLevel = 0,
-                .baseArrayLayer = 0,
-                .layerCount = image.info.resources.layers,
-            },
-        .imageOffset = {0, 0, 0},
-        .imageExtent = {image.info.size.width, image.info.size.height, image.info.size.depth},
+    const ImageBufferCopy image_download = {
+        .buffer_offset = offset,
+        .buffer_row_length = image.info.pitch,
+        .buffer_image_height = image.info.size.height,
+        .layer_count = image.info.resources.layers,
+        .image_extent = {image.info.size.width, image.info.size.height, image.info.size.depth},
     };
-    scheduler.EndRendering();
-    const auto cmdbuf = scheduler.CommandBuffer();
-    image.Transit(ImageStates::TransferSource, {});
-    cmdbuf.copyImageToBuffer(image.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
-                             download_buffer.Handle(), image_download);
+    image.Download(std::span{&image_download, 1}, download_buffer.Handle(), offset, download_size);
 
     if (sync) {
         scheduler.Finish();
@@ -732,7 +720,7 @@ void TextureCache::RefreshImage(Image& image) {
     const bool is_gpu_modified = True(image.flags & ImageFlagBits::GpuModified);
     const bool is_gpu_dirty = True(image.flags & ImageFlagBits::GpuDirty);
 
-    boost::container::small_vector<vk::BufferImageCopy, 14> image_copies;
+    boost::container::small_vector<ImageBufferCopy, 14> image_copies;
     for (u32 m = 0; m < num_mips; m++) {
         const u32 width = std::max(image.info.size.width >> m, 1u);
         const u32 height = std::max(image.info.size.height >> m, 1u);
@@ -753,17 +741,12 @@ void TextureCache::RefreshImage(Image& image) {
         const u32 extent_width = mip_pitch ? std::min(mip_pitch, width) : width;
         const u32 extent_height = mip_height ? std::min(mip_height, height) : height;
         image_copies.push_back({
-            .bufferOffset = mip_offset,
-            .bufferRowLength = mip_pitch,
-            .bufferImageHeight = mip_height,
-            .imageSubresource{
-                .aspectMask = image.aspect_mask & ~vk::ImageAspectFlagBits::eStencil,
-                .mipLevel = m,
-                .baseArrayLayer = 0,
-                .layerCount = num_layers,
-            },
-            .imageOffset = {0, 0, 0},
-            .imageExtent = {extent_width, extent_height, depth},
+            .buffer_offset = mip_offset,
+            .buffer_row_length = mip_pitch,
+            .buffer_image_height = mip_height,
+            .mip_level = m,
+            .layer_count = num_layers,
+            .image_extent = {extent_width, extent_height, depth},
         });
     }
 
@@ -787,7 +770,7 @@ void TextureCache::RefreshImage(Image& image) {
     const auto [buffer, offset] =
         tile_manager.DetileImage(in_buffer->Handle(), in_offset, image.info);
     for (auto& copy : image_copies) {
-        copy.bufferOffset += offset;
+        copy.buffer_offset += offset;
     }
 
     image.Upload(image_copies, buffer, offset);

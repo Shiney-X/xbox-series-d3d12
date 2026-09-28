@@ -7,6 +7,7 @@
 #include "common/incremental_id.h"
 #include "common/types.h"
 #include "video_core/renderer_vulkan/vk_common.h"
+#include "video_core/texture_cache/image_buffer_copy.h"
 #include "video_core/texture_cache/image_info.h"
 #include "video_core/texture_cache/image_sync_state.h"
 #include "video_core/texture_cache/image_view.h"
@@ -130,9 +131,9 @@ struct Image {
     Barriers GetBarriers(ImageResourceState next, std::optional<SubresourceRange> subres_range);
     void Transit(ImageResourceState next, std::optional<SubresourceRange> range,
                  vk::CommandBuffer cmdbuf = {});
-    void Upload(std::span<const vk::BufferImageCopy> upload_copies, vk::Buffer buffer, u64 offset);
-    void Download(std::span<const vk::BufferImageCopy> download_copies, vk::Buffer buffer,
-                  u64 offset, u64 download_size);
+    void Upload(std::span<const ImageBufferCopy> upload_copies, vk::Buffer buffer, u64 offset);
+    void Download(std::span<const ImageBufferCopy> download_copies, vk::Buffer buffer, u64 offset,
+                  u64 download_size);
 
     void CopyImage(Image& src_image);
     void CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset);
