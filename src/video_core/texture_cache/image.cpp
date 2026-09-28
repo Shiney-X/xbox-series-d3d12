@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <array>
 #include <ranges>
+#include <utility>
 #include "common/assert.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
@@ -16,6 +18,148 @@ namespace VideoCore {
 using namespace Vulkan;
 
 Common::IncrementalIdProvider<u64> Image::global_image_uid{};
+
+namespace {
+
+ImageLayout ToNeutralLayout(vk::ImageLayout layout) {
+    switch (layout) {
+    case vk::ImageLayout::eUndefined:
+        return ImageLayout::Undefined;
+    case vk::ImageLayout::eGeneral:
+        return ImageLayout::General;
+    case vk::ImageLayout::eTransferSrcOptimal:
+        return ImageLayout::TransferSource;
+    case vk::ImageLayout::eTransferDstOptimal:
+        return ImageLayout::TransferDestination;
+    case vk::ImageLayout::eShaderReadOnlyOptimal:
+        return ImageLayout::ShaderReadOnly;
+    case vk::ImageLayout::eColorAttachmentOptimal:
+        return ImageLayout::ColorAttachment;
+    case vk::ImageLayout::eDepthAttachmentOptimal:
+        return ImageLayout::DepthAttachment;
+    case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+        return ImageLayout::DepthStencilAttachment;
+    case vk::ImageLayout::eDepthReadOnlyOptimal:
+        return ImageLayout::DepthReadOnly;
+    case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
+        return ImageLayout::DepthStencilReadOnly;
+    case vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal:
+        return ImageLayout::DepthReadOnlyStencilAttachment;
+    case vk::ImageLayout::eAttachmentFeedbackLoopOptimalEXT:
+        return ImageLayout::AttachmentFeedbackLoop;
+    default:
+        UNREACHABLE_MSG("Unsupported image layout {}", vk::to_string(layout));
+    }
+}
+
+vk::ImageLayout ToVulkanLayout(ImageLayout layout) {
+    switch (layout) {
+    case ImageLayout::Undefined:
+        return vk::ImageLayout::eUndefined;
+    case ImageLayout::General:
+        return vk::ImageLayout::eGeneral;
+    case ImageLayout::TransferSource:
+        return vk::ImageLayout::eTransferSrcOptimal;
+    case ImageLayout::TransferDestination:
+        return vk::ImageLayout::eTransferDstOptimal;
+    case ImageLayout::ShaderReadOnly:
+        return vk::ImageLayout::eShaderReadOnlyOptimal;
+    case ImageLayout::ColorAttachment:
+        return vk::ImageLayout::eColorAttachmentOptimal;
+    case ImageLayout::DepthAttachment:
+        return vk::ImageLayout::eDepthAttachmentOptimal;
+    case ImageLayout::DepthStencilAttachment:
+        return vk::ImageLayout::eDepthStencilAttachmentOptimal;
+    case ImageLayout::DepthReadOnly:
+        return vk::ImageLayout::eDepthReadOnlyOptimal;
+    case ImageLayout::DepthStencilReadOnly:
+        return vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+    case ImageLayout::DepthReadOnlyStencilAttachment:
+        return vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal;
+    case ImageLayout::AttachmentFeedbackLoop:
+        return vk::ImageLayout::eAttachmentFeedbackLoopOptimalEXT;
+    }
+    UNREACHABLE();
+}
+
+constexpr std::array AccessMappings{
+    std::pair{vk::AccessFlagBits2::eMemoryRead, ImageAccess::MemoryRead},
+    std::pair{vk::AccessFlagBits2::eMemoryWrite, ImageAccess::MemoryWrite},
+    std::pair{vk::AccessFlagBits2::eTransferRead, ImageAccess::TransferRead},
+    std::pair{vk::AccessFlagBits2::eTransferWrite, ImageAccess::TransferWrite},
+    std::pair{vk::AccessFlagBits2::eShaderRead, ImageAccess::ShaderRead},
+    std::pair{vk::AccessFlagBits2::eShaderWrite, ImageAccess::ShaderWrite},
+    std::pair{vk::AccessFlagBits2::eColorAttachmentRead, ImageAccess::ColorAttachmentRead},
+    std::pair{vk::AccessFlagBits2::eColorAttachmentWrite, ImageAccess::ColorAttachmentWrite},
+    std::pair{vk::AccessFlagBits2::eDepthStencilAttachmentRead, ImageAccess::DepthStencilRead},
+    std::pair{vk::AccessFlagBits2::eDepthStencilAttachmentWrite, ImageAccess::DepthStencilWrite},
+};
+
+ImageAccess ToNeutralAccess(vk::AccessFlags2 access) {
+    ImageAccess result = ImageAccess::None;
+    for (const auto& [native, semantic] : AccessMappings) {
+        if (access & native) {
+            result = result | semantic;
+            access &= ~vk::AccessFlags2{native};
+        }
+    }
+    ASSERT_MSG(!access, "Unsupported image access mask {}", vk::to_string(access));
+    return result;
+}
+
+vk::AccessFlags2 ToVulkanAccess(ImageAccess access) {
+    vk::AccessFlags2 result{};
+    for (const auto& [native, semantic] : AccessMappings) {
+        if (HasImageAccess(access, semantic)) {
+            result |= native;
+        }
+    }
+    return result;
+}
+
+ImageStage ToNeutralStage(vk::PipelineStageFlags2 stage) {
+    if (stage == vk::PipelineStageFlagBits2::eAllCommands) {
+        return ImageStage::AllCommands;
+    }
+    if (stage == vk::PipelineStageFlagBits2::eTransfer) {
+        return ImageStage::Transfer;
+    }
+    if (stage ==
+        (vk::PipelineStageFlagBits2::eAllGraphics | vk::PipelineStageFlagBits2::eComputeShader)) {
+        return ImageStage::GraphicsAndCompute;
+    }
+    if (stage == vk::PipelineStageFlagBits2::eFragmentShader) {
+        return ImageStage::FragmentShader;
+    }
+    if (stage == vk::PipelineStageFlagBits2::eColorAttachmentOutput) {
+        return ImageStage::ColorAttachmentOutput;
+    }
+    if (stage == vk::PipelineStageFlagBits2::eCopy) {
+        return ImageStage::Copy;
+    }
+    UNREACHABLE_MSG("Unsupported image stage mask {}", vk::to_string(stage));
+}
+
+vk::PipelineStageFlags2 ToVulkanStage(ImageStage stage) {
+    switch (stage) {
+    case ImageStage::AllCommands:
+        return vk::PipelineStageFlagBits2::eAllCommands;
+    case ImageStage::Transfer:
+        return vk::PipelineStageFlagBits2::eTransfer;
+    case ImageStage::GraphicsAndCompute:
+        return vk::PipelineStageFlagBits2::eAllGraphics |
+               vk::PipelineStageFlagBits2::eComputeShader;
+    case ImageStage::FragmentShader:
+        return vk::PipelineStageFlagBits2::eFragmentShader;
+    case ImageStage::ColorAttachmentOutput:
+        return vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+    case ImageStage::Copy:
+        return vk::PipelineStageFlagBits2::eCopy;
+    }
+    UNREACHABLE();
+}
+
+} // namespace
 
 static vk::ImageUsageFlags ToVulkanUsage(const Vulkan::Instance& instance, ImageUsage requested) {
     vk::ImageUsageFlags usage{};
@@ -187,6 +331,7 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
     };
 
     backing = &backing_images.emplace_back();
+    backing->sync_state = ImageSyncState{info.resources};
     backing->num_samples = info.num_samples;
     backing->image = UniqueImage{instance->GetDevice(), instance->GetAllocator()};
     backing->image.Create(image_ci);
@@ -216,112 +361,39 @@ ImageView& Image::FindView(const ImageViewInfo& view_info, bool ensure_guest_sam
     return (*slot_image_views)[view_id];
 }
 
+vk::ImageLayout Image::CurrentLayout() const {
+    return ToVulkanLayout(backing->sync_state.Current().layout);
+}
+
 Image::Barriers Image::GetBarriers(vk::ImageLayout dst_layout, vk::AccessFlags2 dst_mask,
                                    vk::PipelineStageFlags2 dst_stage,
                                    std::optional<SubresourceRange> subres_range) {
-    auto& last_state = backing->state;
-    auto& subresource_states = backing->subresource_states;
-
-    const bool needs_partial_transition =
-        subres_range &&
-        (subres_range->base != SubresourceBase{} || subres_range->extent != info.resources);
-    const bool partially_transited = !subresource_states.empty();
-
+    const ImageResourceState next{ToNeutralLayout(dst_layout), ToNeutralAccess(dst_mask),
+                                  ToNeutralStage(dst_stage)};
+    const auto transitions = backing->sync_state.Transition(next, subres_range);
     Barriers barriers;
-    if (needs_partial_transition || partially_transited) {
-        if (!partially_transited) {
-            subresource_states.resize(info.resources.levels * info.resources.layers);
-            std::fill(subresource_states.begin(), subresource_states.end(), last_state);
-        }
-
-        // In case of partial transition, we need to change the specified subresources only.
-        // Otherwise all subresources need to be set to the same state so we can use a full
-        // resource transition for the next time.
-        const auto mips =
-            needs_partial_transition
-                ? std::ranges::views::iota(subres_range->base.level,
-                                           subres_range->base.level + subres_range->extent.levels)
-                : std::views::iota(0u, info.resources.levels);
-        const auto layers =
-            needs_partial_transition
-                ? std::ranges::views::iota(subres_range->base.layer,
-                                           subres_range->base.layer + subres_range->extent.layers)
-                : std::views::iota(0u, info.resources.layers);
-
-        for (u32 mip : mips) {
-            for (u32 layer : layers) {
-                // NOTE: these loops may produce a lot of small barriers.
-                // If this becomes a problem, we can optimize it by merging adjacent barriers.
-                const auto subres_idx = mip * info.resources.layers + layer;
-                ASSERT(subres_idx < subresource_states.size());
-                auto& state = subresource_states[subres_idx];
-
-                constexpr auto write_flags = vk::AccessFlagBits2::eTransferWrite |
-                                             vk::AccessFlagBits2::eShaderWrite |
-                                             vk::AccessFlagBits2::eMemoryWrite;
-                const bool is_write = static_cast<bool>(state.access_mask & write_flags);
-                if (state.layout != dst_layout || state.access_mask != dst_mask || is_write) {
-                    barriers.emplace_back(vk::ImageMemoryBarrier2{
-                        .srcStageMask = state.pl_stage,
-                        .srcAccessMask = state.access_mask,
-                        .dstStageMask = dst_stage,
-                        .dstAccessMask = dst_mask,
-                        .oldLayout = state.layout,
-                        .newLayout = dst_layout,
-                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .image = GetImage(),
-                        .subresourceRange{
-                            .aspectMask = aspect_mask,
-                            .baseMipLevel = mip,
-                            .levelCount = 1,
-                            .baseArrayLayer = layer,
-                            .layerCount = 1,
-                        },
-                    });
-                    state.layout = dst_layout;
-                    state.access_mask = dst_mask;
-                    state.pl_stage = dst_stage;
-                }
-            }
-        }
-
-        if (!needs_partial_transition) {
-            subresource_states.clear();
-        }
-    } else { // Full resource transition
-        constexpr auto write_flags = vk::AccessFlagBits2::eTransferWrite |
-                                     vk::AccessFlagBits2::eShaderWrite |
-                                     vk::AccessFlagBits2::eMemoryWrite;
-        const bool is_write = static_cast<bool>(last_state.access_mask & write_flags);
-        if (last_state.layout == dst_layout && last_state.access_mask == dst_mask && !is_write) {
-            return {};
-        }
-
+    for (const auto& transition : transitions) {
         barriers.emplace_back(vk::ImageMemoryBarrier2{
-            .srcStageMask = last_state.pl_stage,
-            .srcAccessMask = last_state.access_mask,
-            .dstStageMask = dst_stage,
-            .dstAccessMask = dst_mask,
-            .oldLayout = last_state.layout,
-            .newLayout = dst_layout,
+            .srcStageMask = ToVulkanStage(transition.before.stage),
+            .srcAccessMask = ToVulkanAccess(transition.before.access),
+            .dstStageMask = ToVulkanStage(transition.after.stage),
+            .dstAccessMask = ToVulkanAccess(transition.after.access),
+            .oldLayout = ToVulkanLayout(transition.before.layout),
+            .newLayout = ToVulkanLayout(transition.after.layout),
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = GetImage(),
             .subresourceRange{
                 .aspectMask = aspect_mask,
-                .baseMipLevel = 0,
-                .levelCount = VK_REMAINING_MIP_LEVELS,
-                .baseArrayLayer = 0,
-                .layerCount = VK_REMAINING_ARRAY_LAYERS,
+                .baseMipLevel = transition.range.base.level,
+                .levelCount = transition.whole_resource ? VK_REMAINING_MIP_LEVELS
+                                                        : transition.range.extent.levels,
+                .baseArrayLayer = transition.range.base.layer,
+                .layerCount = transition.whole_resource ? VK_REMAINING_ARRAY_LAYERS
+                                                        : transition.range.extent.layers,
             },
         });
     }
-
-    last_state.layout = dst_layout;
-    last_state.access_mask = dst_mask;
-    last_state.pl_stage = dst_stage;
-
     return barriers;
 }
 
@@ -580,8 +652,8 @@ void Image::CopyImage(Image& src_image) {
     auto cmdbuf = scheduler->CommandBuffer();
 
     if (!regions.empty()) {
-        cmdbuf.copyImage(src_image.GetImage(), src_image.backing->state.layout, GetImage(),
-                         backing->state.layout, regions);
+        cmdbuf.copyImage(src_image.GetImage(), src_image.CurrentLayout(), GetImage(),
+                         CurrentLayout(), regions);
     }
 
     Transit(vk::ImageLayout::eGeneral,
@@ -706,8 +778,8 @@ void Image::CopyMip(Image& src_image, u32 mip, u32 slice) {
     src_image.Transit(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead, {});
 
     const auto cmdbuf = scheduler->CommandBuffer();
-    cmdbuf.copyImage(src_image.GetImage(), src_image.backing->state.layout, GetImage(),
-                     backing->state.layout, image_copy);
+    cmdbuf.copyImage(src_image.GetImage(), src_image.CurrentLayout(), GetImage(), CurrentLayout(),
+                     image_copy);
     Transit(vk::ImageLayout::eGeneral,
             vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferRead, {});
 }
@@ -797,6 +869,7 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
         new_image_ci.samples = LiverpoolToVK::NumSamples(num_samples, supported_samples);
 
         new_backing = &backing_images.emplace_back();
+        new_backing->sync_state = ImageSyncState{info.resources};
         new_backing->num_samples = num_samples;
         new_backing->image = UniqueImage{instance->GetDevice(), instance->GetAllocator()};
         new_backing->image.Create(new_image_ci);
@@ -854,9 +927,8 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
             backing->num_samples > 1, backing->image, new_backing->image);
 
         // Update current layout in tracker to new backings layout
-        new_backing->state.layout = dst_layout;
-        new_backing->state.access_mask = dst_access;
-        new_backing->state.pl_stage = dst_stage;
+        new_backing->sync_state.SetCurrent(
+            {ToNeutralLayout(dst_layout), ToNeutralAccess(dst_access), ToNeutralStage(dst_stage)});
     }
 
     backing = new_backing;

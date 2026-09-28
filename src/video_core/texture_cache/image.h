@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_info.h"
+#include "video_core/texture_cache/image_sync_state.h"
 #include "video_core/texture_cache/image_view.h"
 
 #include <deque>
@@ -102,6 +103,8 @@ struct Image {
         return backing->image.image;
     }
 
+    vk::ImageLayout CurrentLayout() const;
+
     bool IsTracked() {
         return track_addr != 0 && track_addr_end != 0;
     }
@@ -159,15 +162,9 @@ public:
     // Resource state tracking
     vk::ImageUsageFlags usage_flags;
     vk::FormatFeatureFlags2 format_features;
-    struct State {
-        vk::PipelineStageFlags2 pl_stage = vk::PipelineStageFlagBits2::eAllCommands;
-        vk::AccessFlags2 access_mask = vk::AccessFlagBits2::eNone;
-        vk::ImageLayout layout = vk::ImageLayout::eUndefined;
-    };
     struct BackingImage {
         UniqueImage image;
-        State state;
-        std::vector<State> subresource_states;
+        ImageSyncState sync_state;
         boost::container::small_vector<ImageViewInfo, 4> image_view_infos;
         boost::container::small_vector<ImageViewId, 4> image_view_ids;
         u32 num_samples;
