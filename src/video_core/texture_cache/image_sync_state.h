@@ -70,12 +70,10 @@ struct ImageResourceState {
 namespace ImageStates {
 inline constexpr ImageResourceState TransferSource{ImageLayout::TransferSource,
                                                    ImageAccess::TransferRead, ImageStage::Transfer};
-inline constexpr ImageResourceState TransferDestination{ImageLayout::TransferDestination,
-                                                        ImageAccess::TransferWrite,
-                                                        ImageStage::Transfer};
-inline constexpr ImageResourceState ShaderReadOnly{ImageLayout::ShaderReadOnly,
-                                                   ImageAccess::ShaderRead,
-                                                   ImageStage::GraphicsAndCompute};
+inline constexpr ImageResourceState TransferDestination{
+    ImageLayout::TransferDestination, ImageAccess::TransferWrite, ImageStage::Transfer};
+inline constexpr ImageResourceState ShaderReadOnly{
+    ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead, ImageStage::GraphicsAndCompute};
 inline constexpr ImageResourceState GeneralShaderTransferRead{
     ImageLayout::General, ImageAccess::ShaderRead | ImageAccess::TransferRead,
     ImageStage::GraphicsAndCompute};

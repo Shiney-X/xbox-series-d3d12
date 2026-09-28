@@ -775,10 +775,10 @@ void Rasterizer::BindTextures(const Shader::Info& stage, Shader::Backend::Bindin
             // storage and feedback loop doesn't make sense for them
             if ((image.binding.force_general || image.binding.is_target) &&
                 !image.info.props.is_depth) {
-                const auto layout = instance.IsAttachmentFeedbackLoopLayoutSupported() &&
-                                            image.binding.is_target
-                                        ? VideoCore::ImageLayout::AttachmentFeedbackLoop
-                                        : VideoCore::ImageLayout::General;
+                const auto layout =
+                    instance.IsAttachmentFeedbackLoopLayoutSupported() && image.binding.is_target
+                        ? VideoCore::ImageLayout::AttachmentFeedbackLoop
+                        : VideoCore::ImageLayout::General;
                 image.Transit({layout,
                                VideoCore::ImageAccess::ShaderRead |
                                    VideoCore::ImageAccess::ColorAttachmentWrite |
@@ -787,11 +787,11 @@ void Rasterizer::BindTextures(const Shader::Info& stage, Shader::Backend::Bindin
                               {});
             } else {
                 if (is_storage) {
-                    image.Transit({VideoCore::ImageLayout::General,
-                                   VideoCore::ImageAccess::ShaderRead |
-                                       VideoCore::ImageAccess::ShaderWrite,
-                                   VideoCore::ImageStage::GraphicsAndCompute},
-                                  desc.view_info.range);
+                    image.Transit(
+                        {VideoCore::ImageLayout::General,
+                         VideoCore::ImageAccess::ShaderRead | VideoCore::ImageAccess::ShaderWrite,
+                         VideoCore::ImageStage::GraphicsAndCompute},
+                        desc.view_info.range);
                 } else {
                     const auto new_layout = image.info.props.is_depth
                                                 ? VideoCore::ImageLayout::DepthStencilReadOnly
@@ -932,18 +932,17 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
         // Stencil writes can be enabled while depth writes are off.
         const bool stencil_write =
             has_stencil && regs.depth_control.stencil_enable && !desc.view_info.is_storage;
-        const auto new_layout = desc.view_info.is_storage
-                                    ? has_stencil ? VideoCore::ImageLayout::DepthStencilAttachment
-                                                  : VideoCore::ImageLayout::DepthAttachment
-                                : stencil_write
-                                    ? VideoCore::ImageLayout::DepthReadOnlyStencilAttachment
-                                : has_stencil ? VideoCore::ImageLayout::DepthStencilReadOnly
-                                              : VideoCore::ImageLayout::DepthReadOnly;
-        image.Transit({new_layout,
-                       VideoCore::ImageAccess::DepthStencilWrite |
-                           VideoCore::ImageAccess::DepthStencilRead,
-                       VideoCore::ImageStage::GraphicsAndCompute},
-                      desc.view_info.range);
+        const auto new_layout =
+            desc.view_info.is_storage ? has_stencil ? VideoCore::ImageLayout::DepthStencilAttachment
+                                                    : VideoCore::ImageLayout::DepthAttachment
+            : stencil_write           ? VideoCore::ImageLayout::DepthReadOnlyStencilAttachment
+            : has_stencil             ? VideoCore::ImageLayout::DepthStencilReadOnly
+                                      : VideoCore::ImageLayout::DepthReadOnly;
+        image.Transit(
+            {new_layout,
+             VideoCore::ImageAccess::DepthStencilWrite | VideoCore::ImageAccess::DepthStencilRead,
+             VideoCore::ImageStage::GraphicsAndCompute},
+            desc.view_info.range);
 
         state.width = std::min<u32>(state.width, image.info.size.width);
         state.height = std::min<u32>(state.height, image.info.size.height);

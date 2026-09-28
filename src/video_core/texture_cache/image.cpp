@@ -369,9 +369,8 @@ void Image::Upload(std::span<const vk::BufferImageCopy> upload_copies, vk::Buffe
         .offset = offset,
         .size = info.guest_size,
     };
-    const auto image_barriers =
-        GetBarriers({ImageLayout::TransferDestination, ImageAccess::TransferWrite,
-                     ImageStage::Copy}, {});
+    const auto image_barriers = GetBarriers(
+        {ImageLayout::TransferDestination, ImageAccess::TransferWrite, ImageStage::Copy}, {});
     const auto cmdbuf = scheduler->CommandBuffer();
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -807,9 +806,9 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
         ASSERT(info.resources.levels == 1 && info.resources.layers == 1);
 
         // Transition current backing to shader read layout
-        auto barriers =
-            GetBarriers({ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead,
-                         ImageStage::FragmentShader}, std::nullopt);
+        auto barriers = GetBarriers(
+            {ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead, ImageStage::FragmentShader},
+            std::nullopt);
 
         // Transition dest backing to color attachment layout, not caring of previous contents
         constexpr auto dst_stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
