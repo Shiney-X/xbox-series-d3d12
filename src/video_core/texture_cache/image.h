@@ -83,7 +83,8 @@ class BlitHelper;
 
 struct Image {
     Image(const Vulkan::Instance& instance, Vulkan::Scheduler& scheduler, BlitHelper& blit_helper,
-          Common::SlotVector<ImageView>& slot_image_views, const ImageInfo& info);
+          Common::SlotVector<ImageView>& slot_image_views, const ImageInfo& info,
+          ImageResourceDesc resource_desc);
     ~Image();
 
     Image(const Image&) = delete;
@@ -149,6 +150,7 @@ public:
     BlitHelper* blit_helper;
     Common::SlotVector<ImageView>* slot_image_views;
     ImageInfo info;
+    ImageResourceDesc resource_desc;
     vk::ImageAspectFlags aspect_mask = vk::ImageAspectFlagBits::eColor;
     vk::SampleCountFlags supported_samples = vk::SampleCountFlagBits::e1;
     ImageFlagBits flags = ImageFlagBits::Dirty;

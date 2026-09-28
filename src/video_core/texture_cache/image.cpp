@@ -196,42 +196,48 @@ void UniqueImage::Create(const vk::ImageCreateInfo& image_ci) {
 
 Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
              BlitHelper& blit_helper_, Common::SlotVector<ImageView>& slot_image_views_,
-             const ImageInfo& info_)
+             const ImageInfo& info_, ImageResourceDesc resource_desc_)
     : instance{&instance_}, scheduler{&scheduler_}, blit_helper{&blit_helper_},
-      slot_image_views{&slot_image_views_}, info{info_} {
-    if (info.pixel_format == vk::Format::eUndefined) {
+      slot_image_views{&slot_image_views_}, info{info_}, resource_desc{std::move(resource_desc_)} {
+    if (!resource_desc.Valid()) {
         return;
     }
+    const auto requested_format = LiverpoolToVK::ImageFormat(resource_desc.guest_format);
+    if (requested_format == vk::Format::eUndefined) {
+        return;
+    }
+    ASSERT_MSG(requested_format == info.pixel_format,
+               "Guest image format changed before allocation");
     image_uid = global_image_uid.Next();
-    mip_hashes.resize(info.resources.levels);
+    mip_hashes.resize(resource_desc.resources.levels);
     // Here we force `eExtendedUsage` as don't know all image usage cases beforehand. In normal case
     // the texture cache should re-create the resource with the usage requested
     vk::ImageCreateFlags flags{vk::ImageCreateFlagBits::eMutableFormat |
                                vk::ImageCreateFlagBits::eExtendedUsage};
-    if (info.props.is_volume) {
+    if (resource_desc.is_volume) {
         flags |= vk::ImageCreateFlagBits::e2DArrayCompatible;
         if (instance->Is2dViewOf3dSupported()) {
             flags |= vk::ImageCreateFlagBits::e2DViewCompatibleEXT;
         }
     }
-    if (info.props.is_block && instance->IsBlockTexelViewSupported()) {
+    if (resource_desc.is_block && instance->IsBlockTexelViewSupported()) {
         flags |= vk::ImageCreateFlagBits::eBlockTexelViewCompatible;
     }
 
-    usage_flags = ToVulkanUsage(*instance, info.Usage());
+    usage_flags = ToVulkanUsage(*instance, resource_desc.usage);
     format_features = FormatFeatureFlags(usage_flags);
-    if (info.props.is_depth) {
+    if (resource_desc.is_depth) {
         aspect_mask = vk::ImageAspectFlagBits::eDepth;
-        if (info.props.has_stencil) {
+        if (resource_desc.has_stencil) {
             aspect_mask |= vk::ImageAspectFlagBits::eStencil;
         }
     }
 
     constexpr auto tiling = vk::ImageTiling::eOptimal;
-    const auto supported_format = instance->GetSupportedFormat(info.pixel_format, format_features);
+    const auto supported_format = instance->GetSupportedFormat(requested_format, format_features);
     const vk::PhysicalDeviceImageFormatInfo2 format_info{
         .format = supported_format,
-        .type = ConvertImageType(info.type),
+        .type = ConvertImageType(resource_desc.type),
         .tiling = tiling,
         .usage = usage_flags,
         .flags = flags,
@@ -249,24 +255,24 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
 
     const vk::ImageCreateInfo image_ci = {
         .flags = flags,
-        .imageType = ConvertImageType(info.type),
+        .imageType = ConvertImageType(resource_desc.type),
         .format = supported_format,
         .extent{
-            .width = info.size.width,
-            .height = info.size.height,
-            .depth = info.size.depth,
+            .width = resource_desc.size.width,
+            .height = resource_desc.size.height,
+            .depth = resource_desc.size.depth,
         },
-        .mipLevels = static_cast<u32>(info.resources.levels),
-        .arrayLayers = static_cast<u32>(info.resources.layers),
-        .samples = LiverpoolToVK::NumSamples(info.num_samples, supported_samples),
+        .mipLevels = resource_desc.resources.levels,
+        .arrayLayers = resource_desc.resources.layers,
+        .samples = LiverpoolToVK::NumSamples(resource_desc.num_samples, supported_samples),
         .tiling = tiling,
         .usage = usage_flags,
         .initialLayout = vk::ImageLayout::eUndefined,
     };
 
     backing = &backing_images.emplace_back();
-    backing->sync_state = ImageSyncState{info.resources};
-    backing->num_samples = info.num_samples;
+    backing->sync_state = ImageSyncState{resource_desc.resources};
+    backing->num_samples = resource_desc.num_samples;
     backing->image = UniqueImage{instance->GetDevice(), instance->GetAllocator()};
     backing->image.Create(image_ci);
 
@@ -786,7 +792,7 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
         new_image_ci.samples = LiverpoolToVK::NumSamples(num_samples, supported_samples);
 
         new_backing = &backing_images.emplace_back();
-        new_backing->sync_state = ImageSyncState{info.resources};
+        new_backing->sync_state = ImageSyncState{resource_desc.resources};
         new_backing->num_samples = num_samples;
         new_backing->image = UniqueImage{instance->GetDevice(), instance->GetAllocator()};
         new_backing->image.Create(new_image_ci);
