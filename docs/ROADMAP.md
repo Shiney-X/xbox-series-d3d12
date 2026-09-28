@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (primeiro corte da Fase 2J).**
+**Status: em andamento (segundo corte da Fase 2J).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -118,6 +118,8 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 - [x] Separar o rastreamento de transições de imagens da emissão de barriers Vulkan.
 - [x] Permitir que o cache solicite transições de imagem em estados neutros nos
       caminhos de download e resolução de overlap.
+- [x] Remover os pedidos de transição Vulkan da API de `Image`, preservando a
+      tradução de barriers no adaptador existente.
 - [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
@@ -173,6 +175,12 @@ No primeiro corte da Fase 2J, `TextureCache` envia `ImageResourceState` ao
 adaptador `Image` para download e resolução de overlap. A API Vulkan antiga
 delega ao mesmo caminho. Esse passo inicia a fronteira de comandos, mas ainda
 não neutraliza cópias, handles, views ou todo o cache.
+
+No segundo corte do 2J, rasterizer, presenter e operações internas também
+pedem transições via `ImageResourceState`. A conversão reversa de layouts,
+acessos e estágios Vulkan foi removida da entrada de `Image`. A saída Vulkan,
+os handles e os comandos de cópia continuam no adaptador atual. Ainda falta a
+fronteira de recursos e comandos além de transições para concluir o 2J.
 
 Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)

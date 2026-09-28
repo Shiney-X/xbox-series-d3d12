@@ -11,15 +11,14 @@ using VideoCore::ImageAccess;
 using VideoCore::ImageLayout;
 using VideoCore::ImageResourceState;
 using VideoCore::ImageStage;
+namespace ImageStates = VideoCore::ImageStates;
 using VideoCore::ImageSyncState;
 using VideoCore::SubresourceRange;
 
 TEST(ImageSyncState, TracksFullPartialAndRepeatedWriteTransitions) {
     ImageSyncState sync{{2, 2}};
-    const ImageResourceState read{ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead,
-                                  ImageStage::GraphicsAndCompute};
-    const ImageResourceState write{ImageLayout::TransferDestination, ImageAccess::TransferWrite,
-                                   ImageStage::Transfer};
+    const ImageResourceState read = ImageStates::ShaderReadOnly;
+    const ImageResourceState write = ImageStates::TransferDestination;
 
     auto full = sync.Transition(read);
     ASSERT_EQ(full.size(), 1);
@@ -49,13 +48,25 @@ TEST(ImageSyncState, TracksFullPartialAndRepeatedWriteTransitions) {
 
 TEST(ImageSyncState, StageOnlyChangeDoesNotEmitBarrier) {
     ImageSyncState sync;
-    const ImageResourceState graphics_read{ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead,
-                                           ImageStage::GraphicsAndCompute};
+    const ImageResourceState graphics_read = ImageStates::ShaderReadOnly;
     const ImageResourceState fragment_read{ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead,
                                            ImageStage::FragmentShader};
     ASSERT_EQ(sync.Transition(graphics_read).size(), 1);
     EXPECT_TRUE(sync.Transition(fragment_read).empty());
     EXPECT_EQ(sync.Current(), fragment_read);
+}
+
+TEST(ImageSyncState, NamedTransitionRequestsPreserveAccessAndStage) {
+    EXPECT_EQ(ImageStates::TransferSource,
+              (ImageResourceState{ImageLayout::TransferSource, ImageAccess::TransferRead,
+                                  ImageStage::Transfer}));
+    EXPECT_EQ(ImageStates::TransferDestination,
+              (ImageResourceState{ImageLayout::TransferDestination, ImageAccess::TransferWrite,
+                                  ImageStage::Transfer}));
+    EXPECT_EQ(ImageStates::GeneralShaderTransferRead,
+              (ImageResourceState{ImageLayout::General,
+                                  ImageAccess::ShaderRead | ImageAccess::TransferRead,
+                                  ImageStage::GraphicsAndCompute}));
 }
 
 } // namespace
