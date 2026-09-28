@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (Fase 2I).**
+**Status: em andamento (primeiro corte da Fase 2J).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -116,6 +116,8 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 - [x] Preservar o formato original das image views e centralizar sua conversão Vulkan.
 - [x] Descrever capacidades de uso das imagens sem flags Vulkan.
 - [x] Separar o rastreamento de transições de imagens da emissão de barriers Vulkan.
+- [x] Permitir que o cache solicite transições de imagem em estados neutros nos
+      caminhos de download e resolução de overlap.
 - [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
@@ -162,10 +164,15 @@ ao suporte do dispositivo Vulkan. Estado de recurso e barriers ainda são Vulkan
 Na Fase 2I, `ImageSyncState` acompanha estado de layout, acesso e estágio de
 imagens inteiras ou subrecursos em termos neutros. Ele decide quando uma
 transição é necessária; `Image::GetBarriers` traduz o resultado para
-`vk::ImageMemoryBarrier2`. Chamadores Vulkan ainda passam layouts e máscaras
-nativos na API atual de `Image::Transit`; o contrato completo de backend segue
+`vk::ImageMemoryBarrier2`. Os chamadores Vulkan ainda passam layouts e máscaras
+nativos na API anterior de `Image::Transit`; o contrato completo de backend segue
 para a Fase 2J. O rastreador mantém a regra anterior para escritas repetidas e
 tem testes de transição total, parcial e mudança apenas de estágio.
+
+No primeiro corte da Fase 2J, `TextureCache` envia `ImageResourceState` ao
+adaptador `Image` para download e resolução de overlap. A API Vulkan antiga
+delega ao mesmo caminho. Esse passo inicia a fronteira de comandos, mas ainda
+não neutraliza cópias, handles, views ou todo o cache.
 
 Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)

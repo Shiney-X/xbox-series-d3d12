@@ -370,6 +370,11 @@ Image::Barriers Image::GetBarriers(vk::ImageLayout dst_layout, vk::AccessFlags2 
                                    std::optional<SubresourceRange> subres_range) {
     const ImageResourceState next{ToNeutralLayout(dst_layout), ToNeutralAccess(dst_mask),
                                   ToNeutralStage(dst_stage)};
+    return GetBarriers(next, subres_range);
+}
+
+Image::Barriers Image::GetBarriers(ImageResourceState next,
+                                   std::optional<SubresourceRange> subres_range) {
     const auto transitions = backing->sync_state.Transition(next, subres_range);
     Barriers barriers;
     for (const auto& transition : transitions) {
@@ -406,7 +411,13 @@ void Image::Transit(vk::ImageLayout dst_layout, vk::AccessFlags2 dst_mask,
             ? vk::PipelineStageFlagBits2::eTransfer
             : vk::PipelineStageFlagBits2::eAllGraphics | vk::PipelineStageFlagBits2::eComputeShader;
 
-    const auto barriers = GetBarriers(dst_layout, dst_mask, dst_pl_stage, range);
+    Transit({ToNeutralLayout(dst_layout), ToNeutralAccess(dst_mask), ToNeutralStage(dst_pl_stage)},
+            range, cmdbuf);
+}
+
+void Image::Transit(ImageResourceState next, std::optional<SubresourceRange> range,
+                    vk::CommandBuffer cmdbuf /*= {}*/) {
+    const auto barriers = GetBarriers(next, range);
     if (barriers.empty()) {
         return;
     }
