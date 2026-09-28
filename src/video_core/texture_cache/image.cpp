@@ -17,31 +17,29 @@ using namespace Vulkan;
 
 Common::IncrementalIdProvider<u64> Image::global_image_uid{};
 
-static vk::ImageUsageFlags ImageUsageFlags(const Vulkan::Instance* instance,
-                                           const ImageInfo& info) {
-    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eTransferSrc |
-                                vk::ImageUsageFlagBits::eTransferDst |
-                                vk::ImageUsageFlagBits::eSampled;
-    if (!info.props.is_block) {
-        if (info.props.is_depth) {
-            usage |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
-        } else {
-            usage |= vk::ImageUsageFlagBits::eColorAttachment;
-            if (instance->IsAttachmentFeedbackLoopLayoutSupported()) {
-                usage |= vk::ImageUsageFlagBits::eAttachmentFeedbackLoopEXT;
-            }
-            // Always create images with storage flag to avoid needing re-creation in case of e.g
-            // compute clears This sacrifices a bit of performance but is less work. ExtendedUsage
-            // flag is also used.
-            usage |= vk::ImageUsageFlagBits::eStorage;
+static vk::ImageUsageFlags ToVulkanUsage(const Vulkan::Instance& instance, ImageUsage requested) {
+    vk::ImageUsageFlags usage{};
+    if (HasUsage(requested, ImageUsage::TransferSource)) {
+        usage |= vk::ImageUsageFlagBits::eTransferSrc;
+    }
+    if (HasUsage(requested, ImageUsage::TransferDestination)) {
+        usage |= vk::ImageUsageFlagBits::eTransferDst;
+    }
+    if (HasUsage(requested, ImageUsage::Sampled)) {
+        usage |= vk::ImageUsageFlagBits::eSampled;
+    }
+    if (HasUsage(requested, ImageUsage::ColorAttachment)) {
+        usage |= vk::ImageUsageFlagBits::eColorAttachment;
+        if (instance.IsAttachmentFeedbackLoopLayoutSupported()) {
+            usage |= vk::ImageUsageFlagBits::eAttachmentFeedbackLoopEXT;
         }
-    } else {
-        // Similarly to above, we specify storage usage. This is typically not supported by
-        // compressed formats, but may be used for uncompressed views. In order to satisfy this,
-        // we will also specify the extended usage bit.
+    }
+    if (HasUsage(requested, ImageUsage::DepthStencilAttachment)) {
+        usage |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
+    }
+    if (HasUsage(requested, ImageUsage::Storage)) {
         usage |= vk::ImageUsageFlagBits::eStorage;
     }
-
     return usage;
 }
 
@@ -142,7 +140,7 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
         flags |= vk::ImageCreateFlagBits::eBlockTexelViewCompatible;
     }
 
-    usage_flags = ImageUsageFlags(instance, info);
+    usage_flags = ToVulkanUsage(*instance, info.Usage());
     format_features = FormatFeatureFlags(usage_flags);
     if (info.props.is_depth) {
         aspect_mask = vk::ImageAspectFlagBits::eDepth;
