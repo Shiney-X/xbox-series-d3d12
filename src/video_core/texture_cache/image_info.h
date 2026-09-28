@@ -8,6 +8,7 @@
 #include "video_core/amdgpu/tiling.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_format_desc.h"
+#include "video_core/texture_cache/image_resource_desc.h"
 #include "video_core/texture_cache/image_usage.h"
 #include "video_core/texture_cache/types.h"
 
@@ -51,6 +52,22 @@ struct ImageInfo {
 
     ImageUsage Usage() const noexcept {
         return CachedImageUsage(props.is_block, props.is_depth);
+    }
+
+    ImageResourceDesc ResourceDesc() const noexcept {
+        if (pixel_format == vk::Format::eUndefined) {
+            return {};
+        }
+        return {guest_format,
+                type,
+                size,
+                resources,
+                Usage(),
+                num_samples,
+                static_cast<bool>(props.is_volume),
+                static_cast<bool>(props.is_block),
+                static_cast<bool>(props.is_depth),
+                static_cast<bool>(props.has_stencil)};
     }
 
     Extent2D BlockDim() const {
