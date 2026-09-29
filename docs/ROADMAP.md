@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: Fase 2J implementada; Fase 2K em andamento (quarto corte).**
+**Status: Fase 2J implementada; Fase 2K em andamento (quinto corte).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -231,6 +231,13 @@ passa a criar seus buffers temporários por esse proprietário e mantém sua vid
 útil até o tick da GPU por operação adiada. O cache ainda contém barriers,
 comandos e formatos Vulkan, então a fronteira completa e a regressão visual
 seguem pendentes.
+
+No quinto corte do 2K, `Buffer::Transition` entrega somente
+`BufferTransition`, sem barrier nativa. `Vulkan::GetBufferBarrier` converte
+acesso e estágio semânticos para `vk::BufferMemoryBarrier2` e anexa o handle
+do recurso na emissão Vulkan. Os caches ainda constroem listas de barriers e
+comandos Vulkan; a tradução foi centralizada, mas a fronteira não está
+completa.
 
 Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)
