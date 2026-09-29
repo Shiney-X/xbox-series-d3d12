@@ -11,6 +11,7 @@
 #include "shader_recompiler/runtime_info.h"
 #include "video_core/amdgpu/liverpool.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/renderer_vulkan/vk_buffer_barrier.h"
 #include "video_core/renderer_vulkan/vk_image_view_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -283,11 +284,12 @@ void Rasterizer::DrawIndirect(bool is_indexed, VAddr arg_address, u32 offset, u3
         std::tie(count_buffer, count_base) = buffer_cache.ObtainBuffer(count_address, 4, false);
     }
 
-    if (auto barrier = buffer->GetBarrier(VideoCore::BufferAccess::IndirectRead)) {
+    if (auto barrier = Vulkan::GetBufferBarrier(*buffer, VideoCore::BufferAccess::IndirectRead)) {
         buffer_barriers.emplace_back(*barrier);
     }
     if (count_buffer) {
-        if (auto barrier = count_buffer->GetBarrier(VideoCore::BufferAccess::IndirectRead)) {
+        if (auto barrier =
+                Vulkan::GetBufferBarrier(*count_buffer, VideoCore::BufferAccess::IndirectRead)) {
             buffer_barriers.emplace_back(*barrier);
         }
     }
@@ -375,7 +377,7 @@ void Rasterizer::DispatchIndirect(VAddr address, u32 offset, u32 size) {
 
     const auto [buffer, base] = buffer_cache.ObtainBuffer(address + offset, size, false);
 
-    if (auto barrier = buffer->GetBarrier(VideoCore::BufferAccess::IndirectRead)) {
+    if (auto barrier = Vulkan::GetBufferBarrier(*buffer, VideoCore::BufferAccess::IndirectRead)) {
         buffer_barriers.emplace_back(*barrier);
     }
 
@@ -686,9 +688,9 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, Shader::Backend::Binding
             ASSERT(adjust % 4 == 0);
             push_data.AddOffset(binding.buffer, adjust);
             buffer_infos.emplace_back(vk_buffer->Handle(), offset_aligned, size + adjust);
-            if (auto barrier =
-                    vk_buffer->GetBarrier(desc.is_written ? VideoCore::BufferAccess::ShaderWrite
-                                                          : VideoCore::BufferAccess::ShaderRead)) {
+            if (auto barrier = Vulkan::GetBufferBarrier(
+                    *vk_buffer, desc.is_written ? VideoCore::BufferAccess::ShaderWrite
+                                                : VideoCore::BufferAccess::ShaderRead)) {
                 buffer_barriers.emplace_back(*barrier);
             }
             if (desc.is_written && desc.is_formatted) {

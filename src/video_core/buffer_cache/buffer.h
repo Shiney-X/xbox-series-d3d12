@@ -73,7 +73,9 @@ public:
 
     vk::DeviceAddress BufferDeviceAddress() const noexcept;
 
-    std::optional<vk::BufferMemoryBarrier2> GetBarrier(BufferAccess next, u32 offset = 0);
+    [[nodiscard]] std::optional<BufferTransition> Transition(BufferAccess next, u32 offset = 0) {
+        return sync_state.Transition(next, offset, size_bytes);
+    }
 
     void Fill(u64 offset, u32 num_bytes, u32 value);
 
