@@ -5,7 +5,7 @@
 
 #include "common/types.h"
 #include "video_core/renderer_vulkan/vk_common.h"
-#include "video_core/texture_cache/image.h"
+#include "video_core/renderer_vulkan/vk_image_resource.h"
 
 namespace Vulkan::HostPasses {
 
@@ -27,10 +27,10 @@ private:
         u8 id{};
         bool dirty{true};
 
-        VideoCore::UniqueImage intermediary_image;
+        ImageResource intermediary_image;
         vk::UniqueImageView intermediary_image_view;
 
-        VideoCore::UniqueImage output_image;
+        ImageResource output_image;
         vk::UniqueImageView output_image_view;
     };
 

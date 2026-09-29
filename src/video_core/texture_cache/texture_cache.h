@@ -137,8 +137,8 @@ public:
     void RefreshImage(Image& image);
 
     /// Retrieves the sampler that matches the provided S# descriptor.
-    [[nodiscard]] vk::Sampler GetSampler(const AmdGpu::Sampler& sampler,
-                                         AmdGpu::BorderColorBuffer border_color_base);
+    [[nodiscard]] std::shared_ptr<const Vulkan::SamplerResource> GetSampler(
+        const AmdGpu::Sampler& sampler, AmdGpu::BorderColorBuffer border_color_base);
 
     /// Retrieves the image with the specified id.
     [[nodiscard]] Image& GetImage(ImageId id) {

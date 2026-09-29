@@ -6,12 +6,11 @@
 #include <utility>
 #include "common/assert.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/texture_cache/blit_helper.h"
 #include "video_core/texture_cache/image.h"
-
-#include <vk_mem_alloc.h>
 
 namespace VideoCore {
 
@@ -190,41 +189,6 @@ static vk::FormatFeatureFlags2 FormatFeatureFlags(const vk::ImageUsageFlags usag
     return feature_flags;
 }
 
-UniqueImage::~UniqueImage() {
-    if (image) {
-        vmaDestroyImage(allocator, image, allocation);
-    }
-}
-
-void UniqueImage::Destroy() {
-    if (image) {
-        vmaDestroyImage(allocator, image, allocation);
-        image = vk::Image{};
-        allocation = {};
-    }
-}
-
-void UniqueImage::Create(const vk::ImageCreateInfo& image_ci) {
-    this->image_ci = image_ci;
-    ASSERT(!image);
-    const VmaAllocationCreateInfo alloc_info = {
-        .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT,
-        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-        .requiredFlags = 0,
-        .preferredFlags = 0,
-        .pool = VK_NULL_HANDLE,
-        .pUserData = nullptr,
-    };
-
-    const VkImageCreateInfo image_ci_unsafe = static_cast<VkImageCreateInfo>(image_ci);
-    VkImage unsafe_image{};
-    VkResult result = vmaCreateImage(allocator, &image_ci_unsafe, &alloc_info, &unsafe_image,
-                                     &allocation, nullptr);
-    ASSERT_MSG(result == VK_SUCCESS, "Failed allocating image with error {}",
-               vk::to_string(vk::Result{result}));
-    image = vk::Image{unsafe_image};
-}
-
 Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
              BlitHelper& blit_helper_, Common::SlotVector<ImageView>& slot_image_views_,
              const ImageInfo& info_, ImageResourceDesc resource_desc_)
@@ -304,8 +268,8 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
     backing = &backing_images.emplace_back();
     backing->sync_state = ImageSyncState{resource_desc.resources};
     backing->num_samples = resource_desc.num_samples;
-    backing->image = UniqueImage{instance->GetDevice(), instance->GetAllocator()};
-    backing->image.Create(image_ci);
+    backing->image = std::make_unique<Vulkan::ImageResource>(instance->GetAllocator());
+    backing->image->Create(image_ci);
 
     Vulkan::SetObjectName(instance->GetDevice(), GetImage(),
                           "Image {}x{}x{} {} {} {:#x}:{:#x} L:{} M:{} S:{}", info.size.width,
@@ -315,6 +279,14 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
 }
 
 Image::~Image() = default;
+
+const Vulkan::ImageResource& Image::Native() const noexcept {
+    return *backing->image;
+}
+
+vk::Image Image::GetImage() const {
+    return Native().Handle();
+}
 
 ImageView& Image::FindView(const ImageViewInfo& view_info, bool ensure_guest_samples) {
     if (ensure_guest_samples && backing->num_samples > 1 != info.num_samples > 1) {
@@ -860,16 +832,16 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
     BackingImage* new_backing;
     auto it = std::ranges::find(backing_images, num_samples, &BackingImage::num_samples);
     if (it == backing_images.end()) {
-        auto new_image_ci = backing->image.image_ci;
+        auto new_image_ci = backing->image->CreateInfo();
         new_image_ci.samples = LiverpoolToVK::NumSamples(num_samples, supported_samples);
 
         new_backing = &backing_images.emplace_back();
         new_backing->sync_state = ImageSyncState{resource_desc.resources};
         new_backing->num_samples = num_samples;
-        new_backing->image = UniqueImage{instance->GetDevice(), instance->GetAllocator()};
-        new_backing->image.Create(new_image_ci);
+        new_backing->image = std::make_unique<Vulkan::ImageResource>(instance->GetAllocator());
+        new_backing->image->Create(new_image_ci);
 
-        Vulkan::SetObjectName(instance->GetDevice(), new_backing->image.image,
+        Vulkan::SetObjectName(instance->GetDevice(), new_backing->image->Handle(),
                               "Image {}x{}x{} {} {} {:#x}:{:#x} L:{} M:{} S:{} (backing)",
                               info.size.width, info.size.height, info.size.depth,
                               AmdGpu::NameOf(info.tile_mode), vk::to_string(info.pixel_format),
@@ -901,7 +873,7 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
             .newLayout = dst_layout,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = new_backing->image,
+            .image = new_backing->image->Handle(),
             .subresourceRange{
                 .aspectMask = aspect_mask,
                 .baseMipLevel = 0,
@@ -919,7 +891,7 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
         // Copy between ms and non ms backing images
         blit_helper->CopyBetweenMsImages(
             info.size.width, info.size.height, new_backing->num_samples, info.pixel_format,
-            backing->num_samples > 1, backing->image, new_backing->image);
+            backing->num_samples > 1, backing->image->Handle(), new_backing->image->Handle());
 
         // Update current layout in tracker to new backings layout
         new_backing->sync_state.SetCurrent({ImageLayout::ColorAttachment,

@@ -5,6 +5,7 @@
 
 #include "common/logging/log.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_image_view_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/texture_cache/image.h"
@@ -79,7 +80,7 @@ ImageViewResource::ImageViewResource(const Instance& instance, const VideoCore::
 
     const vk::ImageViewCreateInfo image_view_ci = {
         .pNext = &usage_ci,
-        .image = image.GetImage(),
+        .image = image.Native().Handle(),
         .viewType = ConvertImageViewType(info.type),
         .format = instance.GetSupportedFormat(format, image.format_features),
         .components = LiverpoolToVK::ComponentMapping(info.mapping),
