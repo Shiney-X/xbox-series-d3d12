@@ -4,45 +4,14 @@
 #include "common/alignment.h"
 #include "common/assert.h"
 #include "video_core/buffer_cache/buffer.h"
-#include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/renderer_vulkan/vk_buffer_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 
-#include <vk_mem_alloc.h>
-
 namespace VideoCore {
 
 namespace {
-
-vk::BufferUsageFlags ToVulkanUsage(BufferUsage usage) {
-    vk::BufferUsageFlags flags{};
-    if (HasUsage(usage, BufferUsage::TransferSource)) {
-        flags |= vk::BufferUsageFlagBits::eTransferSrc;
-    }
-    if (HasUsage(usage, BufferUsage::TransferDestination)) {
-        flags |= vk::BufferUsageFlagBits::eTransferDst;
-    }
-    if (HasUsage(usage, BufferUsage::Uniform)) {
-        flags |= vk::BufferUsageFlagBits::eUniformBuffer;
-    }
-    if (HasUsage(usage, BufferUsage::Storage)) {
-        flags |= vk::BufferUsageFlagBits::eStorageBuffer;
-    }
-    if (HasUsage(usage, BufferUsage::Index)) {
-        flags |= vk::BufferUsageFlagBits::eIndexBuffer;
-    }
-    if (HasUsage(usage, BufferUsage::Vertex)) {
-        flags |= vk::BufferUsageFlagBits::eVertexBuffer;
-    }
-    if (HasUsage(usage, BufferUsage::Indirect)) {
-        flags |= vk::BufferUsageFlagBits::eIndirectBuffer;
-    }
-    if (HasUsage(usage, BufferUsage::DeviceAddress)) {
-        flags |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
-    }
-    return flags;
-}
 
 struct VulkanBufferAccess {
     vk::AccessFlags2 access;
@@ -95,100 +64,35 @@ std::string_view BufferTypeName(MemoryUsage type) {
     }
 }
 
-[[nodiscard]] VkMemoryPropertyFlags MemoryUsagePreferredVmaFlags(MemoryUsage usage) {
-    return usage != MemoryUsage::DeviceLocal ? VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                             : VkMemoryPropertyFlagBits{};
-}
-
-[[nodiscard]] VmaAllocationCreateFlags MemoryUsageVmaFlags(MemoryUsage usage) {
-    switch (usage) {
-    case MemoryUsage::Upload:
-    case MemoryUsage::Stream:
-        return VMA_ALLOCATION_CREATE_MAPPED_BIT |
-               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-    case MemoryUsage::Download:
-        return VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
-    case MemoryUsage::DeviceLocal:
-        return {};
-    }
-    return {};
-}
-
-[[nodiscard]] VmaMemoryUsage MemoryUsageVma(MemoryUsage usage) {
-    switch (usage) {
-    case MemoryUsage::DeviceLocal:
-    case MemoryUsage::Stream:
-        return VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-    case MemoryUsage::Upload:
-    case MemoryUsage::Download:
-        return VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
-    }
-    return VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-}
-
-UniqueBuffer::UniqueBuffer(vk::Device device_, VmaAllocator allocator_)
-    : device{device_}, allocator{allocator_} {}
-
-UniqueBuffer::~UniqueBuffer() {
-    if (buffer) {
-        vmaDestroyBuffer(allocator, buffer, allocation);
-    }
-}
-
-void UniqueBuffer::Create(const vk::BufferCreateInfo& buffer_ci, MemoryUsage usage,
-                          VmaAllocationInfo* out_alloc_info) {
-    const bool with_bda = bool(buffer_ci.usage & vk::BufferUsageFlagBits::eShaderDeviceAddress);
-    const VmaAllocationCreateFlags bda_flag =
-        with_bda ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : 0;
-    const VmaAllocationCreateInfo alloc_ci = {
-        .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT | bda_flag | MemoryUsageVmaFlags(usage),
-        .usage = MemoryUsageVma(usage),
-        .requiredFlags = 0,
-        .preferredFlags = MemoryUsagePreferredVmaFlags(usage),
-        .pool = VK_NULL_HANDLE,
-        .pUserData = nullptr,
-    };
-
-    const VkBufferCreateInfo buffer_ci_unsafe = static_cast<VkBufferCreateInfo>(buffer_ci);
-    VkBuffer unsafe_buffer{};
-    VkResult result = vmaCreateBuffer(allocator, &buffer_ci_unsafe, &alloc_ci, &unsafe_buffer,
-                                      &allocation, out_alloc_info);
-    ASSERT_MSG(result == VK_SUCCESS, "Failed allocating buffer with error {}",
-               vk::to_string(vk::Result{result}));
-    buffer = vk::Buffer{unsafe_buffer};
-
-    if (with_bda) {
-        vk::BufferDeviceAddressInfo bda_info{
-            .buffer = buffer,
-        };
-        auto bda_result = device.getBufferAddress(bda_info);
-        ASSERT_MSG(bda_result != 0, "Failed to get buffer device address");
-        bda_addr = bda_result;
-    }
-}
-
 Buffer::Buffer(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_, BufferDesc desc)
     : cpu_addr{desc.guest_address}, size_bytes{desc.size_bytes}, instance{&instance_},
       scheduler{&scheduler_}, usage{desc.memory_usage},
-      buffer{instance->GetDevice(), instance->GetAllocator()} {
-    // Create buffer object.
-    const vk::BufferCreateInfo buffer_ci = {
-        .size = size_bytes,
-        .usage = ToVulkanUsage(desc.usage),
-    };
-    VmaAllocationInfo alloc_info{};
-    buffer.Create(buffer_ci, desc.memory_usage, &alloc_info);
+      buffer{std::make_unique<Vulkan::BufferResource>(instance_, desc)} {
 
     const auto device = instance->GetDevice();
     Vulkan::SetObjectName(device, Handle(), "Buffer {:#x}:{:#x}", cpu_addr, size_bytes);
 
     // Map it if it is host visible.
-    VkMemoryPropertyFlags property_flags{};
-    vmaGetAllocationMemoryProperties(instance->GetAllocator(), buffer.allocation, &property_flags);
-    if (alloc_info.pMappedData) {
-        mapped_data = std::span<u8>{std::bit_cast<u8*>(alloc_info.pMappedData), size_bytes};
-    }
-    is_coherent = property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    mapped_data = buffer->MappedData();
+    is_coherent = buffer->IsCoherent();
+}
+
+Buffer::~Buffer() = default;
+Buffer::Buffer(Buffer&&) noexcept = default;
+Buffer& Buffer::operator=(Buffer&&) noexcept = default;
+
+const Vulkan::BufferResource& Buffer::Native() const noexcept {
+    return *buffer;
+}
+
+vk::Buffer Buffer::Handle() const noexcept {
+    return Native().Handle();
+}
+
+vk::DeviceAddress Buffer::BufferDeviceAddress() const noexcept {
+    const auto address = Native().DeviceAddress();
+    ASSERT_MSG(address != 0, "Can't get BDA from a non BDA buffer");
+    return address;
 }
 
 std::optional<vk::BufferMemoryBarrier2> Buffer::GetBarrier(BufferAccess next, u32 offset) {
@@ -204,7 +108,7 @@ std::optional<vk::BufferMemoryBarrier2> Buffer::GetBarrier(BufferAccess next, u3
         .srcAccessMask = source.access,
         .dstStageMask = destination.stage,
         .dstAccessMask = destination.access,
-        .buffer = buffer.buffer,
+        .buffer = Handle(),
         .offset = transition->offset,
         .size = transition->size,
     };
@@ -220,7 +124,7 @@ void Buffer::Fill(u64 offset, u32 num_bytes, u32 value) {
         .srcAccessMask = vk::AccessFlagBits2::eMemoryRead,
         .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
         .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
-        .buffer = buffer,
+        .buffer = Handle(),
         .offset = offset,
         .size = num_bytes,
     };
@@ -229,7 +133,7 @@ void Buffer::Fill(u64 offset, u32 num_bytes, u32 value) {
         .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
         .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
         .dstAccessMask = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-        .buffer = buffer,
+        .buffer = Handle(),
         .offset = offset,
         .size = num_bytes,
     };
@@ -238,7 +142,7 @@ void Buffer::Fill(u64 offset, u32 num_bytes, u32 value) {
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &pre_barrier,
     });
-    cmdbuf.fillBuffer(buffer, offset, num_bytes, value);
+    cmdbuf.fillBuffer(Handle(), offset, num_bytes, value);
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
@@ -297,10 +201,9 @@ std::pair<u8*, u64> StreamBuffer::Map(u64 size, u64 alignment, bool allow_wait) 
 void StreamBuffer::Commit() {
     if (!is_coherent) {
         if (usage == MemoryUsage::Download) {
-            vmaInvalidateAllocation(instance->GetAllocator(), buffer.allocation, offset,
-                                    mapped_size);
+            Native().InvalidateMappedRange(offset, mapped_size);
         } else {
-            vmaFlushAllocation(instance->GetAllocator(), buffer.allocation, offset, mapped_size);
+            Native().FlushMappedRange(offset, mapped_size);
         }
     }
 

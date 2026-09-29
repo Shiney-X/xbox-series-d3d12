@@ -8,6 +8,8 @@
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/texture_cache/image_buffer_copy.h"
 
+VK_DEFINE_HANDLE(VmaAllocation)
+
 namespace VideoCore {
 
 struct ImageInfo;
