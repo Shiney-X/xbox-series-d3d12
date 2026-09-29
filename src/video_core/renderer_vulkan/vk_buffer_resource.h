@@ -22,7 +22,8 @@ class Instance;
 // Owns a VMA-backed Vulkan buffer and its mapping/address metadata.
 class BufferResource {
 public:
-    BufferResource(const Instance& instance, const VideoCore::BufferDesc& desc);
+    BufferResource(const Instance& instance, const VideoCore::BufferDesc& desc,
+                   bool within_budget = true);
     ~BufferResource();
 
     BufferResource(const BufferResource&) = delete;

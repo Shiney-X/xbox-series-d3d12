@@ -22,6 +22,7 @@
 namespace Vulkan {
 class Instance;
 class ImageResource;
+class BufferResource;
 class Scheduler;
 } // namespace Vulkan
 
@@ -88,13 +89,14 @@ struct Image {
     Barriers GetBarriers(ImageResourceState next, std::optional<SubresourceRange> subres_range);
     void Transit(ImageResourceState next, std::optional<SubresourceRange> range,
                  vk::CommandBuffer cmdbuf = {});
-    void Upload(std::span<const ImageBufferCopy> upload_copies, vk::Buffer buffer, u64 offset);
-    void Download(std::span<const ImageBufferCopy> download_copies, vk::Buffer buffer, u64 offset,
-                  u64 download_size);
+    void Upload(std::span<const ImageBufferCopy> upload_copies,
+                const Vulkan::BufferResource& buffer, u64 offset);
+    void Download(std::span<const ImageBufferCopy> download_copies,
+                  const Vulkan::BufferResource& buffer, u64 offset, u64 download_size);
 
     void CopyImage(Image& src_image);
     void CopyRegion(Image& src_image, const ImageCopyRequest& request);
-    void CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset);
+    void CopyImageWithBuffer(Image& src_image, const Vulkan::BufferResource& buffer, u64 offset);
     void CopyMip(Image& src_image, u32 mip, u32 slice);
 
     void Resolve(Image& src_image, const VideoCore::SubresourceRange& mrt0_range,

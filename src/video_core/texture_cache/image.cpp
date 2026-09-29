@@ -6,6 +6,7 @@
 #include <utility>
 #include "common/assert.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/renderer_vulkan/vk_buffer_resource.h"
 #include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
@@ -355,7 +356,9 @@ void Image::Transit(ImageResourceState next, std::optional<SubresourceRange> ran
     });
 }
 
-void Image::Upload(std::span<const ImageBufferCopy> upload_copies, vk::Buffer buffer, u64 offset) {
+void Image::Upload(std::span<const ImageBufferCopy> upload_copies,
+                   const Vulkan::BufferResource& buffer, u64 offset) {
+    const vk::Buffer native_buffer = buffer.Handle();
     SetBackingSamples(info.num_samples, false);
     scheduler->EndRendering();
 
@@ -364,7 +367,7 @@ void Image::Upload(std::span<const ImageBufferCopy> upload_copies, vk::Buffer bu
         .srcAccessMask = vk::AccessFlagBits2::eMemoryWrite,
         .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
         .dstAccessMask = vk::AccessFlagBits2::eTransferRead,
-        .buffer = buffer,
+        .buffer = native_buffer,
         .offset = offset,
         .size = info.guest_size,
     };
@@ -373,7 +376,7 @@ void Image::Upload(std::span<const ImageBufferCopy> upload_copies, vk::Buffer bu
         .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
         .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
         .dstAccessMask = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-        .buffer = buffer,
+        .buffer = native_buffer,
         .offset = offset,
         .size = info.guest_size,
     };
@@ -392,7 +395,7 @@ void Image::Upload(std::span<const ImageBufferCopy> upload_copies, vk::Buffer bu
         native_copies.push_back(
             ToVulkanCopy(copy, aspect_mask & ~vk::ImageAspectFlagBits::eStencil));
     }
-    cmdbuf.copyBufferToImage(buffer, GetImage(), vk::ImageLayout::eTransferDstOptimal,
+    cmdbuf.copyBufferToImage(native_buffer, GetImage(), vk::ImageLayout::eTransferDstOptimal,
                              native_copies);
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -403,8 +406,9 @@ void Image::Upload(std::span<const ImageBufferCopy> upload_copies, vk::Buffer bu
     flags &= ~ImageFlagBits::Dirty;
 }
 
-void Image::Download(std::span<const ImageBufferCopy> download_copies, vk::Buffer buffer,
-                     u64 offset, u64 download_size) {
+void Image::Download(std::span<const ImageBufferCopy> download_copies,
+                     const Vulkan::BufferResource& buffer, u64 offset, u64 download_size) {
+    const vk::Buffer native_buffer = buffer.Handle();
     SetBackingSamples(info.num_samples);
     scheduler->EndRendering();
 
@@ -413,7 +417,7 @@ void Image::Download(std::span<const ImageBufferCopy> download_copies, vk::Buffe
         .srcAccessMask = vk::AccessFlagBits2::eMemoryRead,
         .dstStageMask = vk::PipelineStageFlagBits2::eCopy,
         .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
-        .buffer = buffer,
+        .buffer = native_buffer,
         .offset = offset,
         .size = download_size,
     };
@@ -422,7 +426,7 @@ void Image::Download(std::span<const ImageBufferCopy> download_copies, vk::Buffe
         .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
         .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
         .dstAccessMask = vk::AccessFlagBits2::eMemoryRead,
-        .buffer = buffer,
+        .buffer = native_buffer,
         .offset = offset,
         .size = download_size,
     };
@@ -441,7 +445,7 @@ void Image::Download(std::span<const ImageBufferCopy> download_copies, vk::Buffe
         native_copies.push_back(
             ToVulkanCopy(copy, aspect_mask & ~vk::ImageAspectFlagBits::eStencil));
     }
-    cmdbuf.copyImageToBuffer(GetImage(), vk::ImageLayout::eTransferSrcOptimal, buffer,
+    cmdbuf.copyImageToBuffer(GetImage(), vk::ImageLayout::eTransferSrcOptimal, native_buffer,
                              native_copies);
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -629,7 +633,9 @@ void Image::CopyRegion(Image& src_image, const ImageCopyRequest& request) {
                                          GetImage(), CurrentLayout(), region);
 }
 
-void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset) {
+void Image::CopyImageWithBuffer(Image& src_image, const Vulkan::BufferResource& buffer,
+                                u64 offset) {
+    const vk::Buffer native_buffer = buffer.Handle();
     const auto& src_info = src_image.info;
     const u32 num_mips = std::min(src_info.resources.levels, info.resources.levels);
     const u32 num_layers = std::min(src_info.resources.layers, info.resources.layers);
@@ -664,7 +670,7 @@ void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset)
         .srcAccessMask = vk::AccessFlagBits2::eTransferRead,
         .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
         .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
-        .buffer = buffer,
+        .buffer = native_buffer,
         .offset = offset,
         .size = VK_WHOLE_SIZE,
     };
@@ -674,7 +680,7 @@ void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset)
         .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
         .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
         .dstAccessMask = vk::AccessFlagBits2::eTransferRead,
-        .buffer = buffer,
+        .buffer = native_buffer,
         .offset = offset,
         .size = VK_WHOLE_SIZE,
     };
@@ -690,8 +696,8 @@ void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset)
         .pBufferMemoryBarriers = &pre_copy_barrier,
     });
 
-    cmdbuf.copyImageToBuffer(src_image.GetImage(), vk::ImageLayout::eTransferSrcOptimal, buffer,
-                             buffer_copies);
+    cmdbuf.copyImageToBuffer(src_image.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
+                             native_buffer, buffer_copies);
 
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -703,7 +709,7 @@ void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset)
         copy.imageSubresource.aspectMask = aspect_mask & ~vk::ImageAspectFlagBits::eStencil;
     }
 
-    cmdbuf.copyBufferToImage(buffer, GetImage(), vk::ImageLayout::eTransferDstOptimal,
+    cmdbuf.copyBufferToImage(native_buffer, GetImage(), vk::ImageLayout::eTransferDstOptimal,
                              buffer_copies);
     Transit(ImageStates::GeneralShaderTransferRead, {});
 }

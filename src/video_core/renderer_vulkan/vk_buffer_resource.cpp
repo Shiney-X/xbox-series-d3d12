@@ -77,7 +77,8 @@ VmaMemoryUsage VmaUsage(VideoCore::MemoryUsage usage) {
 
 } // namespace
 
-BufferResource::BufferResource(const Instance& instance, const VideoCore::BufferDesc& desc)
+BufferResource::BufferResource(const Instance& instance, const VideoCore::BufferDesc& desc,
+                               bool within_budget)
     : allocator{instance.GetAllocator()} {
     const vk::BufferCreateInfo buffer_ci = {
         .size = desc.size_bytes,
@@ -87,7 +88,8 @@ BufferResource::BufferResource(const Instance& instance, const VideoCore::Buffer
     const VmaAllocationCreateFlags bda_flag =
         with_bda ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : 0;
     const VmaAllocationCreateInfo alloc_ci = {
-        .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT | bda_flag | VmaFlags(desc.memory_usage),
+        .flags = (within_budget ? VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT : 0) | bda_flag |
+                 VmaFlags(desc.memory_usage),
         .usage = VmaUsage(desc.memory_usage),
         .requiredFlags = 0,
         .preferredFlags = PreferredVmaFlags(desc.memory_usage),
