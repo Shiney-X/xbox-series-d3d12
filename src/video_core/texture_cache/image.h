@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_buffer_copy.h"
+#include "video_core/texture_cache/image_commands.h"
 #include "video_core/texture_cache/image_info.h"
 #include "video_core/texture_cache/image_sync_state.h"
 #include "video_core/texture_cache/image_view.h"
@@ -136,12 +137,13 @@ struct Image {
                   u64 download_size);
 
     void CopyImage(Image& src_image);
+    void CopyRegion(Image& src_image, const ImageCopyRequest& request);
     void CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset);
     void CopyMip(Image& src_image, u32 mip, u32 slice);
 
     void Resolve(Image& src_image, const VideoCore::SubresourceRange& mrt0_range,
                  const VideoCore::SubresourceRange& mrt1_range);
-    void Clear(const vk::ClearValue& clear_value, const VideoCore::SubresourceRange& range);
+    void Clear(const ColorClearRequest& request);
 
     void SetBackingSamples(u32 num_samples, bool copy_backing = true);
 

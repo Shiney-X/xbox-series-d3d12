@@ -21,6 +21,20 @@ Common::IncrementalIdProvider<u64> Image::global_image_uid{};
 
 namespace {
 
+vk::ImageAspectFlags ToVulkanAspects(ImageCopyAspects aspects) {
+    switch (aspects) {
+    case ImageCopyAspects::Color:
+        return vk::ImageAspectFlagBits::eColor;
+    case ImageCopyAspects::Depth:
+        return vk::ImageAspectFlagBits::eDepth;
+    case ImageCopyAspects::Stencil:
+        return vk::ImageAspectFlagBits::eStencil;
+    case ImageCopyAspects::DepthStencil:
+        return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+    }
+    UNREACHABLE();
+}
+
 vk::BufferImageCopy ToVulkanCopy(const ImageBufferCopy& copy, vk::ImageAspectFlags aspect) {
     ASSERT(copy.Valid());
     return {
@@ -611,6 +625,38 @@ void Image::CopyImage(Image& src_image) {
 
     Transit(ImageStates::GeneralShaderTransferRead, {});
 }
+
+void Image::CopyRegion(Image& src_image, const ImageCopyRequest& request) {
+    ASSERT(request.Valid());
+    const SubresourceRange src_range{request.src, {1, request.src_layer_count}};
+    const SubresourceRange dst_range{request.dst, {1, request.dst_layer_count}};
+
+    scheduler->EndRendering();
+    src_image.Transit(ImageStates::TransferSource, src_range);
+    Transit(ImageStates::TransferDestination, dst_range);
+
+    const auto aspect = ToVulkanAspects(request.aspects);
+    const vk::ImageCopy region{
+        .srcSubresource{
+            .aspectMask = aspect,
+            .mipLevel = request.src.level,
+            .baseArrayLayer = request.src.layer,
+            .layerCount = request.src_layer_count,
+        },
+        .srcOffset = {request.src_offset.x, request.src_offset.y, request.src_offset.z},
+        .dstSubresource{
+            .aspectMask = aspect,
+            .mipLevel = request.dst.level,
+            .baseArrayLayer = request.dst.layer,
+            .layerCount = request.dst_layer_count,
+        },
+        .dstOffset = {request.dst_offset.x, request.dst_offset.y, request.dst_offset.z},
+        .extent = {request.extent.width, request.extent.height, request.extent.depth},
+    };
+    scheduler->CommandBuffer().copyImage(src_image.GetImage(), src_image.CurrentLayout(),
+                                         GetImage(), CurrentLayout(), region);
+}
+
 void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset) {
     const auto& src_info = src_image.info;
     const u32 num_mips = std::min(src_info.resources.levels, info.resources.levels);
@@ -791,19 +837,19 @@ void Image::Resolve(Image& src_image, const VideoCore::SubresourceRange& mrt0_ra
     flags &= ~VideoCore::ImageFlagBits::Dirty;
 }
 
-void Image::Clear(const vk::ClearValue& clear_value, const VideoCore::SubresourceRange& range) {
+void Image::Clear(const ColorClearRequest& request) {
     const vk::ImageSubresourceRange vk_range = {
         .aspectMask = vk::ImageAspectFlagBits::eColor,
-        .baseMipLevel = range.base.level,
-        .levelCount = range.extent.levels,
-        .baseArrayLayer = range.base.layer,
-        .layerCount = range.extent.layers,
+        .baseMipLevel = request.range.base.level,
+        .levelCount = request.range.extent.levels,
+        .baseArrayLayer = request.range.base.layer,
+        .layerCount = request.range.extent.layers,
     };
     scheduler->EndRendering();
     Transit(ImageStates::TransferDestination, {});
     const auto cmdbuf = scheduler->CommandBuffer();
-    cmdbuf.clearColorImage(GetImage(), vk::ImageLayout::eTransferDstOptimal, clear_value.color,
-                           vk_range);
+    const vk::ClearColorValue color{.uint32 = request.component_bits};
+    cmdbuf.clearColorImage(GetImage(), vk::ImageLayout::eTransferDstOptimal, color, vk_range);
 }
 
 void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {

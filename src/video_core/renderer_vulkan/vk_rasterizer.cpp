@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <bit>
+#include <cstring>
+
 #include "common/debug.h"
 #include "core/debug_state.h"
 #include "core/emulator_settings.h"
@@ -20,6 +23,14 @@
 #endif
 
 namespace Vulkan {
+
+static VideoCore::ColorClearRequest ToClearRequest(const vk::ClearColorValue& color,
+                                                   VideoCore::SubresourceRange range) {
+    VideoCore::ColorClearRequest request{.range = range};
+    static_assert(sizeof(request.component_bits) == sizeof(color));
+    std::memcpy(request.component_bits.data(), &color, sizeof(color));
+    return request;
+}
 
 static Shader::PushData MakeUserData(const AmdGpu::Regs& regs) {
     // TODO(roamic): Add support for multiple viewports and geometry shaders when ViewportIndex
@@ -182,7 +193,7 @@ void Rasterizer::EliminateFastClear() {
 
     ScopeMarkerBegin(fmt::format("EliminateFastClear:MRT={:#x}:M={:#x}", col_buf.Address(),
                                  col_buf.CmaskAddress()));
-    image.Clear(clear_value, desc.view_info.range);
+    image.Clear(ToClearRequest(clear_value.color, desc.view_info.range));
     ScopeMarkerEnd();
 }
 
@@ -581,9 +592,7 @@ bool Rasterizer::IsComputeImageClear(const Pipeline* pipeline) {
 
     // Perform image clear
     const float* values = reinterpret_cast<float*>(buf0.base_address);
-    const vk::ClearValue clear = {
-        .color = {.float32 = std::array<float, 4>{values[0], values[1], values[2], values[3]}},
-    };
+    const std::array<float, 4> clear_values{values[0], values[1], values[2], values[3]};
     const VideoCore::SubresourceRange range = {
         .base =
             {
@@ -592,7 +601,8 @@ bool Rasterizer::IsComputeImageClear(const Pipeline* pipeline) {
             },
         .extent = image1.info.resources,
     };
-    image1.Clear(clear, range);
+    image1.Clear(
+        {.component_bits = std::bit_cast<std::array<u32, 4>>(clear_values), .range = range});
     image1.flags |= VideoCore::ImageFlagBits::GpuModified;
     image1.flags &= ~VideoCore::ImageFlagBits::Dirty;
     return true;
@@ -1013,39 +1023,18 @@ void Rasterizer::DepthStencilCopy(bool is_depth, bool is_stencil) {
         regs.depth_buffer.StencilAddress(), regs.depth_buffer.DepthWriteAddress(),
         regs.depth_buffer.StencilWriteAddress()));
 
-    read_image.Transit(VideoCore::ImageStates::TransferSource, sub_range);
-    write_image.Transit(VideoCore::ImageStates::TransferDestination, sub_range);
-
-    auto aspect_mask = vk::ImageAspectFlags(0);
-    if (is_depth) {
-        aspect_mask |= vk::ImageAspectFlagBits::eDepth;
-    }
-    if (is_stencil) {
-        aspect_mask |= vk::ImageAspectFlagBits::eStencil;
-    }
-
-    vk::ImageCopy region = {
-        .srcSubresource =
-            {
-                .aspectMask = aspect_mask,
-                .mipLevel = 0,
-                .baseArrayLayer = sub_range.base.layer,
-                .layerCount = sub_range.extent.layers,
-            },
-        .srcOffset = {0, 0, 0},
-        .dstSubresource =
-            {
-                .aspectMask = aspect_mask,
-                .mipLevel = 0,
-                .baseArrayLayer = sub_range.base.layer,
-                .layerCount = sub_range.extent.layers,
-            },
-        .dstOffset = {0, 0, 0},
-        .extent = {write_image.info.size.width, write_image.info.size.height, 1},
-    };
-    scheduler.CommandBuffer().copyImage(read_image.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
-                                        write_image.GetImage(),
-                                        vk::ImageLayout::eTransferDstOptimal, region);
+    const auto aspects = is_depth && is_stencil ? VideoCore::ImageCopyAspects::DepthStencil
+                         : is_depth             ? VideoCore::ImageCopyAspects::Depth
+                                                : VideoCore::ImageCopyAspects::Stencil;
+    write_image.CopyRegion(
+        read_image, {
+                        .aspects = aspects,
+                        .src = sub_range.base,
+                        .dst = sub_range.base,
+                        .src_layer_count = sub_range.extent.layers,
+                        .dst_layer_count = sub_range.extent.layers,
+                        .extent = {write_image.info.size.width, write_image.info.size.height, 1},
+                    });
 
     ScopeMarkerEnd();
 }
