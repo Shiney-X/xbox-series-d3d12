@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: em andamento (quarto corte da Fase 2J).**
+**Status: Fase 2J implementada; validação de regressão pendente. Próxima: 2K.**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -122,7 +122,8 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
       tradução de barriers no adaptador existente.
 - [x] Passar um descritor neutro de criação de imagem entre o cache e o
       adaptador Vulkan.
-- [ ] Introduzir contratos neutros de recursos, comandos e sincronização.
+- [x] Introduzir contratos neutros de recursos, comandos e sincronização para
+      criação, transições, transferências, cópia de região e clear de imagens.
 - [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
 - [ ] Criar testes de contrato e trace replay.
@@ -195,6 +196,13 @@ No quarto corte do 2J, upload e download de imagens passam regiões
 O adaptador `Image` traduz as regiões para `vk::BufferImageCopy` ao emitir os
 comandos. Cópias entre imagens, clears e handles de buffers ainda usam Vulkan;
 o 2J permanece em andamento.
+
+O quinto corte encerra a implementação planejada do 2J: cópia de região
+imagem/imagem e clear de cor passam pedidos `ImageCopyRequest` e
+`ColorClearRequest` sem tipos Vulkan. O adaptador `Image` emite os comandos
+Vulkan. `Image::CopyImage`, `CopyMip` e `Resolve` já eram pedidos sem regiões
+Vulkan externas; sua lógica interna permanece no adaptador. Os handles nativos
+nos caches, os comandos de buffers e a regressão Vulkan continuam para 2K/2L.
 
 Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)

@@ -20,6 +20,7 @@ set(TEST_TARGETS
     shadps4_image_usage_test
     shadps4_image_resource_desc_test
     shadps4_image_buffer_copy_test
+    shadps4_image_commands_test
     shadps4_image_sync_state_test
     shadps4_uwp_core_bridge_test
 )
@@ -176,6 +177,7 @@ add_executable(shadps4_image_view_desc_test test_image_view_desc.cpp)
 add_executable(shadps4_image_usage_test test_image_usage.cpp)
 add_executable(shadps4_image_resource_desc_test test_image_resource_desc.cpp)
 add_executable(shadps4_image_buffer_copy_test test_image_buffer_copy.cpp)
+add_executable(shadps4_image_commands_test test_image_commands.cpp)
 add_executable(shadps4_image_sync_state_test test_image_sync_state.cpp)
 add_executable(shadps4_uwp_core_bridge_test
     ${CMAKE_SOURCE_DIR}/src/core/uwp/core_bridge.cpp
@@ -237,6 +239,11 @@ target_link_libraries(shadps4_image_resource_desc_test PRIVATE
     spdlog::spdlog
 )
 target_link_libraries(shadps4_image_buffer_copy_test PRIVATE
+    GTest::gtest_main
+    fmt::fmt
+    spdlog::spdlog
+)
+target_link_libraries(shadps4_image_commands_test PRIVATE
     GTest::gtest_main
     fmt::fmt
     spdlog::spdlog
