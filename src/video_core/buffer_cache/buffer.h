@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -15,59 +16,24 @@
 #include "video_core/renderer_vulkan/vk_common.h"
 
 namespace Vulkan {
+class BufferResource;
 class Instance;
 class Scheduler;
 } // namespace Vulkan
 
-VK_DEFINE_HANDLE(VmaAllocation)
-VK_DEFINE_HANDLE(VmaAllocator)
-
-struct VmaAllocationInfo;
-
 namespace VideoCore {
-
-struct UniqueBuffer {
-    explicit UniqueBuffer(vk::Device device, VmaAllocator allocator);
-    ~UniqueBuffer();
-
-    UniqueBuffer(const UniqueBuffer&) = delete;
-    UniqueBuffer& operator=(const UniqueBuffer&) = delete;
-
-    UniqueBuffer(UniqueBuffer&& other)
-        : allocator{std::exchange(other.allocator, VK_NULL_HANDLE)},
-          allocation{std::exchange(other.allocation, VK_NULL_HANDLE)},
-          buffer{std::exchange(other.buffer, VK_NULL_HANDLE)} {}
-    UniqueBuffer& operator=(UniqueBuffer&& other) {
-        buffer = std::exchange(other.buffer, VK_NULL_HANDLE);
-        allocator = std::exchange(other.allocator, VK_NULL_HANDLE);
-        allocation = std::exchange(other.allocation, VK_NULL_HANDLE);
-        return *this;
-    }
-
-    void Create(const vk::BufferCreateInfo& image_ci, MemoryUsage usage,
-                VmaAllocationInfo* out_alloc_info);
-
-    operator vk::Buffer() const {
-        return buffer;
-    }
-
-    vk::Device device;
-    VmaAllocator allocator;
-    VmaAllocation allocation;
-    vk::Buffer buffer{};
-    vk::DeviceAddress bda_addr = 0;
-};
 
 class Buffer {
 public:
     explicit Buffer(const Vulkan::Instance& instance, Vulkan::Scheduler& scheduler,
                     BufferDesc desc);
+    ~Buffer();
 
     Buffer& operator=(const Buffer&) = delete;
     Buffer(const Buffer&) = delete;
 
-    Buffer& operator=(Buffer&&) = default;
-    Buffer(Buffer&&) = default;
+    Buffer& operator=(Buffer&&) noexcept;
+    Buffer(Buffer&&) noexcept;
 
     void IncreaseStreamScore(int score) noexcept {
         stream_score += score;
@@ -101,14 +67,11 @@ public:
         return lru_id;
     }
 
-    vk::Buffer Handle() const noexcept {
-        return buffer;
-    }
+    [[nodiscard]] const Vulkan::BufferResource& Native() const noexcept;
 
-    vk::DeviceAddress BufferDeviceAddress() const noexcept {
-        ASSERT_MSG(buffer.bda_addr != 0, "Can't get BDA from a non BDA buffer");
-        return buffer.bda_addr;
-    }
+    vk::Buffer Handle() const noexcept;
+
+    vk::DeviceAddress BufferDeviceAddress() const noexcept;
 
     std::optional<vk::BufferMemoryBarrier2> GetBarrier(BufferAccess next, u32 offset = 0);
 
@@ -126,7 +89,7 @@ public:
     const Vulkan::Instance* instance;
     Vulkan::Scheduler* scheduler;
     MemoryUsage usage;
-    UniqueBuffer buffer;
+    std::unique_ptr<Vulkan::BufferResource> buffer;
     BufferSyncState sync_state{};
 };
 

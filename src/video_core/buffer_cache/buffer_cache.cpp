@@ -128,7 +128,7 @@ void BufferCache::DownloadBufferMemory(Buffer& buffer, VAddr device_addr, u64 si
     download_buffer.Commit();
     scheduler.EndRendering();
     const auto cmdbuf = scheduler.CommandBuffer();
-    cmdbuf.copyBuffer(buffer.buffer, download_buffer.Handle(), copies);
+    cmdbuf.copyBuffer(buffer.Handle(), download_buffer.Handle(), copies);
     const auto write_data = [&]() {
         auto* memory = Core::Memory::Instance();
         for (const auto& copy : copies) {
@@ -209,7 +209,7 @@ void BufferCache::BindVertexBuffers(
     for (auto& range : ranges_merged) {
         const u64 size = memory->ClampRangeSize(range.base_address, range.GetSize());
         const auto [buffer, offset] = ObtainBuffer(range.base_address, size, false);
-        range.vk_buffer = buffer->buffer;
+        range.vk_buffer = buffer->Handle();
         range.offset = offset;
         if (IsRegionGpuModified(range.base_address, size)) {
             if (auto barrier = buffer->GetBarrier(BufferAccess::VertexRead)) {
@@ -682,7 +682,7 @@ bool BufferCache::SynchronizeBuffer(Buffer& buffer, VAddr device_addr, u32 size,
             .bufferMemoryBarrierCount = 1,
             .pBufferMemoryBarriers = &pre_barrier,
         });
-        cmdbuf.copyBuffer(src_buffer, buffer.buffer, copies);
+        cmdbuf.copyBuffer(src_buffer, buffer.Handle(), copies);
         cmdbuf.pipelineBarrier2(vk::DependencyInfo{
             .dependencyFlags = vk::DependencyFlagBits::eByRegion,
             .bufferMemoryBarrierCount = 1,
