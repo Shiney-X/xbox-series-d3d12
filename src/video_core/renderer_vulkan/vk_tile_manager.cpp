@@ -6,16 +6,18 @@
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
+#include "video_core/renderer_vulkan/vk_tile_manager.h"
 #include "video_core/texture_cache/image.h"
 #include "video_core/texture_cache/image_info.h"
 #include "video_core/texture_cache/image_view.h"
-#include "video_core/texture_cache/tile_manager.h"
 
 #include "video_core/host_shaders/tiling_comp.h"
 
 #include <magic_enum/magic_enum.hpp>
 
-namespace VideoCore {
+namespace Vulkan {
+
+using namespace VideoCore;
 
 struct TilingInfo {
     u32 bank_swizzle;
@@ -307,4 +309,4 @@ void TileManager::TileImage(Image& in_image, std::span<ImageBufferCopy> buffer_c
     cmdbuf.dispatch(dim_x, 1, 1);
 }
 
-} // namespace VideoCore
+} // namespace Vulkan

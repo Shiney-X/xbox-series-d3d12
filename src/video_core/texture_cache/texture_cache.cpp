@@ -11,13 +11,14 @@
 #include "core/memory.h"
 #include "video_core/buffer_cache/buffer_cache.h"
 #include "video_core/page_manager.h"
+#include "video_core/renderer_vulkan/vk_blit_helper.h"
 #include "video_core/renderer_vulkan/vk_buffer_barrier.h"
 #include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
+#include "video_core/renderer_vulkan/vk_tile_manager.h"
 #include "video_core/texture_cache/host_compatibility.h"
 #include "video_core/texture_cache/texture_cache.h"
-#include "video_core/texture_cache/tile_manager.h"
 
 namespace VideoCore {
 
@@ -28,8 +29,10 @@ TextureCache::TextureCache(const Vulkan::Instance& instance_, Vulkan::Scheduler&
                            AmdGpu::Liverpool* liverpool_, BufferCache& buffer_cache_,
                            PageManager& tracker_)
     : instance{instance_}, scheduler{scheduler_}, liverpool{liverpool_},
-      buffer_cache{buffer_cache_}, tracker{tracker_}, blit_helper{instance, scheduler},
-      tile_manager{instance, scheduler, buffer_cache.GetUtilityBuffer(MemoryUsage::Stream)},
+      buffer_cache{buffer_cache_}, tracker{tracker_},
+      blit_helper{std::make_unique<Vulkan::BlitHelper>(instance, scheduler)},
+      tile_manager{std::make_unique<Vulkan::TileManager>(
+          instance, scheduler, buffer_cache.GetUtilityBuffer(MemoryUsage::Stream))},
       readback_linear_images{EmulatorSettings.IsReadbackLinearImagesEnabled()} {
 
     u32 max_samplers = instance.GetMaxSamplerAllocationCount();
@@ -61,6 +64,10 @@ TextureCache::TextureCache(const Vulkan::Instance& instance_, Vulkan::Scheduler&
 }
 
 TextureCache::~TextureCache() = default;
+
+Vulkan::TileManager& TextureCache::GetTileManager() noexcept {
+    return *tile_manager;
+}
 
 void TextureCache::ProcessDownloadImages() {
     std::unique_lock lk{download_images_mutex};
@@ -217,7 +224,7 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
         auto new_info = requested_info;
         new_info.resources = std::max(requested_info.resources, cache_image.info.resources);
         const auto new_image_id = slot_images.insert(
-            instance, scheduler, blit_helper, slot_image_views, new_info, new_info.ResourceDesc());
+            instance, scheduler, *blit_helper, slot_image_views, new_info, new_info.ResourceDesc());
         RegisterImage(new_image_id);
 
         // Inherit image usage
@@ -242,7 +249,7 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
             new_image.Transit({ImageLayout::DepthAttachment, ImageAccess::DepthStencilWrite,
                                ImageStage::GraphicsAndCompute},
                               {});
-            blit_helper.ReinterpretColorAsMsDepth(
+            blit_helper->ReinterpretColorAsMsDepth(
                 new_info.size.width, new_info.size.height, new_info.num_samples,
                 cache_image.info.pixel_format, new_info.pixel_format, cache_image.Native().Handle(),
                 new_image.Native().Handle());
@@ -472,8 +479,8 @@ std::tuple<ImageId, int, int> TextureCache::ResolveOverlap(const ImageInfo& imag
 }
 
 ImageId TextureCache::ExpandImage(const ImageInfo& info, ImageId image_id) {
-    const auto new_image_id = slot_images.insert(instance, scheduler, blit_helper, slot_image_views,
-                                                 info, info.ResourceDesc());
+    const auto new_image_id = slot_images.insert(instance, scheduler, *blit_helper,
+                                                 slot_image_views, info, info.ResourceDesc());
     RegisterImage(new_image_id);
 
     auto& src_image = slot_images[image_id];
@@ -559,7 +566,7 @@ ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
     }
     // Create and register a new image
     if (!image_id) {
-        image_id = slot_images.insert(instance, scheduler, blit_helper, slot_image_views, info,
+        image_id = slot_images.insert(instance, scheduler, *blit_helper, slot_image_views, info,
                                       info.ResourceDesc());
         RegisterImage(image_id);
     }
@@ -677,7 +684,7 @@ ImageView& TextureCache::FindDepthTarget(ImageId image_id, const ImageDesc& desc
             info.guest_address = desc.info.stencil_addr;
             info.guest_size = desc.info.stencil_size;
             info.size = desc.info.size;
-            stencil_id = slot_images.insert(instance, scheduler, blit_helper, slot_image_views,
+            stencil_id = slot_images.insert(instance, scheduler, *blit_helper, slot_image_views,
                                             info, info.ResourceDesc());
             RegisterImage(stencil_id);
         }
@@ -770,7 +777,7 @@ void TextureCache::RefreshImage(Image& image) {
     }
 
     const auto [buffer, offset] =
-        tile_manager.DetileImage(in_buffer->Native(), in_offset, image.info);
+        tile_manager->DetileImage(in_buffer->Native(), in_offset, image.info);
     for (auto& copy : image_copies) {
         copy.buffer_offset += offset;
     }

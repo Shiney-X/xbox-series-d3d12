@@ -1110,6 +1110,8 @@ set(VIDEO_CORE src/video_core/amdgpu/cb_db_extent.h
                src/video_core/buffer_cache/region_manager.h
                src/video_core/renderer_vulkan/liverpool_to_vk.cpp
                src/video_core/renderer_vulkan/liverpool_to_vk.h
+               src/video_core/renderer_vulkan/vk_blit_helper.cpp
+               src/video_core/renderer_vulkan/vk_blit_helper.h
                src/video_core/renderer_vulkan/vk_buffer_barrier.cpp
                src/video_core/renderer_vulkan/vk_buffer_barrier.h
                src/video_core/renderer_vulkan/vk_buffer_resource.cpp
@@ -1150,14 +1152,14 @@ set(VIDEO_CORE src/video_core/amdgpu/cb_db_extent.h
                src/video_core/renderer_vulkan/vk_shader_hle.h
                src/video_core/renderer_vulkan/vk_shader_util.cpp
                src/video_core/renderer_vulkan/vk_shader_util.h
+               src/video_core/renderer_vulkan/vk_tile_manager.cpp
+               src/video_core/renderer_vulkan/vk_tile_manager.h
                src/video_core/renderer_vulkan/vk_swapchain.cpp
                src/video_core/renderer_vulkan/vk_swapchain.h
                src/video_core/renderer_vulkan/host_passes/fsr_pass.cpp
                src/video_core/renderer_vulkan/host_passes/fsr_pass.h
                src/video_core/renderer_vulkan/host_passes/pp_pass.cpp
                src/video_core/renderer_vulkan/host_passes/pp_pass.h
-               src/video_core/texture_cache/blit_helper.cpp
-               src/video_core/texture_cache/blit_helper.h
                src/video_core/texture_cache/host_compatibility.cpp
                src/video_core/texture_cache/host_compatibility.h
                src/video_core/texture_cache/image.cpp
@@ -1176,8 +1178,6 @@ set(VIDEO_CORE src/video_core/amdgpu/cb_db_extent.h
                src/video_core/texture_cache/sampler.h
                src/video_core/texture_cache/texture_cache.cpp
                src/video_core/texture_cache/texture_cache.h
-               src/video_core/texture_cache/tile_manager.cpp
-               src/video_core/texture_cache/tile_manager.h
                src/video_core/texture_cache/types.h
                src/video_core/cache_storage.cpp
                src/video_core/cache_storage.h

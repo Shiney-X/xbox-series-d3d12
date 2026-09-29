@@ -11,13 +11,6 @@
 namespace Vulkan {
 class Instance;
 class Scheduler;
-} // namespace Vulkan
-
-namespace VideoCore {
-
-class Image;
-class ImageView;
-struct ImageInfo;
 
 class BlitHelper {
     static constexpr size_t MaxMsPipelines = 6;
@@ -62,4 +55,4 @@ private:
     std::vector<MsPipeline> ms_image_copy_pl;
 };
 
-} // namespace VideoCore
+} // namespace Vulkan

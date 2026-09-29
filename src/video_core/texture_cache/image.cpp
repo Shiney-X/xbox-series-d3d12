@@ -6,11 +6,11 @@
 #include <utility>
 #include "common/assert.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/renderer_vulkan/vk_blit_helper.h"
 #include "video_core/renderer_vulkan/vk_buffer_resource.h"
 #include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
-#include "video_core/texture_cache/blit_helper.h"
 #include "video_core/texture_cache/image.h"
 
 namespace VideoCore {
@@ -191,7 +191,7 @@ static vk::FormatFeatureFlags2 FormatFeatureFlags(const vk::ImageUsageFlags usag
 }
 
 Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
-             BlitHelper& blit_helper_, Common::SlotVector<ImageView>& slot_image_views_,
+             Vulkan::BlitHelper& blit_helper_, Common::SlotVector<ImageView>& slot_image_views_,
              const ImageInfo& info_, ImageResourceDesc resource_desc_)
     : instance{&instance_}, scheduler{&scheduler_}, blit_helper{&blit_helper_},
       slot_image_views{&slot_image_views_}, info{info_}, resource_desc{std::move(resource_desc_)} {

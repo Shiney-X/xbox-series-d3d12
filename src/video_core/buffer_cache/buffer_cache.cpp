@@ -13,6 +13,7 @@
 #include "video_core/renderer_vulkan/vk_graphics_pipeline.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
+#include "video_core/renderer_vulkan/vk_tile_manager.h"
 #include "video_core/texture_cache/texture_cache.h"
 
 namespace VideoCore {
