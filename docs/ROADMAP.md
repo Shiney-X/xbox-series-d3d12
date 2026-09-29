@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: Fase 2J implementada; validação de regressão pendente. Próxima: 2K.**
+**Status: Fase 2J implementada; Fase 2K em andamento (primeiro corte).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -203,6 +203,13 @@ imagem/imagem e clear de cor passam pedidos `ImageCopyRequest` e
 Vulkan. `Image::CopyImage`, `CopyMip` e `Resolve` já eram pedidos sem regiões
 Vulkan externas; sua lógica interna permanece no adaptador. Os handles nativos
 nos caches, os comandos de buffers e a regressão Vulkan continuam para 2K/2L.
+
+No primeiro corte do 2K, a posse de `vk::UniqueImageView` sai de
+`texture_cache::ImageView` e passa a `Vulkan::ImageViewResource`. O cache guarda
+um ponteiro opaco ao recurso nativo; apenas o renderer Vulkan extrai o handle
+para bindings e apresentação. `ImageViewInfo` ainda contém `vk::Format`, e
+imagens, buffers, samplers e outros caminhos do cache ainda expõem tipos
+Vulkan. O 2K não está concluído.
 
 Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)

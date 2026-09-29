@@ -17,6 +17,7 @@ set(TEST_TARGETS
     shadps4_gpu_memory_tracker_test
     shadps4_buffer_sync_state_test
     shadps4_image_view_desc_test
+    shadps4_image_view_handle_boundary_test
     shadps4_image_usage_test
     shadps4_image_resource_desc_test
     shadps4_image_buffer_copy_test
@@ -174,6 +175,7 @@ add_executable(shadps4_frontend_window_test test_frontend_window.cpp)
 add_executable(shadps4_gpu_memory_tracker_test test_gpu_memory_tracker.cpp)
 add_executable(shadps4_buffer_sync_state_test test_buffer_sync_state.cpp)
 add_executable(shadps4_image_view_desc_test test_image_view_desc.cpp)
+add_executable(shadps4_image_view_handle_boundary_test test_image_view_handle_boundary.cpp)
 add_executable(shadps4_image_usage_test test_image_usage.cpp)
 add_executable(shadps4_image_resource_desc_test test_image_resource_desc.cpp)
 add_executable(shadps4_image_buffer_copy_test test_image_buffer_copy.cpp)
@@ -226,6 +228,12 @@ target_link_libraries(shadps4_frontend_window_test PRIVATE GTest::gtest_main)
 target_link_libraries(shadps4_gpu_memory_tracker_test PRIVATE GTest::gtest_main)
 target_link_libraries(shadps4_buffer_sync_state_test PRIVATE GTest::gtest_main)
 target_link_libraries(shadps4_image_view_desc_test PRIVATE
+    GTest::gtest_main
+    Vulkan::Headers
+    fmt::fmt
+    spdlog::spdlog
+)
+target_link_libraries(shadps4_image_view_handle_boundary_test PRIVATE
     GTest::gtest_main
     Vulkan::Headers
     fmt::fmt

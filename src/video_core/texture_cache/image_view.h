@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "video_core/amdgpu/regs_depth.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_view_desc.h"
@@ -17,6 +19,7 @@ struct ImageResource;
 
 namespace Vulkan {
 class Instance;
+class ImageViewResource;
 class Scheduler;
 } // namespace Vulkan
 
@@ -48,11 +51,15 @@ struct ImageView {
     ImageView(const ImageView&) = delete;
     ImageView& operator=(const ImageView&) = delete;
 
-    ImageView(ImageView&&) = default;
-    ImageView& operator=(ImageView&&) = default;
+    ImageView(ImageView&&);
+    ImageView& operator=(ImageView&&);
+
+    [[nodiscard]] const Vulkan::ImageViewResource& Native() const noexcept;
 
     ImageViewInfo info;
-    vk::UniqueImageView image_view;
+
+private:
+    std::unique_ptr<Vulkan::ImageViewResource> native;
 };
 
 } // namespace VideoCore
