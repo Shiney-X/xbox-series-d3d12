@@ -11,6 +11,7 @@
 #include "core/memory.h"
 #include "video_core/buffer_cache/buffer_cache.h"
 #include "video_core/page_manager.h"
+#include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/texture_cache/host_compatibility.h"
@@ -242,8 +243,8 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
                               {});
             blit_helper.ReinterpretColorAsMsDepth(
                 new_info.size.width, new_info.size.height, new_info.num_samples,
-                cache_image.info.pixel_format, new_info.pixel_format, cache_image.GetImage(),
-                new_image.GetImage());
+                cache_image.info.pixel_format, new_info.pixel_format, cache_image.Native().Handle(),
+                new_image.Native().Handle());
         } else {
             LOG_WARNING(Render_Vulkan, "Unimplemented depth overlap copy");
         }
@@ -776,8 +777,8 @@ void TextureCache::RefreshImage(Image& image) {
     image.Upload(image_copies, buffer, offset);
 }
 
-vk::Sampler TextureCache::GetSampler(const AmdGpu::Sampler& sampler,
-                                     AmdGpu::BorderColorBuffer border_color_base) {
+std::shared_ptr<const Vulkan::SamplerResource> TextureCache::GetSampler(
+    const AmdGpu::Sampler& sampler, AmdGpu::BorderColorBuffer border_color_base) {
     const u64 hash = XXH3_64bits(&sampler, sizeof(sampler));
 
     std::scoped_lock lock{samplers_mutex};
@@ -788,7 +789,7 @@ vk::Sampler TextureCache::GetSampler(const AmdGpu::Sampler& sampler,
         sampler_lru_cache.Touch(it->second.lru_id, gc_tick);
     }
 
-    return it->second.Handle();
+    return it->second.Native();
 }
 
 void TextureCache::RegisterImage(ImageId image_id) {

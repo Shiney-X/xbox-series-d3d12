@@ -3,13 +3,15 @@
 
 #pragma once
 
+#include <memory>
+
 #include "video_core/amdgpu/regs_texture.h"
 #include "video_core/amdgpu/resource.h"
-#include "video_core/renderer_vulkan/vk_common.h"
 
 namespace Vulkan {
 class Instance;
-}
+class SamplerResource;
+} // namespace Vulkan
 
 namespace VideoCore {
 
@@ -25,14 +27,14 @@ public:
     Sampler(Sampler&&) = default;
     Sampler& operator=(Sampler&&) = default;
 
-    vk::Sampler Handle() const noexcept {
-        return *handle;
+    [[nodiscard]] std::shared_ptr<const Vulkan::SamplerResource> Native() const noexcept {
+        return native;
     }
 
     size_t lru_id{};
 
 private:
-    vk::UniqueSampler handle;
+    std::shared_ptr<Vulkan::SamplerResource> native;
 };
 
 } // namespace VideoCore

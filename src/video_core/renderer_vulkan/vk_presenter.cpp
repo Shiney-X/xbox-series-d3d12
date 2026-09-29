@@ -19,6 +19,7 @@
 #include "imgui/shadnet_notifications_layer.h"
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/renderdoc.h"
+#include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_image_view_resource.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 #include "video_core/renderer_vulkan/vk_presenter.h"
@@ -751,7 +752,7 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
 
         // Capture the guest output before any host-side scaling (FSR/PP) is applied.
         image.Transit(VideoCore::ImageStates::TransferSource, {}, cmdbuf);
-        CopyImageToReadback(cmdbuf, image.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
+        CopyImageToReadback(cmdbuf, image.Native().Handle(), vk::ImageLayout::eTransferSrcOptimal,
                             readback);
     }
 

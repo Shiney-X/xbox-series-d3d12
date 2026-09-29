@@ -14,17 +14,16 @@
 #include "video_core/texture_cache/image_view.h"
 
 #include <deque>
+#include <memory>
 #include <optional>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
 
 namespace Vulkan {
 class Instance;
+class ImageResource;
 class Scheduler;
 } // namespace Vulkan
-
-VK_DEFINE_HANDLE(VmaAllocation)
-VK_DEFINE_HANDLE(VmaAllocator)
 
 namespace VideoCore {
 
@@ -39,47 +38,6 @@ enum ImageFlagBits : u32 {
     Picked = 1 << 7,      ///< Temporary flag to mark the image as picked
 };
 DECLARE_ENUM_FLAG_OPERATORS(ImageFlagBits)
-
-struct UniqueImage {
-    explicit UniqueImage() = default;
-    explicit UniqueImage(vk::Device device, VmaAllocator allocator)
-        : device{device}, allocator{allocator} {}
-    ~UniqueImage();
-
-    UniqueImage(const UniqueImage&) = delete;
-    UniqueImage& operator=(const UniqueImage&) = delete;
-
-    UniqueImage(UniqueImage&& other)
-        : allocator{std::exchange(other.allocator, VK_NULL_HANDLE)},
-          allocation{std::exchange(other.allocation, VK_NULL_HANDLE)},
-          image{std::exchange(other.image, VK_NULL_HANDLE)}, image_ci{std::move(other.image_ci)} {}
-    UniqueImage& operator=(UniqueImage&& other) {
-        image = std::exchange(other.image, VK_NULL_HANDLE);
-        allocator = std::exchange(other.allocator, VK_NULL_HANDLE);
-        allocation = std::exchange(other.allocation, VK_NULL_HANDLE);
-        image_ci = std::move(other.image_ci);
-        return *this;
-    }
-
-    void Create(const vk::ImageCreateInfo& image_ci);
-
-    void Destroy();
-
-    operator vk::Image() const {
-        return image;
-    }
-
-    operator bool() const {
-        return image;
-    }
-
-public:
-    vk::Device device{};
-    VmaAllocator allocator{};
-    VmaAllocation allocation{};
-    vk::Image image{};
-    vk::ImageCreateInfo image_ci{};
-};
 
 class BlitHelper;
 
@@ -102,9 +60,7 @@ struct Image {
         return image_addr < overlap_end && overlap_cpu_addr < image_end;
     }
 
-    vk::Image GetImage() const {
-        return backing->image.image;
-    }
+    [[nodiscard]] const Vulkan::ImageResource& Native() const noexcept;
 
     vk::ImageLayout CurrentLayout() const;
 
@@ -166,7 +122,7 @@ public:
     vk::ImageUsageFlags usage_flags;
     vk::FormatFeatureFlags2 format_features;
     struct BackingImage {
-        UniqueImage image;
+        std::unique_ptr<Vulkan::ImageResource> image;
         ImageSyncState sync_state;
         boost::container::small_vector<ImageViewInfo, 4> image_view_infos;
         boost::container::small_vector<ImageViewId, 4> image_view_ids;
@@ -196,6 +152,7 @@ public:
     } binding{};
 
 private:
+    vk::Image GetImage() const;
     static Common::IncrementalIdProvider<u64> global_image_uid;
 };
 
