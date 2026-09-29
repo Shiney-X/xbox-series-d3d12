@@ -19,6 +19,7 @@
 #include "imgui/shadnet_notifications_layer.h"
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/renderdoc.h"
+#include "video_core/renderer_vulkan/vk_image_view_resource.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 #include "video_core/renderer_vulkan/vk_presenter.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -732,7 +733,7 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     view_info.mapping.a = AmdGpu::CompSwizzle::One;
 
     auto& image = texture_cache.GetImage(image_id);
-    auto image_view = *image.FindView(view_info).image_view;
+    auto image_view = image.FindView(view_info).Native().Handle();
     const vk::Extent2D image_size = {image.info.size.width, image.info.size.height};
     expected_ratio = static_cast<float>(image_size.width) / static_cast<float>(image_size.height);
 
