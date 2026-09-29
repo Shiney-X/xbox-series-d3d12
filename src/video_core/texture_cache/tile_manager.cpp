@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "video_core/buffer_cache/buffer.h"
+#include "video_core/renderer_vulkan/vk_buffer_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
@@ -13,7 +14,6 @@
 #include "video_core/host_shaders/tiling_comp.h"
 
 #include <magic_enum/magic_enum.hpp>
-#include <vk_mem_alloc.h>
 
 namespace VideoCore {
 
@@ -76,26 +76,10 @@ TileManager::TileManager(const Vulkan::Instance& instance, Vulkan::Scheduler& sc
 TileManager::~TileManager() = default;
 
 TileManager::ScratchBuffer TileManager::GetScratchBuffer(u32 size) {
-    constexpr auto usage =
-        vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eStorageBuffer |
-        vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst;
-
-    const vk::BufferCreateInfo buffer_ci = {
-        .size = size,
-        .usage = usage,
-    };
-
-    const VmaAllocationCreateInfo alloc_info{
-        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-    };
-
-    VkBuffer buffer;
-    VmaAllocation allocation;
-    const auto buffer_ci_unsafe = static_cast<VkBufferCreateInfo>(buffer_ci);
-    const auto result = vmaCreateBuffer(instance.GetAllocator(), &buffer_ci_unsafe, &alloc_info,
-                                        &buffer, &allocation, nullptr);
-    ASSERT(result == VK_SUCCESS);
-    return {buffer, allocation};
+    constexpr auto usage = BufferUsage::Uniform | BufferUsage::Storage |
+                           BufferUsage::TransferSource | BufferUsage::TransferDestination;
+    return std::make_shared<Vulkan::BufferResource>(
+        instance, BufferDesc{MemoryUsage::DeviceLocal, 0, usage, size}, false);
 }
 
 vk::Pipeline TileManager::GetTilingPipeline(const ImageInfo& info, bool is_tiler) {
@@ -161,10 +145,10 @@ vk::Pipeline TileManager::GetTilingPipeline(const ImageInfo& info, bool is_tiler
     return *tiling_pipelines[pl_id];
 }
 
-TileManager::Result TileManager::DetileImage(vk::Buffer in_buffer, u32 in_offset,
+TileManager::Result TileManager::DetileImage(const Vulkan::BufferResource& in_buffer, u32 in_offset,
                                              const ImageInfo& info) {
     if (!info.props.is_tiled) {
-        return {in_buffer, in_offset};
+        return {&in_buffer, in_offset};
     }
 
     TilingInfo params{};
@@ -186,10 +170,9 @@ TileManager::Result TileManager::DetileImage(vk::Buffer in_buffer, u32 in_offset
         .range = sizeof(params),
     };
 
-    const auto [out_buffer, out_allocation] = GetScratchBuffer(info.guest_size);
-    scheduler.DeferOperation([this, out_buffer, out_allocation]() {
-        vmaDestroyBuffer(instance.GetAllocator(), out_buffer, out_allocation);
-    });
+    auto out_buffer = GetScratchBuffer(info.guest_size);
+    auto* const out_resource = out_buffer.get();
+    scheduler.DeferOperation([resource = out_buffer]() mutable { resource.reset(); });
 
     scheduler.EndRendering();
 
@@ -197,13 +180,13 @@ TileManager::Result TileManager::DetileImage(vk::Buffer in_buffer, u32 in_offset
     cmdbuf.bindPipeline(vk::PipelineBindPoint::eCompute, GetTilingPipeline(info, false));
 
     const vk::DescriptorBufferInfo tiled_buffer_info{
-        .buffer = in_buffer,
+        .buffer = in_buffer.Handle(),
         .offset = in_offset,
         .range = info.guest_size,
     };
 
     const vk::DescriptorBufferInfo linear_buffer_info{
-        .buffer = out_buffer,
+        .buffer = out_resource->Handle(),
         .offset = 0,
         .range = info.guest_size,
     };
@@ -238,11 +221,12 @@ TileManager::Result TileManager::DetileImage(vk::Buffer in_buffer, u32 in_offset
 
     const auto dim_x = (info.guest_size / (info.num_bits / 8)) / 64;
     cmdbuf.dispatch(dim_x, 1, 1);
-    return {out_buffer, 0};
+    return {out_resource, 0};
 }
 
 void TileManager::TileImage(Image& in_image, std::span<ImageBufferCopy> buffer_copies,
-                            vk::Buffer out_buffer, u32 out_offset, u32 copy_size) {
+                            const Vulkan::BufferResource& out_buffer, u32 out_offset,
+                            u32 copy_size) {
     const auto& info = in_image.info;
     if (!info.props.is_tiled) {
         for (auto& copy : buffer_copies) {
@@ -271,24 +255,22 @@ void TileManager::TileImage(Image& in_image, std::span<ImageBufferCopy> buffer_c
         .range = sizeof(params),
     };
 
-    const auto [temp_buffer, temp_allocation] = GetScratchBuffer(info.guest_size);
-    scheduler.DeferOperation([this, temp_buffer, temp_allocation]() {
-        vmaDestroyBuffer(instance.GetAllocator(), temp_buffer, temp_allocation);
-    });
+    auto temp_buffer = GetScratchBuffer(info.guest_size);
+    scheduler.DeferOperation([resource = temp_buffer]() mutable { resource.reset(); });
 
     const auto cmdbuf = scheduler.CommandBuffer();
-    in_image.Download(buffer_copies, temp_buffer, 0, copy_size);
+    in_image.Download(buffer_copies, *temp_buffer, 0, copy_size);
 
     cmdbuf.bindPipeline(vk::PipelineBindPoint::eCompute, GetTilingPipeline(info, true));
 
     const vk::DescriptorBufferInfo tiled_buffer_info{
-        .buffer = out_buffer,
+        .buffer = out_buffer.Handle(),
         .offset = out_offset,
         .range = info.guest_size,
     };
 
     const vk::DescriptorBufferInfo linear_buffer_info{
-        .buffer = temp_buffer,
+        .buffer = temp_buffer->Handle(),
         .offset = 0,
         .range = info.guest_size,
     };

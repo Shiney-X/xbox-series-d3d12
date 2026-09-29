@@ -544,7 +544,7 @@ bool Rasterizer::IsComputeImageCopy(const Pipeline* pipeline) {
     } else {
         const auto& copy_buffer =
             buffer_cache.GetUtilityBuffer(VideoCore::MemoryUsage::DeviceLocal);
-        dst_image.CopyImageWithBuffer(src_image, copy_buffer.Handle(), 0);
+        dst_image.CopyImageWithBuffer(src_image, copy_buffer.Native(), 0);
     }
     dst_image.flags |= VideoCore::ImageFlagBits::GpuModified;
     dst_image.flags &= ~VideoCore::ImageFlagBits::Dirty;

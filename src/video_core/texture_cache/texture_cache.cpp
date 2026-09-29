@@ -87,7 +87,7 @@ void TextureCache::DownloadImageMemory(ImageId image_id, bool sync) {
         .layer_count = image.info.resources.layers,
         .image_extent = {image.info.size.width, image.info.size.height, image.info.size.depth},
     };
-    image.Download(std::span{&image_download, 1}, download_buffer.Handle(), offset, download_size);
+    image.Download(std::span{&image_download, 1}, download_buffer.Native(), offset, download_size);
 
     if (sync) {
         scheduler.Finish();
@@ -232,7 +232,7 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
                 new_image.CopyImage(cache_image);
             } else {
                 const auto& copy_buffer = buffer_cache.GetUtilityBuffer(MemoryUsage::DeviceLocal);
-                new_image.CopyImageWithBuffer(cache_image, copy_buffer.Handle(), 0);
+                new_image.CopyImageWithBuffer(cache_image, copy_buffer.Native(), 0);
             }
         } else if (cache_image.info.num_samples == 1 && new_info.props.is_depth &&
                    new_info.num_samples > 1) {
@@ -769,12 +769,12 @@ void TextureCache::RefreshImage(Image& image) {
     }
 
     const auto [buffer, offset] =
-        tile_manager.DetileImage(in_buffer->Handle(), in_offset, image.info);
+        tile_manager.DetileImage(in_buffer->Native(), in_offset, image.info);
     for (auto& copy : image_copies) {
         copy.buffer_offset += offset;
     }
 
-    image.Upload(image_copies, buffer, offset);
+    image.Upload(image_copies, *buffer, offset);
 }
 
 std::shared_ptr<const Vulkan::SamplerResource> TextureCache::GetSampler(
