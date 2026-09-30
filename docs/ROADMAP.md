@@ -100,7 +100,7 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: Fase 2J implementada; Fase 2K em andamento (sexto corte).**
+**Status: Fase 2J implementada; Fase 2K em andamento (sétimo corte).**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -244,6 +244,21 @@ passam a `renderer_vulkan` e ao namespace `Vulkan`. `TextureCache` os guarda
 por ponteiros proprietários opacos, sem expor seus pipelines, layouts ou
 shaders no cabeçalho do cache. Restam formatos nativos e APIs de comandos e
 barriers em caches; a 2K ainda não está encerrada.
+
+No sétimo corte do 2K, o gerenciador do buffer de faults e de seu pipeline
+compute passa a `renderer_vulkan`. `BufferCache` o guarda por ponteiro opaco;
+seu cabeçalho não inclui mais o gerenciador nem expõe os objetos Vulkan de
+pipeline. Este corte não retira os formatos nativos de imagens nem as APIs de
+cópia e barriers dos caches.
+
+Para encerrar 2K, ainda precisamos remover os **handles e pedidos nativos**
+que atravessam as interfaces de `buffer_cache` e `texture_cache`: `Buffer::Handle`,
+`Image::GetImage`, listas de barriers Vulkan, cópias com `vk::BufferCopy` e
+formatos `vk::Format` usados como chaves do cache. As implementações podem
+continuar Vulkan por dentro; a fronteira pública deve aceitar descritores
+neutros e deixar a tradução para o backend. A prova de regressão visual e o
+trace replay pertencem à 2L. Não há número fixo de PRs para fechar 2K; a
+conclusão depende dessas fronteiras estarem removidas e compiladas.
 
 Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)

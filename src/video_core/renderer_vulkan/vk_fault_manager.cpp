@@ -3,7 +3,7 @@
 
 #include "common/div_ceil.h"
 #include "video_core/buffer_cache/buffer_cache.h"
-#include "video_core/buffer_cache/fault_manager.h"
+#include "video_core/renderer_vulkan/vk_fault_manager.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
@@ -11,21 +11,24 @@
 
 #include "video_core/host_shaders/fault_buffer_process_comp.h"
 
-namespace VideoCore {
+namespace Vulkan {
 
 static constexpr size_t MaxPageFaults = 1024;
 static constexpr size_t PageFaultAreaSize = MaxPageFaults * sizeof(u64);
 
-FaultManager::FaultManager(const Vulkan::Instance& instance, Vulkan::Scheduler& scheduler_,
-                           BufferCache& buffer_cache_, u32 caching_pagebits, u64 caching_num_pages_)
+FaultManager::FaultManager(const Instance& instance, Scheduler& scheduler_,
+                           VideoCore::BufferCache& buffer_cache_, u32 caching_pagebits,
+                           u64 caching_num_pages_)
     : scheduler{scheduler_}, buffer_cache{buffer_cache_},
       caching_pagesize{1ULL << caching_pagebits}, caching_num_pages{caching_num_pages_},
       fault_buffer_size{caching_num_pages_ / 8},
       fault_buffer{instance, scheduler,
-                   BufferDesc{MemoryUsage::DeviceLocal, 0, AllFlags, fault_buffer_size}},
+                   VideoCore::BufferDesc{VideoCore::MemoryUsage::DeviceLocal, 0,
+                                         VideoCore::AllFlags, fault_buffer_size}},
       download_buffer{
           instance, scheduler,
-          BufferDesc{MemoryUsage::Download, 0, AllFlags, MaxPendingFaults * PageFaultAreaSize}} {
+          VideoCore::BufferDesc{VideoCore::MemoryUsage::Download, 0, VideoCore::AllFlags,
+                                MaxPendingFaults * PageFaultAreaSize}} {
     const auto device = instance.GetDevice();
     Vulkan::SetObjectName(device, fault_buffer.Handle(), "Fault Buffer");
 
@@ -176,4 +179,4 @@ void FaultManager::ProcessFaultBuffer() {
     current_area %= MaxPendingFaults;
 }
 
-} // namespace VideoCore
+} // namespace Vulkan
