@@ -4,6 +4,7 @@
 #pragma once
 
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <unordered_set>
@@ -15,11 +16,14 @@
 #include "common/slot_vector.h"
 #include "shader_recompiler/resource.h"
 #include "video_core/multi_level_page_table.h"
-#include "video_core/texture_cache/blit_helper.h"
 #include "video_core/texture_cache/image.h"
 #include "video_core/texture_cache/image_view.h"
 #include "video_core/texture_cache/sampler.h"
-#include "video_core/texture_cache/tile_manager.h"
+
+namespace Vulkan {
+class BlitHelper;
+class TileManager;
+} // namespace Vulkan
 
 namespace AmdGpu {
 struct Liverpool;
@@ -80,9 +84,7 @@ public:
                  AmdGpu::Liverpool* liverpool, BufferCache& buffer_cache, PageManager& tracker);
     ~TextureCache();
 
-    TileManager& GetTileManager() noexcept {
-        return tile_manager;
-    }
+    Vulkan::TileManager& GetTileManager() noexcept;
 
     /// Invalidates any image in the logical page range.
     void InvalidateMemory(VAddr addr, size_t size);
@@ -316,8 +318,8 @@ private:
     AmdGpu::Liverpool* liverpool;
     BufferCache& buffer_cache;
     PageManager& tracker;
-    BlitHelper blit_helper;
-    TileManager tile_manager;
+    std::unique_ptr<Vulkan::BlitHelper> blit_helper;
+    std::unique_ptr<Vulkan::TileManager> tile_manager;
     Common::SlotVector<Image> slot_images;
     Common::SlotVector<ImageView> slot_image_views;
     tsl::robin_map<u64, Sampler> samplers;

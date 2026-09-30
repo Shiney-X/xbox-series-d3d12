@@ -23,6 +23,7 @@ namespace Vulkan {
 class Instance;
 class ImageResource;
 class BufferResource;
+class BlitHelper;
 class Scheduler;
 } // namespace Vulkan
 
@@ -40,12 +41,10 @@ enum ImageFlagBits : u32 {
 };
 DECLARE_ENUM_FLAG_OPERATORS(ImageFlagBits)
 
-class BlitHelper;
-
 struct Image {
-    Image(const Vulkan::Instance& instance, Vulkan::Scheduler& scheduler, BlitHelper& blit_helper,
-          Common::SlotVector<ImageView>& slot_image_views, const ImageInfo& info,
-          ImageResourceDesc resource_desc);
+    Image(const Vulkan::Instance& instance, Vulkan::Scheduler& scheduler,
+          Vulkan::BlitHelper& blit_helper, Common::SlotVector<ImageView>& slot_image_views,
+          const ImageInfo& info, ImageResourceDesc resource_desc);
     ~Image();
 
     Image(const Image&) = delete;
@@ -108,7 +107,7 @@ struct Image {
 public:
     const Vulkan::Instance* instance;
     Vulkan::Scheduler* scheduler;
-    BlitHelper* blit_helper;
+    Vulkan::BlitHelper* blit_helper;
     Common::SlotVector<ImageView>* slot_image_views;
     ImageInfo info;
     ImageResourceDesc resource_desc;

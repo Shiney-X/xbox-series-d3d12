@@ -1,17 +1,16 @@
 // SPDX-FileCopyrightText: Copyright 2025 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "video_core/renderer_vulkan/vk_blit_helper.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
-#include "video_core/texture_cache/blit_helper.h"
-#include "video_core/texture_cache/image.h"
 
 #include "video_core/host_shaders/color_to_ms_depth_frag.h"
 #include "video_core/host_shaders/fs_tri_vert.h"
 #include "video_core/host_shaders/ms_image_blit_frag.h"
 
-namespace VideoCore {
+namespace Vulkan {
 
 static vk::SampleCountFlagBits ToSampleCount(u32 num_samples) {
     switch (num_samples) {
@@ -435,4 +434,4 @@ void BlitHelper::CreateMsCopyPipeline(const MsPipelineKey& key) {
     ms_image_copy_pl.emplace_back(key, std::move(pipeline));
 }
 
-} // namespace VideoCore
+} // namespace Vulkan
