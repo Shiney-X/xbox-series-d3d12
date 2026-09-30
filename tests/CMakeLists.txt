@@ -16,6 +16,7 @@ set(TEST_TARGETS
     shadps4_frontend_window_test
     shadps4_gpu_memory_tracker_test
     shadps4_buffer_sync_state_test
+    shadps4_gpu_contract_trace_test
     shadps4_buffer_handle_boundary_test
     shadps4_image_view_desc_test
     shadps4_image_view_handle_boundary_test
@@ -176,6 +177,7 @@ add_executable(shadps4_gcn_test ${GCN_TEST_SOURCES})
 add_executable(shadps4_frontend_window_test test_frontend_window.cpp)
 add_executable(shadps4_gpu_memory_tracker_test test_gpu_memory_tracker.cpp)
 add_executable(shadps4_buffer_sync_state_test test_buffer_sync_state.cpp)
+add_executable(shadps4_gpu_contract_trace_test test_gpu_contract_trace.cpp)
 add_executable(shadps4_buffer_handle_boundary_test test_buffer_handle_boundary.cpp)
 add_executable(shadps4_image_view_desc_test test_image_view_desc.cpp)
 add_executable(shadps4_image_view_handle_boundary_test test_image_view_handle_boundary.cpp)
@@ -231,6 +233,12 @@ target_link_libraries(shadps4_gcn_test PRIVATE
 target_link_libraries(shadps4_frontend_window_test PRIVATE GTest::gtest_main)
 target_link_libraries(shadps4_gpu_memory_tracker_test PRIVATE GTest::gtest_main)
 target_link_libraries(shadps4_buffer_sync_state_test PRIVATE GTest::gtest_main)
+target_link_libraries(shadps4_gpu_contract_trace_test PRIVATE
+    GTest::gtest_main
+    Boost::headers
+    fmt::fmt
+    spdlog::spdlog
+)
 target_link_libraries(shadps4_buffer_handle_boundary_test PRIVATE
     GTest::gtest_main
     Vulkan::Headers
@@ -322,6 +330,12 @@ foreach(t ${TEST_TARGETS})
         DISCOVERY_TIMEOUT 60
     )
 endforeach()
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if (Python3_Interpreter_FOUND)
+    add_test(NAME shadps4_compare_frames_test
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_compare_frames.py)
+endif()
 
 # ===========================================================================
 # HTTP tests (libSceHttp - URI helpers and status-line parsing)

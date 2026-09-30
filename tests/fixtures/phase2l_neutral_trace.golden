@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright 2026 shadPS4 Emulator Project
+# SPDX-License-Identifier: GPL-2.0-or-later
+B Initial TransferWrite 0 4096
+B TransferWrite ShaderRead 128 3968
+B -
+I Undefined ShaderReadOnly 0 0 2 2 whole
+I ShaderReadOnly TransferDestination 1 0 1 1 sub
+I TransferDestination TransferDestination 1 0 1 1 sub
+I TransferDestination ShaderReadOnly 1 0 1 1 sub
+I -

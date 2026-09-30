@@ -100,8 +100,8 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: Fase 2J implementada; fronteira de tipos da Fase 2K implementada,
-aguardando validação da PR de fechamento; Fase 2L pendente.**
+**Status: Fases 2J e 2K integradas; ferramentas de regressão da Fase 2L em
+validação; comparação visual de jogo real pendente.**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -128,7 +128,8 @@ aguardando validação da PR de fechamento; Fase 2L pendente.**
 - [x] Remover declarações de handles e outros tipos `vk::` dos cabeçalhos de
       `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
-- [ ] Criar testes de contrato e trace replay.
+- [x] Criar testes de contrato e replay sintético das transições neutras.
+- [ ] Comparar capturas reais do renderer Vulkan antes/depois da 2K.
 
 Na Fase 2B, `AmdGpu::Liverpool` entrega draw, dispatch, cópias, sincronização
 e marcadores ao `VideoCore::GpuCommandSink`. O rasterizer Vulkan implementa o
@@ -269,6 +270,9 @@ Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos 
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)
 e **2L** (testes de contrato, trace replay e regressão do renderer Vulkan).
 Esses nomes agrupam trabalho técnico; um marco pode precisar de mais de uma PR.
+O procedimento e os critérios de evidência da 2L estão em
+[`PHASE2L_VALIDATION.md`](PHASE2L_VALIDATION.md). O trace atual é sintético;
+o marco só se encerra após a comparação visual de uma cena de jogo real.
 
 ## Fase 3 — Backend D3D12
 
