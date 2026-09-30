@@ -32,7 +32,7 @@ Buffer::Buffer(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
       buffer{std::make_unique<Vulkan::BufferResource>(instance_, desc)} {
 
     const auto device = instance->GetDevice();
-    Vulkan::SetObjectName(device, Handle(), "Buffer {:#x}:{:#x}", cpu_addr, size_bytes);
+    Vulkan::SetObjectName(device, Native().Handle(), "Buffer {:#x}:{:#x}", cpu_addr, size_bytes);
 
     // Map it if it is host visible.
     mapped_data = buffer->MappedData();
@@ -47,16 +47,6 @@ const Vulkan::BufferResource& Buffer::Native() const noexcept {
     return *buffer;
 }
 
-vk::Buffer Buffer::Handle() const noexcept {
-    return Native().Handle();
-}
-
-vk::DeviceAddress Buffer::BufferDeviceAddress() const noexcept {
-    const auto address = Native().DeviceAddress();
-    ASSERT_MSG(address != 0, "Can't get BDA from a non BDA buffer");
-    return address;
-}
-
 void Buffer::Fill(u64 offset, u32 num_bytes, u32 value) {
     scheduler->EndRendering();
     ASSERT_MSG(offset % 4 == 0 && num_bytes % 4 == 0,
@@ -67,7 +57,7 @@ void Buffer::Fill(u64 offset, u32 num_bytes, u32 value) {
         .srcAccessMask = vk::AccessFlagBits2::eMemoryRead,
         .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
         .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
-        .buffer = Handle(),
+        .buffer = Native().Handle(),
         .offset = offset,
         .size = num_bytes,
     };
@@ -76,7 +66,7 @@ void Buffer::Fill(u64 offset, u32 num_bytes, u32 value) {
         .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
         .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
         .dstAccessMask = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-        .buffer = Handle(),
+        .buffer = Native().Handle(),
         .offset = offset,
         .size = num_bytes,
     };
@@ -85,7 +75,7 @@ void Buffer::Fill(u64 offset, u32 num_bytes, u32 value) {
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &pre_barrier,
     });
-    cmdbuf.fillBuffer(Handle(), offset, num_bytes, value);
+    cmdbuf.fillBuffer(Native().Handle(), offset, num_bytes, value);
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
@@ -102,8 +92,8 @@ StreamBuffer::StreamBuffer(const Vulkan::Instance& instance, Vulkan::Scheduler& 
     ReserveWatches(current_watches, WATCHES_INITIAL_RESERVE);
     ReserveWatches(previous_watches, WATCHES_INITIAL_RESERVE);
     const auto device = instance.GetDevice();
-    Vulkan::SetObjectName(device, Handle(), "StreamBuffer({}):{:#x}", BufferTypeName(usage),
-                          size_bytes);
+    Vulkan::SetObjectName(device, Native().Handle(), "StreamBuffer({}):{:#x}",
+                          BufferTypeName(usage), size_bytes);
 }
 
 std::pair<u8*, u64> StreamBuffer::Map(u64 size, u64 alignment, bool allow_wait) {

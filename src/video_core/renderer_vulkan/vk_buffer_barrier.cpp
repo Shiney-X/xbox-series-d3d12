@@ -4,6 +4,7 @@
 #include "common/assert.h"
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/renderer_vulkan/vk_buffer_barrier.h"
+#include "video_core/renderer_vulkan/vk_buffer_resource.h"
 
 namespace Vulkan {
 
@@ -52,16 +53,21 @@ std::optional<vk::BufferMemoryBarrier2> GetBufferBarrier(VideoCore::Buffer& buff
     if (!transition) {
         return std::nullopt;
     }
-    const auto source = ToVulkanAccess(transition->before);
-    const auto destination = ToVulkanAccess(transition->after);
+    return ToBufferBarrier(buffer.Native(), *transition);
+}
+
+vk::BufferMemoryBarrier2 ToBufferBarrier(const BufferResource& resource,
+                                         const VideoCore::BufferTransition& transition) {
+    const auto source = ToVulkanAccess(transition.before);
+    const auto destination = ToVulkanAccess(transition.after);
     return vk::BufferMemoryBarrier2{
         .srcStageMask = source.stage,
         .srcAccessMask = source.access,
         .dstStageMask = destination.stage,
         .dstAccessMask = destination.access,
-        .buffer = buffer.Handle(),
-        .offset = transition->offset,
-        .size = transition->size,
+        .buffer = resource.Handle(),
+        .offset = transition.offset,
+        .size = transition.size,
     };
 }
 

@@ -853,6 +853,23 @@ vk::Format ImageFormat(const VideoCore::ImageFormatDesc& format, bool storage_vi
     return vk::Format::eUndefined;
 }
 
+vk::Format FrameViewFormat(const Libraries::VideoOut::PixelFormat format) {
+    using PixelFormat = Libraries::VideoOut::PixelFormat;
+    switch (format) {
+    case PixelFormat::A8B8G8R8Srgb:
+        return vk::Format::eR8G8B8A8Srgb;
+    case PixelFormat::A8R8G8B8Srgb:
+        return vk::Format::eB8G8R8A8Srgb;
+    case PixelFormat::A2R10G10B10:
+    case PixelFormat::A2R10G10B10Srgb:
+    case PixelFormat::A2R10G10B10Bt2020Pq:
+        return vk::Format::eA2R10G10B10UnormPack32;
+    default:
+        UNREACHABLE_MSG("Unknown format={}", static_cast<u32>(format));
+        return vk::Format::eUndefined;
+    }
+}
+
 vk::ClearValue ColorBufferClearValue(const AmdGpu::ColorBuffer& color_buffer) {
     const auto comp_swizzle = color_buffer.Swizzle();
     const auto format = AmdGpu::DataFormat(color_buffer.info.format);

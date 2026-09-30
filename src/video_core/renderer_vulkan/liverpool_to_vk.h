@@ -77,6 +77,8 @@ vk::Format DepthFormat(AmdGpu::DepthBuffer::ZFormat z_format,
 
 vk::Format ImageFormat(const VideoCore::ImageFormatDesc& format, bool storage_view = false);
 
+vk::Format FrameViewFormat(Libraries::VideoOut::PixelFormat format);
+
 vk::ClearValue ColorBufferClearValue(const AmdGpu::ColorBuffer& color_buffer);
 
 vk::SampleCountFlagBits NumSamples(u32 num_samples, vk::SampleCountFlags supported_flags);

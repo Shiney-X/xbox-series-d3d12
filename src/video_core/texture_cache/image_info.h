@@ -6,7 +6,6 @@
 #include "common/types.h"
 #include "video_core/amdgpu/cb_db_extent.h"
 #include "video_core/amdgpu/tiling.h"
-#include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_format_desc.h"
 #include "video_core/texture_cache/image_resource_desc.h"
 #include "video_core/texture_cache/image_usage.h"
@@ -54,21 +53,7 @@ struct ImageInfo {
         return CachedImageUsage(props.is_block, props.is_depth);
     }
 
-    ImageResourceDesc ResourceDesc() const noexcept {
-        if (pixel_format == vk::Format::eUndefined) {
-            return {};
-        }
-        return {guest_format,
-                type,
-                size,
-                resources,
-                Usage(),
-                num_samples,
-                static_cast<bool>(props.is_volume),
-                static_cast<bool>(props.is_block),
-                static_cast<bool>(props.is_depth),
-                static_cast<bool>(props.has_stencil)};
-    }
+    ImageResourceDesc ResourceDesc() const noexcept;
 
     Extent2D BlockDim() const {
         const auto dim = props.is_block ? 2 : 0;
@@ -90,7 +75,6 @@ struct ImageInfo {
 
     ImageProperties props{};
     ImageFormatDesc guest_format{};
-    vk::Format pixel_format = vk::Format::eUndefined;
     AmdGpu::ImageType type;
     SubresourceExtent resources;
     Extent3D size{1, 1, 1};

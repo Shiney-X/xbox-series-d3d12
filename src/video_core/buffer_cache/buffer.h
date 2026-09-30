@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 #include "common/types.h"
@@ -13,7 +14,6 @@
 #include "video_core/amdgpu/resource.h"
 #include "video_core/buffer_cache/buffer_desc.h"
 #include "video_core/buffer_cache/buffer_sync_state.h"
-#include "video_core/renderer_vulkan/vk_common.h"
 
 namespace Vulkan {
 class BufferResource;
@@ -68,10 +68,6 @@ public:
     }
 
     [[nodiscard]] const Vulkan::BufferResource& Native() const noexcept;
-
-    vk::Buffer Handle() const noexcept;
-
-    vk::DeviceAddress BufferDeviceAddress() const noexcept;
 
     [[nodiscard]] std::optional<BufferTransition> Transition(BufferAccess next, u32 offset = 0) {
         return sync_state.Transition(next, offset, size_bytes);

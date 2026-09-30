@@ -8,21 +8,31 @@
 #include <gtest/gtest.h>
 
 #include "video_core/buffer_cache/buffer.h"
+#include "video_core/buffer_cache/buffer_cache.h"
 #include "video_core/renderer_vulkan/vk_buffer_barrier.h"
 #include "video_core/renderer_vulkan/vk_tile_manager.h"
 #include "video_core/texture_cache/image.h"
 
 namespace {
 
+template <typename T>
+concept ExposesNativeHandle = requires(const T& value) { value.Handle(); };
+
 TEST(BufferHandleBoundary, CacheOwnsOpaqueRendererResource) {
     static_assert(std::is_same_v<decltype(std::declval<const VideoCore::Buffer&>().Native()),
                                  const Vulkan::BufferResource&>);
     static_assert(!std::is_copy_constructible_v<VideoCore::Buffer>);
+    static_assert(!ExposesNativeHandle<VideoCore::Buffer>);
     SUCCEED();
 }
 
 TEST(BufferHandleBoundary, ImageTransfersUseResourceReferences) {
     using Resource = const Vulkan::BufferResource&;
+    static_assert(std::is_same_v<decltype(std::declval<const VideoCore::Image&>().CurrentLayout()),
+                                 VideoCore::ImageLayout>);
+    static_assert(std::is_same_v<decltype(std::declval<VideoCore::Image&>().GetTransitions(
+                                     VideoCore::ImageStates::ShaderReadOnly, std::nullopt)),
+                                 VideoCore::ImageTransitions>);
     static_assert(std::is_same_v<decltype(&VideoCore::Image::Upload),
                                  void (VideoCore::Image::*)(
                                      std::span<const VideoCore::ImageBufferCopy>, Resource, u64)>);
@@ -45,6 +55,18 @@ TEST(BufferHandleBoundary, BufferTransitionIsSemantic) {
     static_assert(std::is_same_v<decltype(&Vulkan::GetBufferBarrier),
                                  std::optional<vk::BufferMemoryBarrier2> (*)(
                                      VideoCore::Buffer&, VideoCore::BufferAccess, u32)>);
+    SUCCEED();
+}
+
+TEST(BufferHandleBoundary, CacheBindingsReturnSemanticBarrierRequests) {
+    using Requests = VideoCore::BufferBarrierRequests;
+    static_assert(std::is_same_v<decltype(&VideoCore::BufferCache::BindVertexBuffers),
+                                 void (VideoCore::BufferCache::*)(const Vulkan::GraphicsPipeline&,
+                                                                  Requests&)>);
+    static_assert(std::is_same_v<decltype(&VideoCore::BufferCache::BindIndexBuffer),
+                                 void (VideoCore::BufferCache::*)(u32, Requests&)>);
+    static_assert(VideoCore::BufferCache::BDA_PAGETABLE_SIZE ==
+                  VideoCore::BufferCache::CACHING_NUMPAGES * sizeof(u64));
     SUCCEED();
 }
 

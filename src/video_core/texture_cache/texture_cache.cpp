@@ -11,19 +11,24 @@
 #include "core/memory.h"
 #include "video_core/buffer_cache/buffer_cache.h"
 #include "video_core/page_manager.h"
+#include "video_core/renderer_vulkan/liverpool_to_vk.h"
 #include "video_core/renderer_vulkan/vk_blit_helper.h"
 #include "video_core/renderer_vulkan/vk_buffer_barrier.h"
+#include "video_core/renderer_vulkan/vk_format_compatibility.h"
 #include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_tile_manager.h"
-#include "video_core/texture_cache/host_compatibility.h"
 #include "video_core/texture_cache/texture_cache.h"
 
 namespace VideoCore {
 
 static constexpr u64 PageShift = 12;
 static constexpr u64 NumFramesBeforeRemoval = 32;
+
+static vk::Format HostFormat(const ImageInfo& info) {
+    return Vulkan::LiverpoolToVK::ImageFormat(info.guest_format);
+}
 
 TextureCache::TextureCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
                            AmdGpu::Liverpool* liverpool_, BufferCache& buffer_cache_,
@@ -251,7 +256,7 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
                               {});
             blit_helper->ReinterpretColorAsMsDepth(
                 new_info.size.width, new_info.size.height, new_info.num_samples,
-                cache_image.info.pixel_format, new_info.pixel_format, cache_image.Native().Handle(),
+                HostFormat(cache_image.info), HostFormat(new_info), cache_image.Native().Handle(),
                 new_image.Native().Handle());
         } else {
             LOG_WARNING(Render_Vulkan, "Unimplemented depth overlap copy");
@@ -303,12 +308,12 @@ std::tuple<ImageId, int, int> TextureCache::ResolveOverlap(const ImageInfo& imag
         }
 
         // Size and resources are less than or equal, use image view.
-        if (image_info.pixel_format != cache_image.info.pixel_format ||
+        if (HostFormat(image_info) != HostFormat(cache_image.info) ||
             image_info.guest_size <= cache_image.info.guest_size) {
             auto result_id = merged_image_id ? merged_image_id : cache_image_id;
             const auto& result_image = slot_images[result_id];
-            const bool is_compatible =
-                IsVulkanFormatCompatible(result_image.info.pixel_format, image_info.pixel_format);
+            const bool is_compatible = Vulkan::IsVulkanFormatCompatible(
+                HostFormat(result_image.info), HostFormat(image_info));
             return {is_compatible ? result_id : ImageId{}, -1, -1};
         }
 
@@ -391,7 +396,7 @@ std::tuple<ImageId, int, int> TextureCache::ResolveOverlap(const ImageInfo& imag
 
                   // Old image details
                   cache_image.info.guest_address, cache_image.info.guest_size,
-                  vk::to_string(cache_image.info.pixel_format),
+                  vk::to_string(HostFormat(cache_image.info)),
                   static_cast<int>(cache_image.info.type), cache_image.info.size.width,
                   cache_image.info.size.height, cache_image.info.size.depth, cache_image.info.pitch,
                   cache_image.info.resources.levels, cache_image.info.resources.layers,
@@ -401,14 +406,14 @@ std::tuple<ImageId, int, int> TextureCache::ResolveOverlap(const ImageInfo& imag
 
                   // New image details
                   image_info.guest_address, image_info.guest_size,
-                  vk::to_string(image_info.pixel_format), static_cast<int>(image_info.type),
+                  vk::to_string(HostFormat(image_info)), static_cast<int>(image_info.type),
                   image_info.size.width, image_info.size.height, image_info.size.depth,
                   image_info.pitch, image_info.resources.levels, image_info.resources.layers,
                   image_info.num_samples, static_cast<u32>(image_info.tile_mode),
                   image_info.num_bits, image_info.props.is_block, image_info.guest_size,
 
                   // Comparison
-                  (image_info.pixel_format == cache_image.info.pixel_format),
+                  (HostFormat(image_info) == HostFormat(cache_image.info)),
                   (image_info.type == cache_image.info.type),
                   (image_info.tile_mode == cache_image.info.tile_mode),
                   (image_info.num_bits == cache_image.info.num_bits),
@@ -523,11 +528,11 @@ ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
         if (cache_image.info.size != info.size) {
             continue;
         }
-        if (!IsVulkanFormatCompatible(cache_image.info.pixel_format, info.pixel_format) ||
+        if (!Vulkan::IsVulkanFormatCompatible(HostFormat(cache_image.info), HostFormat(info)) ||
             (cache_image.info.type != info.type && info.size != Extent3D{1, 1, 1})) {
             continue;
         }
-        if (exact_fmt && info.pixel_format != cache_image.info.pixel_format) {
+        if (exact_fmt && HostFormat(info) != HostFormat(cache_image.info)) {
             continue;
         }
         image_id = cache_id;
@@ -554,7 +559,7 @@ ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
 
     if (image_id) {
         Image& image_resolved = slot_images[image_id];
-        if (exact_fmt && info.pixel_format != image_resolved.info.pixel_format) {
+        if (exact_fmt && HostFormat(info) != HostFormat(image_resolved.info)) {
             // Cannot reuse this image as we need the exact requested format.
             image_id = {};
         } else if (image_resolved.info.resources < info.resources) {

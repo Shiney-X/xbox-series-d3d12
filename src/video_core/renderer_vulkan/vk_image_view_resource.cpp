@@ -5,6 +5,7 @@
 
 #include "common/logging/log.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/renderer_vulkan/vk_image_native_state.h"
 #include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_image_view_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
@@ -53,7 +54,7 @@ bool IsViewTypeCompatible(AmdGpu::ImageType view_type, AmdGpu::ImageType image_t
 
 ImageViewResource::ImageViewResource(const Instance& instance, const VideoCore::ImageViewInfo& info,
                                      const VideoCore::Image& image) {
-    vk::ImageViewUsageCreateInfo usage_ci{.usage = image.usage_flags};
+    vk::ImageViewUsageCreateInfo usage_ci{.usage = image.NativeState().usage_flags};
     if (!info.is_storage) {
         usage_ci.usage &= ~vk::ImageUsageFlagBits::eStorage;
     }
@@ -65,16 +66,19 @@ ImageViewResource::ImageViewResource(const Instance& instance, const VideoCore::
         usage_ci.pNext = &min_lod_ci;
     }
     // When sampling D32/D16 texture from shader, the T# specifies R32/R16 format so adjust it.
-    vk::Format format = info.format;
-    vk::ImageAspectFlags aspect = image.aspect_mask;
-    if (image.aspect_mask & vk::ImageAspectFlagBits::eDepth &&
+    vk::Format format = LiverpoolToVK::ImageFormat(info.guest_format, info.is_storage);
+    if (const auto* video_out = std::get_if<VideoCore::VideoOutImageFormat>(&info.guest_format)) {
+        format = LiverpoolToVK::FrameViewFormat(video_out->pixel);
+    }
+    vk::ImageAspectFlags aspect = image.NativeState().aspect_mask;
+    if (image.NativeState().aspect_mask & vk::ImageAspectFlagBits::eDepth &&
         LiverpoolToVK::IsFormatDepthCompatible(format)) {
-        format = image.info.pixel_format;
+        format = LiverpoolToVK::ImageFormat(image.info.guest_format);
         aspect = vk::ImageAspectFlagBits::eDepth;
     }
-    if (image.aspect_mask & vk::ImageAspectFlagBits::eStencil &&
+    if (image.NativeState().aspect_mask & vk::ImageAspectFlagBits::eStencil &&
         LiverpoolToVK::IsFormatStencilCompatible(format)) {
-        format = image.info.pixel_format;
+        format = LiverpoolToVK::ImageFormat(image.info.guest_format);
         aspect = vk::ImageAspectFlagBits::eStencil;
     }
 
@@ -82,7 +86,7 @@ ImageViewResource::ImageViewResource(const Instance& instance, const VideoCore::
         .pNext = &usage_ci,
         .image = image.Native().Handle(),
         .viewType = ConvertImageViewType(info.type),
-        .format = instance.GetSupportedFormat(format, image.format_features),
+        .format = instance.GetSupportedFormat(format, image.NativeState().format_features),
         .components = LiverpoolToVK::ComponentMapping(info.mapping),
         .subresourceRange{
             .aspectMask = aspect,

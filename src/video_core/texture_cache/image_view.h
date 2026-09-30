@@ -6,7 +6,6 @@
 #include <memory>
 
 #include "video_core/amdgpu/regs_depth.h"
-#include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_view_desc.h"
 
 namespace AmdGpu {
@@ -32,14 +31,7 @@ struct ImageViewInfo : ImageViewDesc {
     ImageViewInfo(const AmdGpu::DepthBuffer& depth_buffer, AmdGpu::DepthView view,
                   AmdGpu::DepthControl ctl);
 
-    vk::Format format = vk::Format::eR8G8B8A8Unorm;
-
-    // The current Vulkan cache key remains native format + geometry. Guest formats that
-    // resolve to the same Vulkan view may still reuse that view.
-    bool operator==(const ImageViewInfo& other) const {
-        return type == other.type && range == other.range && mapping == other.mapping &&
-               min_lod == other.min_lod && is_storage == other.is_storage && format == other.format;
-    }
+    bool operator==(const ImageViewInfo&) const = default;
 };
 
 struct Image;

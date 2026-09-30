@@ -6,7 +6,6 @@
 #include "common/enum.h"
 #include "common/incremental_id.h"
 #include "common/types.h"
-#include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_buffer_copy.h"
 #include "video_core/texture_cache/image_commands.h"
 #include "video_core/texture_cache/image_info.h"
@@ -22,6 +21,7 @@
 namespace Vulkan {
 class Instance;
 class ImageResource;
+struct ImageNativeState;
 class BufferResource;
 class BlitHelper;
 class Scheduler;
@@ -50,8 +50,8 @@ struct Image {
     Image(const Image&) = delete;
     Image& operator=(const Image&) = delete;
 
-    Image(Image&&) = default;
-    Image& operator=(Image&&) = default;
+    Image(Image&&);
+    Image& operator=(Image&&);
 
     bool Overlaps(VAddr overlap_cpu_addr, size_t overlap_size) const noexcept {
         const VAddr overlap_end = overlap_cpu_addr + overlap_size;
@@ -61,8 +61,9 @@ struct Image {
     }
 
     [[nodiscard]] const Vulkan::ImageResource& Native() const noexcept;
+    [[nodiscard]] const Vulkan::ImageNativeState& NativeState() const noexcept;
 
-    vk::ImageLayout CurrentLayout() const;
+    ImageLayout CurrentLayout() const;
 
     bool IsTracked() {
         return track_addr != 0 && track_addr_end != 0;
@@ -84,10 +85,9 @@ struct Image {
 
     ImageView& FindView(const ImageViewInfo& view_info, bool ensure_guest_samples = true);
 
-    using Barriers = boost::container::small_vector<vk::ImageMemoryBarrier2, 32>;
-    Barriers GetBarriers(ImageResourceState next, std::optional<SubresourceRange> subres_range);
-    void Transit(ImageResourceState next, std::optional<SubresourceRange> range,
-                 vk::CommandBuffer cmdbuf = {});
+    ImageTransitions GetTransitions(ImageResourceState next,
+                                    std::optional<SubresourceRange> subres_range);
+    void Transit(ImageResourceState next, std::optional<SubresourceRange> range);
     void Upload(std::span<const ImageBufferCopy> upload_copies,
                 const Vulkan::BufferResource& buffer, u64 offset);
     void Download(std::span<const ImageBufferCopy> download_copies,
@@ -111,8 +111,6 @@ public:
     Common::SlotVector<ImageView>* slot_image_views;
     ImageInfo info;
     ImageResourceDesc resource_desc;
-    vk::ImageAspectFlags aspect_mask = vk::ImageAspectFlagBits::eColor;
-    vk::SampleCountFlags supported_samples = vk::SampleCountFlagBits::e1;
     ImageFlagBits flags = ImageFlagBits::Dirty;
     VAddr track_addr = 0;
     VAddr track_addr_end = 0;
@@ -120,8 +118,7 @@ public:
     u64 depth_uid{};
 
     // Resource state tracking
-    vk::ImageUsageFlags usage_flags;
-    vk::FormatFeatureFlags2 format_features;
+    std::unique_ptr<Vulkan::ImageNativeState> native_state;
     struct BackingImage {
         std::unique_ptr<Vulkan::ImageResource> image;
         ImageSyncState sync_state;
@@ -153,7 +150,6 @@ public:
     } binding{};
 
 private:
-    vk::Image GetImage() const;
     static Common::IncrementalIdProvider<u64> global_image_uid;
 };
 
