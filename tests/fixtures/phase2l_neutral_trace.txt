@@ -1,0 +1,10 @@
+# Synthetic v1 trace for the neutral buffer/image synchronization contract.
+v1
+B TransferWrite 0 4096
+B ShaderRead 128 4096
+B ShaderRead 128 4096
+I ShaderReadOnly all
+I TransferDestination 1 0 1 1
+I TransferDestination 1 0 1 1
+I ShaderReadOnly all
+I ShaderReadOnly all

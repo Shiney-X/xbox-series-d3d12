@@ -77,6 +77,7 @@ O roteiro completo está em
 
 - [Arquitetura](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Validação da Fase 2L](docs/PHASE2L_VALIDATION.md)
 - [Matriz de plataforma](docs/PLATFORM_MATRIX.md)
 - [Teste no Xbox Dev Mode](docs/TESTING_XBOX_DEV_MODE.md)
 - [Baseline upstream](docs/UPSTREAM.md)
