@@ -25,10 +25,10 @@ FaultManager::FaultManager(const Instance& instance, Scheduler& scheduler_,
       fault_buffer{instance, scheduler,
                    VideoCore::BufferDesc{VideoCore::MemoryUsage::DeviceLocal, 0,
                                          VideoCore::AllFlags, fault_buffer_size}},
-      download_buffer{
-          instance, scheduler,
-          VideoCore::BufferDesc{VideoCore::MemoryUsage::Download, 0, VideoCore::AllFlags,
-                                MaxPendingFaults * PageFaultAreaSize}} {
+      download_buffer{instance, scheduler,
+                      VideoCore::BufferDesc{VideoCore::MemoryUsage::Download, 0,
+                                            VideoCore::AllFlags,
+                                            MaxPendingFaults * PageFaultAreaSize}} {
     const auto device = instance.GetDevice();
     Vulkan::SetObjectName(device, fault_buffer.Handle(), "Fault Buffer");
 

@@ -22,7 +22,7 @@ class MemoryManager;
 namespace Vulkan {
 class FaultManager;
 class GraphicsPipeline;
-}
+} // namespace Vulkan
 
 namespace VideoCore {
 
