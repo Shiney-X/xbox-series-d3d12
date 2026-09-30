@@ -8,7 +8,6 @@
 #include "common/slot_vector.h"
 #include "common/types.h"
 #include "video_core/buffer_cache/buffer.h"
-#include "video_core/buffer_cache/fault_manager.h"
 #include "video_core/buffer_cache/range_set.h"
 #include "video_core/multi_level_page_table.h"
 
@@ -21,8 +20,9 @@ class MemoryManager;
 }
 
 namespace Vulkan {
+class FaultManager;
 class GraphicsPipeline;
-}
+} // namespace Vulkan
 
 namespace VideoCore {
 
@@ -81,9 +81,7 @@ public:
     }
 
     /// Retrieves the fault buffer.
-    [[nodiscard]] Buffer* GetFaultBuffer() noexcept {
-        return fault_manager.GetFaultBuffer();
-    }
+    [[nodiscard]] Buffer* GetFaultBuffer() noexcept;
 
     /// Retrieves the buffer with the specified id.
     [[nodiscard]] Buffer& GetBuffer(BufferId id) {
@@ -204,7 +202,7 @@ private:
     AmdGpu::Liverpool* liverpool;
     Core::MemoryManager* memory;
     TextureCache& texture_cache;
-    FaultManager fault_manager;
+    std::unique_ptr<Vulkan::FaultManager> fault_manager;
     std::unique_ptr<MemoryTracker> memory_tracker;
     StreamBuffer staging_buffer;
     StreamBuffer stream_buffer;
