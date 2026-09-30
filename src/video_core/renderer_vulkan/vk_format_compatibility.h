@@ -8,9 +8,9 @@
 
 #include "video_core/renderer_vulkan/vk_common.h"
 
-namespace VideoCore {
+namespace Vulkan {
 
 /// Returns true if the two formats are compatible according to Vulkan's format compatibility rules
 bool IsVulkanFormatCompatible(vk::Format base, vk::Format view);
 
-} // namespace VideoCore
+} // namespace Vulkan

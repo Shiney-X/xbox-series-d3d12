@@ -167,7 +167,7 @@ TileManager::Result TileManager::DetileImage(const Vulkan::BufferResource& in_bu
     }
 
     const vk::DescriptorBufferInfo params_buffer_info{
-        .buffer = stream_buffer.Handle(),
+        .buffer = stream_buffer.Native().Handle(),
         .offset = stream_buffer.Copy(&params, sizeof(params), instance.UniformMinAlignment()),
         .range = sizeof(params),
     };
@@ -252,7 +252,7 @@ void TileManager::TileImage(Image& in_image, std::span<ImageBufferCopy> buffer_c
     }
 
     const vk::DescriptorBufferInfo params_buffer_info{
-        .buffer = stream_buffer.Handle(),
+        .buffer = stream_buffer.Native().Handle(),
         .offset = stream_buffer.Copy(&params, sizeof(params), instance.UniformMinAlignment()),
         .range = sizeof(params),
     };

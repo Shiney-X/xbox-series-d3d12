@@ -3,6 +3,7 @@
 
 #include "common/div_ceil.h"
 #include "video_core/buffer_cache/buffer_cache.h"
+#include "video_core/renderer_vulkan/vk_buffer_resource.h"
 #include "video_core/renderer_vulkan/vk_fault_manager.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
@@ -30,7 +31,7 @@ FaultManager::FaultManager(const Instance& instance, Scheduler& scheduler_,
                                             VideoCore::AllFlags,
                                             MaxPendingFaults * PageFaultAreaSize}} {
     const auto device = instance.GetDevice();
-    Vulkan::SetObjectName(device, fault_buffer.Handle(), "Fault Buffer");
+    Vulkan::SetObjectName(device, fault_buffer.Native().Handle(), "Fault Buffer");
 
     const std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {{
         {
@@ -97,7 +98,7 @@ void FaultManager::ProcessFaultBuffer() {
         .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
         .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
         .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-        .buffer = fault_buffer.Handle(),
+        .buffer = fault_buffer.Native().Handle(),
         .offset = 0,
         .size = fault_buffer_size,
     };
@@ -106,17 +107,17 @@ void FaultManager::ProcessFaultBuffer() {
         .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
         .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
         .dstAccessMask = vk::AccessFlagBits2::eShaderWrite,
-        .buffer = fault_buffer.Handle(),
+        .buffer = fault_buffer.Native().Handle(),
         .offset = 0,
         .size = fault_buffer_size,
     };
     const vk::DescriptorBufferInfo fault_buffer_info = {
-        .buffer = fault_buffer.Handle(),
+        .buffer = fault_buffer.Native().Handle(),
         .offset = 0,
         .range = fault_buffer_size,
     };
     const vk::DescriptorBufferInfo download_info = {
-        .buffer = download_buffer.Handle(),
+        .buffer = download_buffer.Native().Handle(),
         .offset = offset,
         .range = PageFaultAreaSize,
     };

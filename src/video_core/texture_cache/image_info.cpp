@@ -6,7 +6,7 @@
 #include "core/libraries/videoout/buffer.h"
 #include "shader_recompiler/resource.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
-#include "video_core/texture_cache/host_compatibility.h"
+#include "video_core/renderer_vulkan/vk_format_compatibility.h"
 #include "video_core/texture_cache/image_info.h"
 #include "video_core/texture_cache/tile.h"
 
@@ -26,7 +26,6 @@ ImageInfo::ImageInfo(const Libraries::VideoOut::BufferAttributeGroup& group,
         props.is_tiled ? AmdGpu::TileMode::Display2DThin : AmdGpu::TileMode::DisplayLinearAligned;
     array_mode = AmdGpu::GetArrayMode(tile_mode);
     guest_format = VideoOutImageFormat{attrib.pixel_format};
-    pixel_format = LiverpoolToVK::ImageFormat(guest_format);
     type = AmdGpu::ImageType::Color2D;
     size.width = attrib.width;
     size.height = attrib.height;
@@ -43,7 +42,6 @@ ImageInfo::ImageInfo(const AmdGpu::ColorBuffer& buffer, AmdGpu::CbDbExtent hint)
     tile_mode = buffer.GetTileMode();
     array_mode = AmdGpu::GetArrayMode(tile_mode);
     guest_format = SurfaceImageFormat{buffer.GetDataFmt(), buffer.GetNumberFmt()};
-    pixel_format = LiverpoolToVK::ImageFormat(guest_format);
     num_samples = buffer.NumSamples();
     num_bits = NumBitsPerBlock(buffer.GetDataFmt());
     type = AmdGpu::ImageType::Color2D;
@@ -73,7 +71,6 @@ ImageInfo::ImageInfo(const AmdGpu::DepthBuffer& buffer, u32 num_slices, VAddr ht
     tile_mode = buffer.GetTileMode();
     array_mode = AmdGpu::GetArrayMode(tile_mode);
     guest_format = DepthImageFormat{buffer.z_info.format, buffer.stencil_info.format};
-    pixel_format = LiverpoolToVK::ImageFormat(guest_format);
     type = AmdGpu::ImageType::Color2D;
     props.is_tiled = buffer.IsTiled();
     props.is_depth = true;
@@ -106,7 +103,6 @@ ImageInfo::ImageInfo(const AmdGpu::Image& image, const Shader::ImageResource& de
     tile_mode = image.GetTileMode();
     array_mode = AmdGpu::GetArrayMode(tile_mode);
     guest_format = SurfaceImageFormat{image.GetDataFmt(), image.GetNumberFmt(), desc.is_depth};
-    pixel_format = LiverpoolToVK::ImageFormat(guest_format);
     if (desc.is_depth) {
         props.is_depth = true;
     }
@@ -132,9 +128,27 @@ ImageInfo::ImageInfo(const AmdGpu::Image& image, const Shader::ImageResource& de
 }
 
 bool ImageInfo::IsCompatible(const ImageInfo& info) const {
-    return (IsVulkanFormatCompatible(pixel_format, info.pixel_format) ||
-            IsVulkanFormatCompatible(info.pixel_format, pixel_format)) &&
+    const auto format = LiverpoolToVK::ImageFormat(guest_format);
+    const auto other_format = LiverpoolToVK::ImageFormat(info.guest_format);
+    return (IsVulkanFormatCompatible(format, other_format) ||
+            IsVulkanFormatCompatible(other_format, format)) &&
            num_samples == info.num_samples && num_bits == info.num_bits;
+}
+
+ImageResourceDesc ImageInfo::ResourceDesc() const noexcept {
+    if (LiverpoolToVK::ImageFormat(guest_format) == vk::Format::eUndefined) {
+        return {};
+    }
+    return {guest_format,
+            type,
+            size,
+            resources,
+            Usage(),
+            num_samples,
+            static_cast<bool>(props.is_volume),
+            static_cast<bool>(props.is_block),
+            static_cast<bool>(props.is_depth),
+            static_cast<bool>(props.has_stencil)};
 }
 
 void ImageInfo::UpdateSize() {

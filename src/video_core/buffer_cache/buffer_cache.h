@@ -28,6 +28,12 @@ namespace VideoCore {
 
 using BufferId = Common::SlotId;
 
+struct BufferBarrierRequest {
+    const Vulkan::BufferResource* resource;
+    BufferTransition transition;
+};
+using BufferBarrierRequests = boost::container::small_vector<BufferBarrierRequest, 16>;
+
 class TextureCache;
 class MemoryTracker;
 class PageManager;
@@ -38,7 +44,7 @@ public:
     static constexpr u64 CACHING_PAGESIZE = u64{1} << CACHING_PAGEBITS;
     static constexpr u64 DEVICE_PAGESIZE = 16_KB;
     static constexpr u64 CACHING_NUMPAGES = u64{1} << (40 - CACHING_PAGEBITS);
-    static constexpr u64 BDA_PAGETABLE_SIZE = CACHING_NUMPAGES * sizeof(vk::DeviceAddress);
+    static constexpr u64 BDA_PAGETABLE_SIZE = CACHING_NUMPAGES * sizeof(u64);
 
     // Default values for garbage collection
     static constexpr s64 DEFAULT_TRIGGER_GC_MEMORY = 1_GB;
@@ -109,11 +115,10 @@ public:
 
     /// Binds host vertex buffers for the current draw.
     void BindVertexBuffers(const Vulkan::GraphicsPipeline& pipeline,
-                           boost::container::small_vector<vk::BufferMemoryBarrier2, 16>& barriers);
+                           BufferBarrierRequests& barriers);
 
     /// Bind host index buffer for the current draw.
-    void BindIndexBuffer(u32 index_offset,
-                         boost::container::small_vector<vk::BufferMemoryBarrier2, 16>& barriers);
+    void BindIndexBuffer(u32 index_offset, BufferBarrierRequests& barriers);
 
     /// Writes a value to GPU buffer. (uses command buffer to temporarily store the data)
     void FillBuffer(VAddr address, u32 num_bytes, u32 value, bool is_gds);
@@ -185,9 +190,6 @@ private:
 
     bool SynchronizeBuffer(Buffer& buffer, VAddr device_addr, u32 size, bool is_written,
                            bool is_texel_buffer);
-
-    vk::Buffer UploadCopies(Buffer& buffer, std::span<vk::BufferCopy> copies,
-                            size_t total_size_bytes);
 
     bool SynchronizeBufferFromImage(Buffer& buffer, VAddr device_addr, u32 size);
 

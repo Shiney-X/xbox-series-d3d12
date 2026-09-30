@@ -19,6 +19,9 @@
 #include "imgui/shadnet_notifications_layer.h"
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/renderdoc.h"
+#include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/renderer_vulkan/vk_buffer_resource.h"
+#include "video_core/renderer_vulkan/vk_image_barrier.h"
 #include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_image_view_resource.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
@@ -281,7 +284,7 @@ static void CopyImageToReadback(const vk::CommandBuffer& cmdbuf, const vk::Image
         .imageOffset = {0, 0, 0},
         .imageExtent = {readback.width, readback.height, 1},
     };
-    cmdbuf.copyImageToBuffer(image, layout, readback.buffer.Handle(), copy_region);
+    cmdbuf.copyImageToBuffer(image, layout, readback.buffer.Native().Handle(), copy_region);
 }
 
 static bool ConvertReadbackToRgba8(const ScreenshotReadback& readback, std::vector<u8>& out_rgba) {
@@ -677,23 +680,6 @@ Frame* Presenter::PrepareLastFrame() {
     return frame;
 }
 
-static vk::Format GetFrameViewFormat(const Libraries::VideoOut::PixelFormat format) {
-    switch (format) {
-    case Libraries::VideoOut::PixelFormat::A8B8G8R8Srgb:
-        return vk::Format::eR8G8B8A8Srgb;
-    case Libraries::VideoOut::PixelFormat::A8R8G8B8Srgb:
-        return vk::Format::eB8G8R8A8Srgb;
-    case Libraries::VideoOut::PixelFormat::A2R10G10B10:
-    case Libraries::VideoOut::PixelFormat::A2R10G10B10Srgb:
-    case Libraries::VideoOut::PixelFormat::A2R10G10B10Bt2020Pq:
-        return vk::Format::eA2R10G10B10UnormPack32;
-    default:
-        break;
-    }
-    UNREACHABLE_MSG("Unknown format={}", static_cast<u32>(format));
-    return {};
-}
-
 Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& attribute,
                                VAddr cpu_address) {
     auto desc = VideoCore::TextureCache::ImageDesc{attribute, cpu_address};
@@ -729,7 +715,7 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     });
 
     VideoCore::ImageViewInfo view_info{};
-    view_info.format = GetFrameViewFormat(attribute.attrib.pixel_format);
+    view_info.guest_format = VideoCore::VideoOutImageFormat{attribute.attrib.pixel_format};
     // Exclude alpha from output frame to avoid blending with UI.
     view_info.mapping.a = AmdGpu::CompSwizzle::One;
 
@@ -747,17 +733,18 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
         pending_screenshots.emplace_back(
             instance, draw_scheduler, ScreenshotKind::GameOnly,
             BuildScreenshotPaths(ScreenshotKind::GameOnly, capture_game_only_count),
-            image_size.width, image_size.height, view_info.format, hdr_encoded);
+            image_size.width, image_size.height,
+            LiverpoolToVK::FrameViewFormat(attribute.attrib.pixel_format), hdr_encoded);
         auto& readback = pending_screenshots.back();
 
         // Capture the guest output before any host-side scaling (FSR/PP) is applied.
-        image.Transit(VideoCore::ImageStates::TransferSource, {}, cmdbuf);
+        TransitImage(image, VideoCore::ImageStates::TransferSource, {}, cmdbuf);
         CopyImageToReadback(cmdbuf, image.Native().Handle(), vk::ImageLayout::eTransferSrcOptimal,
                             readback);
     }
 
     // Continue with host-side passes that draw the displayed (scaled) frame.
-    image.Transit(VideoCore::ImageStates::ShaderReadOnly, {}, cmdbuf);
+    TransitImage(image, VideoCore::ImageStates::ShaderReadOnly, {}, cmdbuf);
 
     image_view = fsr_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
                                  fsr_settings, frame->is_hdr);

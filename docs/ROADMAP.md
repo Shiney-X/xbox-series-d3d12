@@ -100,7 +100,8 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 
 ## Fase 2 — Desacoplamento gráfico
 
-**Status: Fase 2J implementada; Fase 2K em andamento (sétimo corte).**
+**Status: Fase 2J implementada; fronteira de tipos da Fase 2K implementada,
+aguardando validação da PR de fechamento; Fase 2L pendente.**
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -124,7 +125,8 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
       adaptador Vulkan.
 - [x] Introduzir contratos neutros de recursos, comandos e sincronização para
       criação, transições, transferências, cópia de região e clear de imagens.
-- [ ] Remover handles Vulkan de `amdgpu`, `buffer_cache` e `texture_cache`.
+- [x] Remover declarações de handles e outros tipos `vk::` dos cabeçalhos de
+      `amdgpu`, `buffer_cache` e `texture_cache`.
 - [ ] Manter o backend Vulkan funcional.
 - [ ] Criar testes de contrato e trace replay.
 
@@ -251,14 +253,17 @@ seu cabeçalho não inclui mais o gerenciador nem expõe os objetos Vulkan de
 pipeline. Este corte não retira os formatos nativos de imagens nem as APIs de
 cópia e barriers dos caches.
 
-Para encerrar 2K, ainda precisamos remover os **handles e pedidos nativos**
-que atravessam as interfaces de `buffer_cache` e `texture_cache`: `Buffer::Handle`,
-`Image::GetImage`, listas de barriers Vulkan, cópias com `vk::BufferCopy` e
-formatos `vk::Format` usados como chaves do cache. As implementações podem
-continuar Vulkan por dentro; a fronteira pública deve aceitar descritores
-neutros e deixar a tradução para o backend. A prova de regressão visual e o
-trace replay pertencem à 2L. Não há número fixo de PRs para fechar 2K; a
-conclusão depende dessas fronteiras estarem removidas e compiladas.
+No fechamento da 2K, `Buffer::Handle`, `Image::GetImage`, os formatos nativos
+armazenados em `ImageInfo`/`ImageViewInfo` e as listas de barriers Vulkan saem
+dos cabeçalhos dos caches. Pedidos de buffer usam `BufferTransition`; pedidos
+de imagem usam `ImageTransition`, e a emissão das barriers fica no adaptador
+Vulkan. `Vulkan::ImageNativeState` guarda as propriedades nativas da imagem.
+A chave das views passa a usar o formato original do guest, podendo criar
+views distintas onde a chave Vulkan antiga as reutilizava. Os `.cpp` dos
+caches ainda implementam comandos Vulkan, e as referências opacas aos recursos
+Vulkan ainda serão substituídas por contratos de backend no trabalho D3D12.
+Este marco fecha a fronteira **de tipos nativos**, não a implementação de um
+backend D3D12. Regressão visual e trace replay pertencem à 2L.
 
 Os marcos planejados para encerrar a Fase 2 são: **2J** (fronteira de comandos e
 recursos entre caches e backend), **2K** (isolar handles Vulkan nessa fronteira)

@@ -1120,12 +1120,17 @@ set(VIDEO_CORE src/video_core/amdgpu/cb_db_extent.h
                src/video_core/renderer_vulkan/vk_compute_pipeline.h
                src/video_core/renderer_vulkan/vk_fault_manager.cpp
                src/video_core/renderer_vulkan/vk_fault_manager.h
+               src/video_core/renderer_vulkan/vk_format_compatibility.cpp
+               src/video_core/renderer_vulkan/vk_format_compatibility.h
                src/video_core/renderer_vulkan/vk_graphics_pipeline.cpp
                src/video_core/renderer_vulkan/vk_graphics_pipeline.h
                src/video_core/renderer_vulkan/vk_instance.cpp
                src/video_core/renderer_vulkan/vk_instance.h
                src/video_core/renderer_vulkan/vk_image_view_resource.cpp
                src/video_core/renderer_vulkan/vk_image_view_resource.h
+               src/video_core/renderer_vulkan/vk_image_barrier.cpp
+               src/video_core/renderer_vulkan/vk_image_barrier.h
+               src/video_core/renderer_vulkan/vk_image_native_state.h
                src/video_core/renderer_vulkan/vk_image_resource.cpp
                src/video_core/renderer_vulkan/vk_image_resource.h
                src/video_core/renderer_vulkan/vk_sampler_resource.cpp
@@ -1160,8 +1165,6 @@ set(VIDEO_CORE src/video_core/amdgpu/cb_db_extent.h
                src/video_core/renderer_vulkan/host_passes/fsr_pass.h
                src/video_core/renderer_vulkan/host_passes/pp_pass.cpp
                src/video_core/renderer_vulkan/host_passes/pp_pass.h
-               src/video_core/texture_cache/host_compatibility.cpp
-               src/video_core/texture_cache/host_compatibility.h
                src/video_core/texture_cache/image.cpp
                src/video_core/texture_cache/image.h
                src/video_core/texture_cache/image_buffer_copy.h

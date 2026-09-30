@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "shader_recompiler/resource.h"
-#include "video_core/renderer_vulkan/liverpool_to_vk.h"
+#include "video_core/amdgpu/regs_color.h"
 #include "video_core/renderer_vulkan/vk_image_view_resource.h"
 #include "video_core/texture_cache/image_view.h"
 
@@ -12,7 +12,6 @@ ImageViewInfo::ImageViewInfo(const AmdGpu::Image& image,
                              const Shader::ImageResource& desc) noexcept {
     is_storage = desc.is_written;
     guest_format = SurfaceImageFormat{image.GetDataFmt(), image.GetNumberFmt(), desc.is_depth};
-    format = Vulkan::LiverpoolToVK::ImageFormat(guest_format, is_storage);
 
     range.base.level = image.base_level;
     range.base.layer = image.base_array;
@@ -31,13 +30,11 @@ ImageViewInfo::ImageViewInfo(const AmdGpu::ColorBuffer& col_buffer) noexcept {
     range.extent.layers = col_buffer.NumSlices() - range.base.layer;
     type = range.extent.layers > 1 ? AmdGpu::ImageType::Color2DArray : AmdGpu::ImageType::Color2D;
     guest_format = SurfaceImageFormat{col_buffer.GetDataFmt(), col_buffer.GetNumberFmt()};
-    format = Vulkan::LiverpoolToVK::ImageFormat(guest_format);
 }
 
 ImageViewInfo::ImageViewInfo(const AmdGpu::DepthBuffer& depth_buffer, AmdGpu::DepthView view,
                              AmdGpu::DepthControl ctl) {
     guest_format = DepthImageFormat{depth_buffer.z_info.format, depth_buffer.stencil_info.format};
-    format = Vulkan::LiverpoolToVK::ImageFormat(guest_format);
     is_storage = ctl.depth_write_enable;
     range.base.layer = view.slice_start;
     range.extent.layers = view.NumSlices() - range.base.layer;

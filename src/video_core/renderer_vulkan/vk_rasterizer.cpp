@@ -12,6 +12,8 @@
 #include "video_core/amdgpu/liverpool.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
 #include "video_core/renderer_vulkan/vk_buffer_barrier.h"
+#include "video_core/renderer_vulkan/vk_buffer_resource.h"
+#include "video_core/renderer_vulkan/vk_image_barrier.h"
 #include "video_core/renderer_vulkan/vk_image_view_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -221,9 +223,18 @@ void Rasterizer::Draw(bool is_indexed, u32 index_offset) {
     }
     const auto state = BeginRendering(pipeline);
 
-    buffer_cache.BindVertexBuffers(*pipeline, buffer_barriers);
+    VideoCore::BufferBarrierRequests cache_barriers;
+    const auto append_cache_barriers = [&] {
+        for (const auto& request : cache_barriers) {
+            buffer_barriers.emplace_back(ToBufferBarrier(*request.resource, request.transition));
+        }
+        cache_barriers.clear();
+    };
+    buffer_cache.BindVertexBuffers(*pipeline, cache_barriers);
+    append_cache_barriers();
     if (is_indexed) {
-        buffer_cache.BindIndexBuffer(index_offset, buffer_barriers);
+        buffer_cache.BindIndexBuffer(index_offset, cache_barriers);
+        append_cache_barriers();
     }
 
     pipeline->BindResources(set_writes, buffer_barriers, push_data);
@@ -270,9 +281,18 @@ void Rasterizer::DrawIndirect(bool is_indexed, VAddr arg_address, u32 offset, u3
     }
     const auto state = BeginRendering(pipeline);
 
-    buffer_cache.BindVertexBuffers(*pipeline, buffer_barriers);
+    VideoCore::BufferBarrierRequests cache_barriers;
+    const auto append_cache_barriers = [&] {
+        for (const auto& request : cache_barriers) {
+            buffer_barriers.emplace_back(ToBufferBarrier(*request.resource, request.transition));
+        }
+        cache_barriers.clear();
+    };
+    buffer_cache.BindVertexBuffers(*pipeline, cache_barriers);
+    append_cache_barriers();
     if (is_indexed) {
-        buffer_cache.BindIndexBuffer(0, buffer_barriers);
+        buffer_cache.BindIndexBuffer(0, cache_barriers);
+        append_cache_barriers();
     }
 
     const auto& [buffer, base] =
@@ -308,20 +328,22 @@ void Rasterizer::DrawIndirect(bool is_indexed, VAddr arg_address, u32 offset, u3
         ASSERT(sizeof(VkDrawIndexedIndirectCommand) == stride);
 
         if (count_address != 0) {
-            cmdbuf.drawIndexedIndirectCount(buffer->Handle(), base, count_buffer->Handle(),
-                                            count_base, max_count, stride);
+            cmdbuf.drawIndexedIndirectCount(buffer->Native().Handle(), base,
+                                            count_buffer->Native().Handle(), count_base, max_count,
+                                            stride);
         } else {
-            cmdbuf.drawIndexedIndirect(buffer->Handle(), base, max_count, stride);
+            cmdbuf.drawIndexedIndirect(buffer->Native().Handle(), base, max_count, stride);
         }
         DebugState.IncDrawCall();
     } else {
         ASSERT(sizeof(VkDrawIndirectCommand) == stride);
 
         if (count_address != 0) {
-            cmdbuf.drawIndirectCount(buffer->Handle(), base, count_buffer->Handle(), count_base,
-                                     max_count, stride);
+            cmdbuf.drawIndirectCount(buffer->Native().Handle(), base,
+                                     count_buffer->Native().Handle(), count_base, max_count,
+                                     stride);
         } else {
-            cmdbuf.drawIndirect(buffer->Handle(), base, max_count, stride);
+            cmdbuf.drawIndirect(buffer->Native().Handle(), base, max_count, stride);
         }
         DebugState.IncDrawCall();
     }
@@ -386,7 +408,7 @@ void Rasterizer::DispatchIndirect(VAddr address, u32 offset, u32 size) {
 
     const auto cmdbuf = scheduler.CommandBuffer();
     cmdbuf.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline->Handle());
-    cmdbuf.dispatchIndirect(buffer->Handle(), base);
+    cmdbuf.dispatchIndirect(buffer->Native().Handle(), base);
     DebugState.IncDispatch();
 
     ResetBindings();
@@ -638,13 +660,13 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, Shader::Backend::Binding
         if (!buffer_id) {
             if (desc.buffer_type == Shader::BufferType::GdsBuffer) {
                 const auto* gds_buf = buffer_cache.GetGdsBuffer();
-                buffer_infos.emplace_back(gds_buf->Handle(), 0, gds_buf->SizeBytes());
+                buffer_infos.emplace_back(gds_buf->Native().Handle(), 0, gds_buf->SizeBytes());
             } else if (desc.buffer_type == Shader::BufferType::Flatbuf) {
                 auto& vk_buffer = buffer_cache.GetUtilityBuffer(VideoCore::MemoryUsage::Stream);
                 const u32 ubo_size = stage.flattened_ud_buf.size() * sizeof(u32);
                 const u64 offset =
                     vk_buffer.Copy(stage.flattened_ud_buf.data(), ubo_size, alignment);
-                buffer_infos.emplace_back(vk_buffer.Handle(), offset, ubo_size);
+                buffer_infos.emplace_back(vk_buffer.Native().Handle(), offset, ubo_size);
             } else if (desc.buffer_type == Shader::BufferType::ClipPlanes) {
                 // Permutations compiled without enabled planes never read the buffer, so the
                 // declared binding is satisfied with a null descriptor instead of a copy.
@@ -662,21 +684,23 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, Shader::Backend::Binding
                     }
                     const u32 ubo_size = static_cast<u32>(sizeof(planes));
                     const u64 offset = vk_buffer.Copy(planes.data(), ubo_size, alignment);
-                    buffer_infos.emplace_back(vk_buffer.Handle(), offset, ubo_size);
+                    buffer_infos.emplace_back(vk_buffer.Native().Handle(), offset, ubo_size);
                 }
             } else if (desc.buffer_type == Shader::BufferType::BdaPagetable) {
                 const auto* bda_buffer = buffer_cache.GetBdaPageTableBuffer();
-                buffer_infos.emplace_back(bda_buffer->Handle(), 0, bda_buffer->SizeBytes());
+                buffer_infos.emplace_back(bda_buffer->Native().Handle(), 0,
+                                          bda_buffer->SizeBytes());
             } else if (desc.buffer_type == Shader::BufferType::FaultBuffer) {
                 const auto* fault_buffer = buffer_cache.GetFaultBuffer();
-                buffer_infos.emplace_back(fault_buffer->Handle(), 0, fault_buffer->SizeBytes());
+                buffer_infos.emplace_back(fault_buffer->Native().Handle(), 0,
+                                          fault_buffer->SizeBytes());
             } else if (desc.buffer_type == Shader::BufferType::SharedMemory) {
                 auto& lds_buffer = buffer_cache.GetUtilityBuffer(VideoCore::MemoryUsage::Stream);
                 const auto& cs_program = liverpool->GetCsRegs();
                 const auto lds_size = cs_program.SharedMemSize() * cs_program.NumWorkgroups();
                 const auto [data, offset] = lds_buffer.Map(lds_size, alignment);
                 std::memset(data, 0, lds_size);
-                buffer_infos.emplace_back(lds_buffer.Handle(), offset, lds_size);
+                buffer_infos.emplace_back(lds_buffer.Native().Handle(), offset, lds_size);
             } else {
                 buffer_infos.emplace_back(VK_NULL_HANDLE, 0, VK_WHOLE_SIZE);
             }
@@ -687,7 +711,7 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, Shader::Backend::Binding
             const u32 adjust = offset - offset_aligned;
             ASSERT(adjust % 4 == 0);
             push_data.AddOffset(binding.buffer, adjust);
-            buffer_infos.emplace_back(vk_buffer->Handle(), offset_aligned, size + adjust);
+            buffer_infos.emplace_back(vk_buffer->Native().Handle(), offset_aligned, size + adjust);
             if (auto barrier = Vulkan::GetBufferBarrier(
                     *vk_buffer, desc.is_written ? VideoCore::BufferAccess::ShaderWrite
                                                 : VideoCore::BufferAccess::ShaderRead)) {
@@ -819,7 +843,7 @@ void Rasterizer::BindTextures(const Shader::Info& stage, Shader::Backend::Bindin
             image.usage.texture |= !is_storage;
 
             image_infos.emplace_back(VK_NULL_HANDLE, image_view.Native().Handle(),
-                                     image.CurrentLayout());
+                                     ToVulkanLayout(image.CurrentLayout()));
         }
     }
 
@@ -919,7 +943,7 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
             is_clear ? LiverpoolToVK::ColorBufferClearValue(col_buf) : vk::ClearValue{};
         auto& attachment = state.color_attachments[cb];
         attachment.image_view = image_view.Native().Handle();
-        attachment.image_layout = image->CurrentLayout();
+        attachment.image_layout = ToVulkanLayout(image->CurrentLayout());
         attachment.clear_value = clear_value.color.uint32;
         attachment.is_clear = is_clear;
 
@@ -966,7 +990,7 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
 
         auto& attachment = state.depth_stencil_attachment;
         attachment.image_view = image_view.Native().Handle();
-        attachment.image_layout = image.CurrentLayout();
+        attachment.image_layout = ToVulkanLayout(image.CurrentLayout());
         attachment.clear_value = {};
 
         if (regs.depth_buffer.DepthValid()) {

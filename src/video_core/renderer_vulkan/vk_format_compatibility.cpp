@@ -6,9 +6,9 @@
 
 #include <unordered_map>
 #include "common/enum.h"
-#include "video_core/texture_cache/host_compatibility.h"
+#include "video_core/renderer_vulkan/vk_format_compatibility.h"
 
-namespace VideoCore {
+namespace Vulkan {
 
 /**
  * @brief All classes of format compatibility according to the Vulkan specification
@@ -217,4 +217,4 @@ bool IsVulkanFormatCompatible(vk::Format base, vk::Format view) {
     return (base_comp & view_comp) == view_comp;
 }
 
-} // namespace VideoCore
+} // namespace Vulkan

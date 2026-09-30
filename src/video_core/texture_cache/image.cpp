@@ -8,6 +8,8 @@
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
 #include "video_core/renderer_vulkan/vk_blit_helper.h"
 #include "video_core/renderer_vulkan/vk_buffer_resource.h"
+#include "video_core/renderer_vulkan/vk_image_barrier.h"
+#include "video_core/renderer_vulkan/vk_image_native_state.h"
 #include "video_core/renderer_vulkan/vk_image_resource.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
@@ -20,6 +22,10 @@ using namespace Vulkan;
 Common::IncrementalIdProvider<u64> Image::global_image_uid{};
 
 namespace {
+
+vk::Format HostFormat(const ImageInfo& info) {
+    return LiverpoolToVK::ImageFormat(info.guest_format);
+}
 
 vk::ImageAspectFlags ToVulkanAspects(ImageCopyAspects aspects) {
     switch (aspects) {
@@ -50,78 +56,6 @@ vk::BufferImageCopy ToVulkanCopy(const ImageBufferCopy& copy, vk::ImageAspectFla
         .imageOffset = {copy.image_offset.x, copy.image_offset.y, copy.image_offset.z},
         .imageExtent = {copy.image_extent.width, copy.image_extent.height, copy.image_extent.depth},
     };
-}
-
-vk::ImageLayout ToVulkanLayout(ImageLayout layout) {
-    switch (layout) {
-    case ImageLayout::Undefined:
-        return vk::ImageLayout::eUndefined;
-    case ImageLayout::General:
-        return vk::ImageLayout::eGeneral;
-    case ImageLayout::TransferSource:
-        return vk::ImageLayout::eTransferSrcOptimal;
-    case ImageLayout::TransferDestination:
-        return vk::ImageLayout::eTransferDstOptimal;
-    case ImageLayout::ShaderReadOnly:
-        return vk::ImageLayout::eShaderReadOnlyOptimal;
-    case ImageLayout::ColorAttachment:
-        return vk::ImageLayout::eColorAttachmentOptimal;
-    case ImageLayout::DepthAttachment:
-        return vk::ImageLayout::eDepthAttachmentOptimal;
-    case ImageLayout::DepthStencilAttachment:
-        return vk::ImageLayout::eDepthStencilAttachmentOptimal;
-    case ImageLayout::DepthReadOnly:
-        return vk::ImageLayout::eDepthReadOnlyOptimal;
-    case ImageLayout::DepthStencilReadOnly:
-        return vk::ImageLayout::eDepthStencilReadOnlyOptimal;
-    case ImageLayout::DepthReadOnlyStencilAttachment:
-        return vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal;
-    case ImageLayout::AttachmentFeedbackLoop:
-        return vk::ImageLayout::eAttachmentFeedbackLoopOptimalEXT;
-    }
-    UNREACHABLE();
-}
-
-constexpr std::array AccessMappings{
-    std::pair{vk::AccessFlagBits2::eMemoryRead, ImageAccess::MemoryRead},
-    std::pair{vk::AccessFlagBits2::eMemoryWrite, ImageAccess::MemoryWrite},
-    std::pair{vk::AccessFlagBits2::eTransferRead, ImageAccess::TransferRead},
-    std::pair{vk::AccessFlagBits2::eTransferWrite, ImageAccess::TransferWrite},
-    std::pair{vk::AccessFlagBits2::eShaderRead, ImageAccess::ShaderRead},
-    std::pair{vk::AccessFlagBits2::eShaderWrite, ImageAccess::ShaderWrite},
-    std::pair{vk::AccessFlagBits2::eColorAttachmentRead, ImageAccess::ColorAttachmentRead},
-    std::pair{vk::AccessFlagBits2::eColorAttachmentWrite, ImageAccess::ColorAttachmentWrite},
-    std::pair{vk::AccessFlagBits2::eDepthStencilAttachmentRead, ImageAccess::DepthStencilRead},
-    std::pair{vk::AccessFlagBits2::eDepthStencilAttachmentWrite, ImageAccess::DepthStencilWrite},
-};
-
-vk::AccessFlags2 ToVulkanAccess(ImageAccess access) {
-    vk::AccessFlags2 result{};
-    for (const auto& [native, semantic] : AccessMappings) {
-        if (HasImageAccess(access, semantic)) {
-            result |= native;
-        }
-    }
-    return result;
-}
-
-vk::PipelineStageFlags2 ToVulkanStage(ImageStage stage) {
-    switch (stage) {
-    case ImageStage::AllCommands:
-        return vk::PipelineStageFlagBits2::eAllCommands;
-    case ImageStage::Transfer:
-        return vk::PipelineStageFlagBits2::eTransfer;
-    case ImageStage::GraphicsAndCompute:
-        return vk::PipelineStageFlagBits2::eAllGraphics |
-               vk::PipelineStageFlagBits2::eComputeShader;
-    case ImageStage::FragmentShader:
-        return vk::PipelineStageFlagBits2::eFragmentShader;
-    case ImageStage::ColorAttachmentOutput:
-        return vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-    case ImageStage::Copy:
-        return vk::PipelineStageFlagBits2::eCopy;
-    }
-    UNREACHABLE();
 }
 
 } // namespace
@@ -194,7 +128,8 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
              Vulkan::BlitHelper& blit_helper_, Common::SlotVector<ImageView>& slot_image_views_,
              const ImageInfo& info_, ImageResourceDesc resource_desc_)
     : instance{&instance_}, scheduler{&scheduler_}, blit_helper{&blit_helper_},
-      slot_image_views{&slot_image_views_}, info{info_}, resource_desc{std::move(resource_desc_)} {
+      slot_image_views{&slot_image_views_}, info{info_}, resource_desc{std::move(resource_desc_)},
+      native_state{std::make_unique<Vulkan::ImageNativeState>()} {
     if (!resource_desc.Valid()) {
         return;
     }
@@ -202,7 +137,7 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
     if (requested_format == vk::Format::eUndefined) {
         return;
     }
-    ASSERT_MSG(requested_format == info.pixel_format,
+    ASSERT_MSG(requested_format == HostFormat(info),
                "Guest image format changed before allocation");
     image_uid = global_image_uid.Next();
     mip_hashes.resize(resource_desc.resources.levels);
@@ -220,22 +155,23 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
         flags |= vk::ImageCreateFlagBits::eBlockTexelViewCompatible;
     }
 
-    usage_flags = ToVulkanUsage(*instance, resource_desc.usage);
-    format_features = FormatFeatureFlags(usage_flags);
+    native_state->usage_flags = ToVulkanUsage(*instance, resource_desc.usage);
+    native_state->format_features = FormatFeatureFlags(native_state->usage_flags);
     if (resource_desc.is_depth) {
-        aspect_mask = vk::ImageAspectFlagBits::eDepth;
+        native_state->aspect_mask = vk::ImageAspectFlagBits::eDepth;
         if (resource_desc.has_stencil) {
-            aspect_mask |= vk::ImageAspectFlagBits::eStencil;
+            native_state->aspect_mask |= vk::ImageAspectFlagBits::eStencil;
         }
     }
 
     constexpr auto tiling = vk::ImageTiling::eOptimal;
-    const auto supported_format = instance->GetSupportedFormat(requested_format, format_features);
+    const auto supported_format =
+        instance->GetSupportedFormat(requested_format, native_state->format_features);
     const vk::PhysicalDeviceImageFormatInfo2 format_info{
         .format = supported_format,
         .type = ConvertImageType(resource_desc.type),
         .tiling = tiling,
-        .usage = usage_flags,
+        .usage = native_state->usage_flags,
         .flags = flags,
     };
     const auto image_format_properties =
@@ -245,9 +181,10 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
                   vk::to_string(supported_format), vk::to_string(format_info.type),
                   vk::to_string(format_info.flags), vk::to_string(format_info.usage));
     }
-    supported_samples = image_format_properties.result == vk::Result::eSuccess
-                            ? image_format_properties.value.imageFormatProperties.sampleCounts
-                            : vk::SampleCountFlagBits::e1;
+    native_state->supported_samples =
+        image_format_properties.result == vk::Result::eSuccess
+            ? image_format_properties.value.imageFormatProperties.sampleCounts
+            : vk::SampleCountFlagBits::e1;
 
     const vk::ImageCreateInfo image_ci = {
         .flags = flags,
@@ -260,9 +197,10 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
         },
         .mipLevels = resource_desc.resources.levels,
         .arrayLayers = resource_desc.resources.layers,
-        .samples = LiverpoolToVK::NumSamples(resource_desc.num_samples, supported_samples),
+        .samples =
+            LiverpoolToVK::NumSamples(resource_desc.num_samples, native_state->supported_samples),
         .tiling = tiling,
-        .usage = usage_flags,
+        .usage = native_state->usage_flags,
         .initialLayout = vk::ImageLayout::eUndefined,
     };
 
@@ -272,21 +210,23 @@ Image::Image(const Vulkan::Instance& instance_, Vulkan::Scheduler& scheduler_,
     backing->image = std::make_unique<Vulkan::ImageResource>(instance->GetAllocator());
     backing->image->Create(image_ci);
 
-    Vulkan::SetObjectName(instance->GetDevice(), GetImage(),
+    Vulkan::SetObjectName(instance->GetDevice(), Native().Handle(),
                           "Image {}x{}x{} {} {} {:#x}:{:#x} L:{} M:{} S:{}", info.size.width,
                           info.size.height, info.size.depth, AmdGpu::NameOf(info.tile_mode),
-                          vk::to_string(info.pixel_format), info.guest_address, info.guest_size,
+                          vk::to_string(HostFormat(info)), info.guest_address, info.guest_size,
                           info.resources.layers, info.resources.levels, info.num_samples);
 }
 
 Image::~Image() = default;
+Image::Image(Image&&) = default;
+Image& Image::operator=(Image&&) = default;
 
 const Vulkan::ImageResource& Image::Native() const noexcept {
     return *backing->image;
 }
 
-vk::Image Image::GetImage() const {
-    return Native().Handle();
+const Vulkan::ImageNativeState& Image::NativeState() const noexcept {
+    return *native_state;
 }
 
 ImageView& Image::FindView(const ImageViewInfo& view_info, bool ensure_guest_samples) {
@@ -305,55 +245,17 @@ ImageView& Image::FindView(const ImageViewInfo& view_info, bool ensure_guest_sam
     return (*slot_image_views)[view_id];
 }
 
-vk::ImageLayout Image::CurrentLayout() const {
-    return ToVulkanLayout(backing->sync_state.Current().layout);
+ImageLayout Image::CurrentLayout() const {
+    return backing->sync_state.Current().layout;
 }
 
-Image::Barriers Image::GetBarriers(ImageResourceState next,
-                                   std::optional<SubresourceRange> subres_range) {
-    const auto transitions = backing->sync_state.Transition(next, subres_range);
-    Barriers barriers;
-    for (const auto& transition : transitions) {
-        barriers.emplace_back(vk::ImageMemoryBarrier2{
-            .srcStageMask = ToVulkanStage(transition.before.stage),
-            .srcAccessMask = ToVulkanAccess(transition.before.access),
-            .dstStageMask = ToVulkanStage(transition.after.stage),
-            .dstAccessMask = ToVulkanAccess(transition.after.access),
-            .oldLayout = ToVulkanLayout(transition.before.layout),
-            .newLayout = ToVulkanLayout(transition.after.layout),
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = GetImage(),
-            .subresourceRange{
-                .aspectMask = aspect_mask,
-                .baseMipLevel = transition.range.base.level,
-                .levelCount = transition.whole_resource ? VK_REMAINING_MIP_LEVELS
-                                                        : transition.range.extent.levels,
-                .baseArrayLayer = transition.range.base.layer,
-                .layerCount = transition.whole_resource ? VK_REMAINING_ARRAY_LAYERS
-                                                        : transition.range.extent.layers,
-            },
-        });
-    }
-    return barriers;
+ImageTransitions Image::GetTransitions(ImageResourceState next,
+                                       std::optional<SubresourceRange> subres_range) {
+    return backing->sync_state.Transition(next, subres_range);
 }
 
-void Image::Transit(ImageResourceState next, std::optional<SubresourceRange> range,
-                    vk::CommandBuffer cmdbuf /*= {}*/) {
-    const auto barriers = GetBarriers(next, range);
-    if (barriers.empty()) {
-        return;
-    }
-
-    if (!cmdbuf) {
-        // When using external cmdbuf you are responsible for ending rp.
-        scheduler->EndRendering();
-        cmdbuf = scheduler->CommandBuffer();
-    }
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
-        .imageMemoryBarrierCount = static_cast<u32>(barriers.size()),
-        .pImageMemoryBarriers = barriers.data(),
-    });
+void Image::Transit(ImageResourceState next, std::optional<SubresourceRange> range) {
+    Vulkan::TransitImage(*this, next, range);
 }
 
 void Image::Upload(std::span<const ImageBufferCopy> upload_copies,
@@ -380,8 +282,9 @@ void Image::Upload(std::span<const ImageBufferCopy> upload_copies,
         .offset = offset,
         .size = info.guest_size,
     };
-    const auto image_barriers = GetBarriers(
-        {ImageLayout::TransferDestination, ImageAccess::TransferWrite, ImageStage::Copy}, {});
+    const auto image_barriers = Vulkan::GetImageBarriers(
+        *this, {ImageLayout::TransferDestination, ImageAccess::TransferWrite, ImageStage::Copy},
+        {});
     const auto cmdbuf = scheduler->CommandBuffer();
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -393,9 +296,9 @@ void Image::Upload(std::span<const ImageBufferCopy> upload_copies,
     boost::container::small_vector<vk::BufferImageCopy, 14> native_copies;
     for (const auto& copy : upload_copies) {
         native_copies.push_back(
-            ToVulkanCopy(copy, aspect_mask & ~vk::ImageAspectFlagBits::eStencil));
+            ToVulkanCopy(copy, native_state->aspect_mask & ~vk::ImageAspectFlagBits::eStencil));
     }
-    cmdbuf.copyBufferToImage(native_buffer, GetImage(), vk::ImageLayout::eTransferDstOptimal,
+    cmdbuf.copyBufferToImage(native_buffer, Native().Handle(), vk::ImageLayout::eTransferDstOptimal,
                              native_copies);
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -430,8 +333,8 @@ void Image::Download(std::span<const ImageBufferCopy> download_copies,
         .offset = offset,
         .size = download_size,
     };
-    const auto image_barriers =
-        GetBarriers({ImageLayout::TransferSource, ImageAccess::TransferRead, ImageStage::Copy}, {});
+    const auto image_barriers = Vulkan::GetImageBarriers(
+        *this, {ImageLayout::TransferSource, ImageAccess::TransferRead, ImageStage::Copy}, {});
     auto cmdbuf = scheduler->CommandBuffer();
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -443,9 +346,9 @@ void Image::Download(std::span<const ImageBufferCopy> download_copies,
     boost::container::small_vector<vk::BufferImageCopy, 8> native_copies;
     for (const auto& copy : download_copies) {
         native_copies.push_back(
-            ToVulkanCopy(copy, aspect_mask & ~vk::ImageAspectFlagBits::eStencil));
+            ToVulkanCopy(copy, native_state->aspect_mask & ~vk::ImageAspectFlagBits::eStencil));
     }
-    cmdbuf.copyImageToBuffer(GetImage(), vk::ImageLayout::eTransferSrcOptimal, native_buffer,
+    cmdbuf.copyImageToBuffer(Native().Handle(), vk::ImageLayout::eTransferSrcOptimal, native_buffer,
                              native_copies);
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
@@ -507,11 +410,11 @@ void Image::CopyImage(Image& src_image) {
     const u32 num_mips = std::min(src_info.resources.levels, info.resources.levels);
 
     // Format mismatch warning (safe but useful)
-    if (src_info.pixel_format != info.pixel_format) {
+    if (HostFormat(src_info) != HostFormat(info)) {
         LOG_DEBUG(Render_Vulkan,
                   "Copy between different formats: src={}, dst={}. "
                   "Result may be undefined.",
-                  vk::to_string(src_info.pixel_format), vk::to_string(info.pixel_format));
+                  vk::to_string(HostFormat(src_info)), vk::to_string(HostFormat(info)));
     }
 
     const u32 base_width = src_info.size.width;
@@ -526,9 +429,10 @@ void Image::CopyImage(Image& src_image) {
     boost::container::small_vector<vk::ImageCopy, 8> regions;
 
     const vk::ImageAspectFlags src_aspect =
-        src_image.aspect_mask & ~vk::ImageAspectFlagBits::eStencil;
+        src_image.NativeState().aspect_mask & ~vk::ImageAspectFlagBits::eStencil;
 
-    const vk::ImageAspectFlags dst_aspect = aspect_mask & ~vk::ImageAspectFlagBits::eStencil;
+    const vk::ImageAspectFlags dst_aspect =
+        native_state->aspect_mask & ~vk::ImageAspectFlagBits::eStencil;
 
     const bool src_is_2d = ConvertImageType(src_info.type) == vk::ImageType::e2D;
     const bool src_is_3d = ConvertImageType(src_info.type) == vk::ImageType::e3D;
@@ -595,8 +499,8 @@ void Image::CopyImage(Image& src_image) {
     auto cmdbuf = scheduler->CommandBuffer();
 
     if (!regions.empty()) {
-        cmdbuf.copyImage(src_image.GetImage(), src_image.CurrentLayout(), GetImage(),
-                         CurrentLayout(), regions);
+        cmdbuf.copyImage(src_image.Native().Handle(), ToVulkanLayout(src_image.CurrentLayout()),
+                         Native().Handle(), ToVulkanLayout(CurrentLayout()), regions);
     }
 
     Transit(ImageStates::GeneralShaderTransferRead, {});
@@ -629,8 +533,9 @@ void Image::CopyRegion(Image& src_image, const ImageCopyRequest& request) {
         .dstOffset = {request.dst_offset.x, request.dst_offset.y, request.dst_offset.z},
         .extent = {request.extent.width, request.extent.height, request.extent.depth},
     };
-    scheduler->CommandBuffer().copyImage(src_image.GetImage(), src_image.CurrentLayout(),
-                                         GetImage(), CurrentLayout(), region);
+    scheduler->CommandBuffer().copyImage(
+        src_image.Native().Handle(), ToVulkanLayout(src_image.CurrentLayout()), Native().Handle(),
+        ToVulkanLayout(CurrentLayout()), region);
 }
 
 void Image::CopyImageWithBuffer(Image& src_image, const Vulkan::BufferResource& buffer,
@@ -655,7 +560,8 @@ void Image::CopyImageWithBuffer(Image& src_image, const Vulkan::BufferResource& 
             .bufferRowLength = 0,
             .bufferImageHeight = 0,
             .imageSubresource{
-                .aspectMask = src_image.aspect_mask & ~vk::ImageAspectFlagBits::eStencil,
+                .aspectMask =
+                    src_image.NativeState().aspect_mask & ~vk::ImageAspectFlagBits::eStencil,
                 .mipLevel = mip,
                 .baseArrayLayer = 0,
                 .layerCount = num_layers,
@@ -696,7 +602,7 @@ void Image::CopyImageWithBuffer(Image& src_image, const Vulkan::BufferResource& 
         .pBufferMemoryBarriers = &pre_copy_barrier,
     });
 
-    cmdbuf.copyImageToBuffer(src_image.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
+    cmdbuf.copyImageToBuffer(src_image.Native().Handle(), vk::ImageLayout::eTransferSrcOptimal,
                              native_buffer, buffer_copies);
 
     cmdbuf.pipelineBarrier2(vk::DependencyInfo{
@@ -706,10 +612,11 @@ void Image::CopyImageWithBuffer(Image& src_image, const Vulkan::BufferResource& 
     });
 
     for (auto& copy : buffer_copies) {
-        copy.imageSubresource.aspectMask = aspect_mask & ~vk::ImageAspectFlagBits::eStencil;
+        copy.imageSubresource.aspectMask =
+            native_state->aspect_mask & ~vk::ImageAspectFlagBits::eStencil;
     }
 
-    cmdbuf.copyBufferToImage(native_buffer, GetImage(), vk::ImageLayout::eTransferDstOptimal,
+    cmdbuf.copyBufferToImage(native_buffer, Native().Handle(), vk::ImageLayout::eTransferDstOptimal,
                              buffer_copies);
     Transit(ImageStates::GeneralShaderTransferRead, {});
 }
@@ -731,13 +638,13 @@ void Image::CopyMip(Image& src_image, u32 mip, u32 slice) {
 
     const vk::ImageCopy image_copy{
         .srcSubresource{
-            .aspectMask = src_image.aspect_mask,
+            .aspectMask = src_image.NativeState().aspect_mask,
             .mipLevel = 0,
             .baseArrayLayer = 0,
             .layerCount = src_layers,
         },
         .dstSubresource{
-            .aspectMask = src_image.aspect_mask,
+            .aspectMask = src_image.NativeState().aspect_mask,
             .mipLevel = mip,
             .baseArrayLayer = slice,
             .layerCount = dst_layers,
@@ -753,8 +660,8 @@ void Image::CopyMip(Image& src_image, u32 mip, u32 slice) {
     src_image.Transit(ImageStates::TransferSource, {});
 
     const auto cmdbuf = scheduler->CommandBuffer();
-    cmdbuf.copyImage(src_image.GetImage(), src_image.CurrentLayout(), GetImage(), CurrentLayout(),
-                     image_copy);
+    cmdbuf.copyImage(src_image.Native().Handle(), ToVulkanLayout(src_image.CurrentLayout()),
+                     Native().Handle(), ToVulkanLayout(CurrentLayout()), image_copy);
     Transit(ImageStates::GeneralShaderTransferRead, {});
 }
 
@@ -785,9 +692,9 @@ void Image::Resolve(Image& src_image, const VideoCore::SubresourceRange& mrt0_ra
             .dstOffset = {0, 0, 0},
             .extent = {info.size.width, info.size.height, 1},
         };
-        scheduler->CommandBuffer().copyImage(src_image.GetImage(),
-                                             vk::ImageLayout::eTransferSrcOptimal, GetImage(),
-                                             vk::ImageLayout::eTransferDstOptimal, region);
+        scheduler->CommandBuffer().copyImage(
+            src_image.Native().Handle(), vk::ImageLayout::eTransferSrcOptimal, Native().Handle(),
+            vk::ImageLayout::eTransferDstOptimal, region);
     } else {
         const vk::ImageResolve region = {
             .srcSubresource{
@@ -806,9 +713,9 @@ void Image::Resolve(Image& src_image, const VideoCore::SubresourceRange& mrt0_ra
             .dstOffset = {0, 0, 0},
             .extent = {info.size.width, info.size.height, 1},
         };
-        scheduler->CommandBuffer().resolveImage(src_image.GetImage(),
-                                                vk::ImageLayout::eTransferSrcOptimal, GetImage(),
-                                                vk::ImageLayout::eTransferDstOptimal, region);
+        scheduler->CommandBuffer().resolveImage(
+            src_image.Native().Handle(), vk::ImageLayout::eTransferSrcOptimal, Native().Handle(),
+            vk::ImageLayout::eTransferDstOptimal, region);
     }
 
     flags |= VideoCore::ImageFlagBits::GpuModified;
@@ -827,7 +734,8 @@ void Image::Clear(const ColorClearRequest& request) {
     Transit(ImageStates::TransferDestination, {});
     const auto cmdbuf = scheduler->CommandBuffer();
     const vk::ClearColorValue color{.uint32 = request.component_bits};
-    cmdbuf.clearColorImage(GetImage(), vk::ImageLayout::eTransferDstOptimal, color, vk_range);
+    cmdbuf.clearColorImage(Native().Handle(), vk::ImageLayout::eTransferDstOptimal, color,
+                           vk_range);
 }
 
 void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
@@ -839,7 +747,8 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
     auto it = std::ranges::find(backing_images, num_samples, &BackingImage::num_samples);
     if (it == backing_images.end()) {
         auto new_image_ci = backing->image->CreateInfo();
-        new_image_ci.samples = LiverpoolToVK::NumSamples(num_samples, supported_samples);
+        new_image_ci.samples =
+            LiverpoolToVK::NumSamples(num_samples, native_state->supported_samples);
 
         new_backing = &backing_images.emplace_back();
         new_backing->sync_state = ImageSyncState{resource_desc.resources};
@@ -850,7 +759,7 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
         Vulkan::SetObjectName(instance->GetDevice(), new_backing->image->Handle(),
                               "Image {}x{}x{} {} {} {:#x}:{:#x} L:{} M:{} S:{} (backing)",
                               info.size.width, info.size.height, info.size.depth,
-                              AmdGpu::NameOf(info.tile_mode), vk::to_string(info.pixel_format),
+                              AmdGpu::NameOf(info.tile_mode), vk::to_string(HostFormat(info)),
                               info.guest_address, info.guest_size, info.resources.layers,
                               info.resources.levels, num_samples);
     } else {
@@ -862,7 +771,8 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
         ASSERT(info.resources.levels == 1 && info.resources.layers == 1);
 
         // Transition current backing to shader read layout
-        auto barriers = GetBarriers(
+        auto barriers = Vulkan::GetImageBarriers(
+            *this,
             {ImageLayout::ShaderReadOnly, ImageAccess::ShaderRead, ImageStage::FragmentShader},
             std::nullopt);
 
@@ -881,7 +791,7 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = new_backing->image->Handle(),
             .subresourceRange{
-                .aspectMask = aspect_mask,
+                .aspectMask = native_state->aspect_mask,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -896,7 +806,7 @@ void Image::SetBackingSamples(u32 num_samples, bool copy_backing) {
 
         // Copy between ms and non ms backing images
         blit_helper->CopyBetweenMsImages(
-            info.size.width, info.size.height, new_backing->num_samples, info.pixel_format,
+            info.size.width, info.size.height, new_backing->num_samples, HostFormat(info),
             backing->num_samples > 1, backing->image->Handle(), new_backing->image->Handle());
 
         // Update current layout in tracker to new backings layout
