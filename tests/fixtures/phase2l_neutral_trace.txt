@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright 2026 shadPS4 Emulator Project
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Synthetic v1 trace for the neutral buffer/image synchronization contract.
 v1
 B TransferWrite 0 4096

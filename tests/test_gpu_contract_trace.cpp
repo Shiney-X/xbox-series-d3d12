@@ -73,6 +73,18 @@ std::string ReadFile(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
 }
 
+std::string ReadGoldenFile(const std::filesystem::path& path) {
+    std::istringstream input{ReadFile(path)};
+    std::ostringstream output;
+    std::string line;
+    while (std::getline(input, line)) {
+        if (!line.empty() && line.front() != '#') {
+            output << line << '\n';
+        }
+    }
+    return output.str();
+}
+
 TEST(GpuContractTrace, ReplaysNeutralTransitionsAgainstGoldenTrace) {
     const auto fixtures = std::filesystem::path{__FILE__}.parent_path() / "fixtures";
     std::istringstream input{ReadFile(fixtures / "phase2l_neutral_trace.txt")};
@@ -133,7 +145,7 @@ TEST(GpuContractTrace, ReplaysNeutralTransitionsAgainstGoldenTrace) {
         }
     }
     ASSERT_TRUE(version_seen);
-    EXPECT_EQ(output.str(), ReadFile(fixtures / "phase2l_neutral_trace.golden"));
+    EXPECT_EQ(output.str(), ReadGoldenFile(fixtures / "phase2l_neutral_trace.golden"));
 }
 
 } // namespace

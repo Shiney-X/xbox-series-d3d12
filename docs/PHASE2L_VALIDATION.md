@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: Copyright 2026 shadPS4 Emulator Project
+SPDX-License-Identifier: GPL-2.0-or-later
+-->
+
 # Fase 2L — validação da fronteira gráfica
 
 Esta etapa verifica que o desacoplamento da Fase 2 não quebrou o renderer
