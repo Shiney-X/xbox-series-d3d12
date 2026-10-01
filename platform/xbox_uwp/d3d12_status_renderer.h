@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "d3d12_device_context.h"
+
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <wrl/client.h>
@@ -72,11 +74,9 @@ struct XboxShellState {
 
 class D3D12StatusRenderer final {
 public:
-  ~D3D12StatusRenderer();
-
   void Initialize(IUnknown *core_window, float width, float height);
   void Render(const XboxShellState &state);
-  [[nodiscard]] bool TryTrim();
+  [[nodiscard]] bool TryTrim() { return device_context_.TryTrim(); }
   [[nodiscard]] bool SelectedGameIconReady() const noexcept {
     return selected_icon_ready_;
   }
@@ -93,12 +93,10 @@ private:
   void EnsureSelectedGameIcon(const XboxShellState &state) noexcept;
   void ResetGameIcon() noexcept;
   [[nodiscard]] bool UploadGameIcon(const XboxGameListEntry &game);
-  void WaitForGpu();
 
   static constexpr UINT FrameCount = 2;
 
-  Microsoft::WRL::ComPtr<ID3D12Device> device_;
-  Microsoft::WRL::ComPtr<ID3D12CommandQueue> command_queue_;
+  D3D12DeviceContext device_context_;
   Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain_;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtv_heap_;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> icon_srv_heap_;
@@ -106,12 +104,9 @@ private:
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> command_list_;
   Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature_;
   Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline_state_;
-  Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
   std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, FrameCount>
       render_targets_;
   Microsoft::WRL::ComPtr<ID3D12Resource> selected_icon_texture_;
-  HANDLE fence_event_{INVALID_HANDLE_VALUE};
-  UINT64 fence_value_{};
   std::uint64_t selected_icon_hash_{};
   bool selected_icon_ready_{};
   UINT rtv_descriptor_size_{};

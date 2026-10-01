@@ -151,23 +151,9 @@ std::array<std::uint8_t, 7> Glyph(char character) {
 
 using Microsoft::WRL::ComPtr;
 
-D3D12StatusRenderer::~D3D12StatusRenderer() {
-  if (fence_event_ != INVALID_HANDLE_VALUE) {
-    CloseHandle(fence_event_);
-  }
-}
-
 void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
                                      float height) {
-  winrt::check_hresult(
-      D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0,
-                        IID_PPV_ARGS(device_.ReleaseAndGetAddressOf())));
-
-  D3D12_COMMAND_QUEUE_DESC queue_description{};
-  queue_description.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-  winrt::check_hresult(device_->CreateCommandQueue(
-      &queue_description,
-      IID_PPV_ARGS(command_queue_.ReleaseAndGetAddressOf())));
+  device_context_.Initialize();
 
   ComPtr<IDXGIFactory4> factory;
   winrt::check_hresult(
@@ -185,8 +171,8 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
 
   ComPtr<IDXGISwapChain1> swap_chain;
   winrt::check_hresult(factory->CreateSwapChainForCoreWindow(
-      command_queue_.Get(), core_window, &swap_chain_description, nullptr,
-      swap_chain.ReleaseAndGetAddressOf()));
+      device_context_.DirectQueue(), core_window, &swap_chain_description,
+      nullptr, swap_chain.ReleaseAndGetAddressOf()));
   winrt::check_hresult(swap_chain.As(&swap_chain_));
 
   viewport_.Width = static_cast<float>(swap_chain_description.Width);
@@ -198,16 +184,17 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
   D3D12_DESCRIPTOR_HEAP_DESC heap_description{};
   heap_description.NumDescriptors = FrameCount;
   heap_description.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-  winrt::check_hresult(device_->CreateDescriptorHeap(
+  winrt::check_hresult(device_context_.Device()->CreateDescriptorHeap(
       &heap_description, IID_PPV_ARGS(rtv_heap_.ReleaseAndGetAddressOf())));
   rtv_descriptor_size_ =
-      device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+      device_context_.Device()->GetDescriptorHandleIncrementSize(
+          D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
   D3D12_DESCRIPTOR_HEAP_DESC icon_heap_description{};
   icon_heap_description.NumDescriptors = 1;
   icon_heap_description.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
   icon_heap_description.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-  winrt::check_hresult(device_->CreateDescriptorHeap(
+  winrt::check_hresult(device_context_.Device()->CreateDescriptorHeap(
       &icon_heap_description,
       IID_PPV_ARGS(icon_srv_heap_.ReleaseAndGetAddressOf())));
   ResetGameIcon();
@@ -216,26 +203,13 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
   for (UINT index = 0; index < FrameCount; ++index) {
     winrt::check_hresult(swap_chain_->GetBuffer(
         index, IID_PPV_ARGS(render_targets_[index].ReleaseAndGetAddressOf())));
-    device_->CreateRenderTargetView(render_targets_[index].Get(), nullptr,
-                                    rtv_handle);
+    device_context_.Device()->CreateRenderTargetView(
+        render_targets_[index].Get(), nullptr, rtv_handle);
     rtv_handle.ptr += rtv_descriptor_size_;
   }
 
-  winrt::check_hresult(device_->CreateCommandAllocator(
-      D3D12_COMMAND_LIST_TYPE_DIRECT,
-      IID_PPV_ARGS(command_allocator_.ReleaseAndGetAddressOf())));
-  winrt::check_hresult(device_->CreateCommandList(
-      0, D3D12_COMMAND_LIST_TYPE_DIRECT, command_allocator_.Get(), nullptr,
-      IID_PPV_ARGS(command_list_.ReleaseAndGetAddressOf())));
+  device_context_.CreateDirectCommands(command_allocator_, command_list_);
   winrt::check_hresult(command_list_->Close());
-
-  winrt::check_hresult(device_->CreateFence(
-      0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence_.ReleaseAndGetAddressOf())));
-  fence_event_ = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
-  if (fence_event_ == nullptr) {
-    fence_event_ = INVALID_HANDLE_VALUE;
-    winrt::throw_last_error();
-  }
 
   CreateShellPipeline();
 }
@@ -284,9 +258,9 @@ void D3D12StatusRenderer::Render(const XboxShellState &state) {
 
   winrt::check_hresult(command_list_->Close());
   ID3D12CommandList *command_lists[] = {command_list_.Get()};
-  command_queue_->ExecuteCommandLists(1, command_lists);
+  device_context_.DirectQueue()->ExecuteCommandLists(1, command_lists);
   winrt::check_hresult(swap_chain_->Present(1, 0));
-  WaitForGpu();
+  device_context_.WaitForGpu();
 }
 
 void D3D12StatusRenderer::DrawRectangle(float x, float y, float width,
@@ -511,22 +485,11 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
            0.065F, 0.865F, 4.0F, SecondaryText);
 }
 
-bool D3D12StatusRenderer::TryTrim() {
-  ComPtr<IDXGIDevice3> dxgi_device;
-  const HRESULT result = device_.As(&dxgi_device);
-  if (result == E_NOINTERFACE) {
-    return false;
-  }
-  winrt::check_hresult(result);
-  dxgi_device->Trim();
-  return true;
-}
-
 void D3D12StatusRenderer::ResetGameIcon() noexcept {
   selected_icon_texture_.Reset();
   selected_icon_hash_ = 0U;
   selected_icon_ready_ = false;
-  if (!device_ || !icon_srv_heap_) {
+  if (!device_context_.Device() || !icon_srv_heap_) {
     return;
   }
 
@@ -535,7 +498,7 @@ void D3D12StatusRenderer::ResetGameIcon() noexcept {
   null_view.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
   null_view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
   null_view.Texture2D.MipLevels = 1;
-  device_->CreateShaderResourceView(
+  device_context_.Device()->CreateShaderResourceView(
       nullptr, &null_view,
       icon_srv_heap_->GetCPUDescriptorHandleForHeapStart());
 }
@@ -591,7 +554,7 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   texture_description.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
   ComPtr<ID3D12Resource> texture;
-  winrt::check_hresult(device_->CreateCommittedResource(
+  winrt::check_hresult(device_context_.Device()->CreateCommittedResource(
       &default_heap, D3D12_HEAP_FLAG_NONE, &texture_description,
       D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
       IID_PPV_ARGS(texture.ReleaseAndGetAddressOf())));
@@ -600,8 +563,9 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   UINT row_count = 0;
   UINT64 row_size = 0;
   UINT64 upload_size = 0;
-  device_->GetCopyableFootprints(&texture_description, 0, 1, 0, &footprint,
-                                 &row_count, &row_size, &upload_size);
+  device_context_.Device()->GetCopyableFootprints(
+      &texture_description, 0, 1, 0, &footprint, &row_count, &row_size,
+      &upload_size);
   if (row_count != game.icon_height ||
       row_size < static_cast<UINT64>(game.icon_width) * 4U) {
     return false;
@@ -620,7 +584,7 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   upload_description.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
   ComPtr<ID3D12Resource> upload;
-  winrt::check_hresult(device_->CreateCommittedResource(
+  winrt::check_hresult(device_context_.Device()->CreateCommittedResource(
       &upload_heap, D3D12_HEAP_FLAG_NONE, &upload_description,
       D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
       IID_PPV_ARGS(upload.ReleaseAndGetAddressOf())));
@@ -642,13 +606,8 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   upload->Unmap(0, &written_range);
 
   ComPtr<ID3D12CommandAllocator> upload_allocator;
-  winrt::check_hresult(device_->CreateCommandAllocator(
-      D3D12_COMMAND_LIST_TYPE_DIRECT,
-      IID_PPV_ARGS(upload_allocator.ReleaseAndGetAddressOf())));
   ComPtr<ID3D12GraphicsCommandList> upload_commands;
-  winrt::check_hresult(device_->CreateCommandList(
-      0, D3D12_COMMAND_LIST_TYPE_DIRECT, upload_allocator.Get(), nullptr,
-      IID_PPV_ARGS(upload_commands.ReleaseAndGetAddressOf())));
+  device_context_.CreateDirectCommands(upload_allocator, upload_commands);
 
   D3D12_TEXTURE_COPY_LOCATION destination{};
   destination.pResource = texture.Get();
@@ -668,15 +627,15 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   upload_commands->ResourceBarrier(1, &barrier);
   winrt::check_hresult(upload_commands->Close());
   ID3D12CommandList *lists[]{upload_commands.Get()};
-  command_queue_->ExecuteCommandLists(1, lists);
-  WaitForGpu();
+  device_context_.DirectQueue()->ExecuteCommandLists(1, lists);
+  device_context_.WaitForGpu();
 
   D3D12_SHADER_RESOURCE_VIEW_DESC icon_view{};
   icon_view.Format = texture_description.Format;
   icon_view.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
   icon_view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
   icon_view.Texture2D.MipLevels = 1;
-  device_->CreateShaderResourceView(
+  device_context_.Device()->CreateShaderResourceView(
       texture.Get(), &icon_view,
       icon_srv_heap_->GetCPUDescriptorHandleForHeapStart());
   selected_icon_texture_ = std::move(texture);
@@ -755,7 +714,7 @@ void D3D12StatusRenderer::CreateShellPipeline() {
       &root_description, D3D_ROOT_SIGNATURE_VERSION_1,
       serialized_root.ReleaseAndGetAddressOf(),
       diagnostics.ReleaseAndGetAddressOf()));
-  winrt::check_hresult(device_->CreateRootSignature(
+  winrt::check_hresult(device_context_.Device()->CreateRootSignature(
       0, serialized_root->GetBufferPointer(), serialized_root->GetBufferSize(),
       IID_PPV_ARGS(root_signature_.ReleaseAndGetAddressOf())));
 
@@ -798,19 +757,6 @@ void D3D12StatusRenderer::CreateShellPipeline() {
   pipeline.NumRenderTargets = 1;
   pipeline.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
   pipeline.SampleDesc.Count = 1;
-  winrt::check_hresult(device_->CreateGraphicsPipelineState(
+  winrt::check_hresult(device_context_.Device()->CreateGraphicsPipelineState(
       &pipeline, IID_PPV_ARGS(pipeline_state_.ReleaseAndGetAddressOf())));
-}
-
-void D3D12StatusRenderer::WaitForGpu() {
-  const UINT64 value = ++fence_value_;
-  winrt::check_hresult(command_queue_->Signal(fence_.Get(), value));
-  if (fence_->GetCompletedValue() >= value) {
-    return;
-  }
-
-  winrt::check_hresult(fence_->SetEventOnCompletion(value, fence_event_));
-  if (WaitForSingleObjectEx(fence_event_, INFINITE, FALSE) == WAIT_FAILED) {
-    winrt::throw_last_error();
-  }
 }
