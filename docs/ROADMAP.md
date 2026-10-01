@@ -130,7 +130,7 @@ frames game-only exigido para fechar a regressão visual.
       criação, transições, transferências, cópia de região e clear de imagens.
 - [x] Remover declarações de handles e outros tipos `vk::` dos cabeçalhos de
       `amdgpu`, `buffer_cache` e `texture_cache`.
-- [ ] Manter o backend Vulkan funcional.
+- [x] Manter o backend Vulkan funcional.
 - [x] Criar testes de contrato e replay sintético das transições neutras.
 - [ ] Comparar capturas reais do renderer Vulkan antes/depois da 2K.
 
