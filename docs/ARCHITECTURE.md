@@ -338,6 +338,20 @@ Isso não define ainda uma API neutra para os comandos de transição vindos do
 rasterizer, nem traduz essas transições para D3D12. Essas interfaces pertencem
 ao próximo corte de fronteira dos caches.
 
+## Caminho inicial de shaders no UWP (4A)
+
+`ComputeFixture` (SPIR-V autoral) → `TranslateCompute` (SPIRV-Cross no
+console) → HLSL/main → DXC/cs_6_0 → DXIL → PSO compute → dispatch → readback.
+O teste compara quatro valores fixos com os produzidos pelo shader HLSL
+original e traduzido. Os dois PSOs compartilham a root de uma UAV.
+
+A biblioteca é compilada de fontes fixadas por commit/SHA-256 para
+AppContainer, não uma DLL desktop. O wrapper só aceita um compute e imagem
+R32_UINT em set 0/binding 0 com tamanho de grupo literal. A entrada interna
+não representa a saída do recompiler PS4; adaptar `EmitSPIRV`, reflection
+geral, bindings guest, vertex/fragment e waves continua pendente. Ver
+[ADR 0038](adr/0038-initial-spirv-hlsl-dxil.md).
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a

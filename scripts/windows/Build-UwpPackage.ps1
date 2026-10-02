@@ -13,6 +13,15 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path $OutputDirectory).Path
 
+# Fetch the hash-pinned SPIRV-Cross sources. They are compiled for AppContainer
+# by the UWP project, not loaded from a desktop DLL.
+$shaderSource = Join-Path $repositoryRoot 'tests\probes\shaders'
+$shaderBuild = Join-Path $repositoryRoot 'out\shader-tools'
+& cmake -S $shaderSource -B $shaderBuild -DBUILD_TESTING=OFF
+if ($LASTEXITCODE -ne 0) {
+    throw "Shader dependency configuration failed with exit code $LASTEXITCODE."
+}
+
 $msbuildCommand = Get-Command 'MSBuild.exe' -ErrorAction SilentlyContinue
 if ($null -eq $msbuildCommand) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -77,6 +86,9 @@ try {
             if ($entryNames -notcontains $runtimeDependency) {
                 throw "MSIX is missing the DXC runtime dependency '$runtimeDependency'."
             }
+        }
+        if ($entryNames -notcontains 'ThirdParty/SPIRV-Cross-Notices.txt') {
+            throw 'MSIX is missing SPIRV-Cross license notices.'
         }
     } finally {
         $archive.Dispose()

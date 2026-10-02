@@ -2,6 +2,7 @@
 
 #include "d3d12_status_renderer.h"
 #include "d3d12_compute_probe.h"
+#include "shaders/spirv_hlsl_bridge.h"
 
 #include <dxcapi.h>
 #include <winrt/base.h>
@@ -214,6 +215,17 @@ std::string D3D12StatusRenderer::PipelineDetails() const {
          ";cache_hits=" + std::to_string(stats.cache_hits) +
          ";rtv_slots=" + std::to_string(rtv_heap_.Used()) +
          ";srv_slots=" + std::to_string(icon_srv_heap_.Used());
+}
+
+std::string D3D12StatusRenderer::ShaderDetails() const {
+  return "source=authored_spirv_compute_fixture;guest_isa=0;"
+         "translation_location=xbox_runtime;translator=SPIRV-Cross;"
+         "translator_revision=aa217aeb6c9f0ace7a0ab233b28807edf45eb165;"
+         "shader_model=6_0;shader_format=DXIL;entry=main;"
+         "descriptor_set=0;binding=0;uav_register=0;register_space=0;"
+         "local_size=2x2x1;format=R32_UINT;expected=100,101,102,103;"
+         "reference_hlsl_passed=" + std::to_string(compute_probe_passed_) +
+         ";translated_readback_passed=" + std::to_string(shader_probe_passed_);
 }
 
 std::string D3D12StatusRenderer::TransferDetails() const {
@@ -576,6 +588,8 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
              4.5F, PrimaryText);
     DrawText("UWP X64  PASS", 0.105F, 0.49F, 4.5F, Accent);
     DrawText("D3D12 DXIL  PASS", 0.105F, 0.59F, 4.5F, Accent);
+    DrawText(shader_probe_passed_ ? "SPIRV HLSL DXIL  PASS" : "SPIRV HLSL DXIL  FAIL",
+             0.105F, 0.69F, 3.0F, shader_probe_passed_ ? Accent : Failure);
     DrawText(state.probes_passed ? "SYSTEM PROBES  PASS"
                                  : "SYSTEM PROBES  FAIL",
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);
@@ -778,6 +792,25 @@ void D3D12StatusRenderer::CreateShellPipeline() {
       device_context_, resource_allocator_, pipeline_cache_,
       {compute_shader->GetBufferPointer(), compute_shader->GetBufferSize()}, &transfer_stats_);
   if (!compute_probe_passed_) {
+    winrt::throw_hresult(E_FAIL);
+  }
+
+  // Translate actual SPIR-V on the Xbox, compile the emitted HLSL through
+  // DXC, and run the same independently expected 2x2 readback as the reference.
+  Xbox::Shaders::ComputeTranslation translated;
+  try {
+    translated = Xbox::Shaders::TranslateCompute(Xbox::Shaders::ComputeFixture());
+  } catch (const std::exception &error) {
+    throw winrt::hresult_error(E_FAIL, winrt::to_hstring(error.what()));
+  }
+  winrt::check_hresult(library->CreateBlobWithEncodingFromPinned(
+      translated.hlsl.data(), static_cast<UINT32>(translated.hlsl.size()), DXC_CP_UTF8,
+      source.ReleaseAndGetAddressOf()));
+  const auto translated_shader = compile_shader(L"main", L"cs_6_0");
+  shader_probe_passed_ = RunD3D12ComputeProbe(
+      device_context_, resource_allocator_, pipeline_cache_,
+      {translated_shader->GetBufferPointer(), translated_shader->GetBufferSize()}, &transfer_stats_);
+  if (!shader_probe_passed_) {
     winrt::throw_hresult(E_FAIL);
   }
 

@@ -301,7 +301,7 @@ o marco só se encerra após a comparação visual de uma cena de jogo real.
       apresentação e suspensão/retomada sem regressão.
 - [x] 3F: consumidor inicial de `VideoCore::GpuCommandSink` para DMA de
       buffers/sincronização, importação linear BGRA e preview UWP sintético.
-- [ ] Validar 3F no Xbox: readbacks do bridge, preview verde/laranja em
+- [x] Validar 3F no Xbox: readbacks do bridge, preview verde/laranja em
       Diagnostics, ícones e suspensão/retomada com o frame preservado.
 
 O contexto 3A reorganiza recursos **já usados pelo shell**. Ainda não recebe
@@ -381,11 +381,30 @@ Dois jogos e dois ícones válidos foram detectados, com o selecionado exibido.
 
 ## Fase 4 — Shaders
 
-- [ ] SPIR-V para HLSL via SPIRV-Cross.
-- [ ] HLSL para DXIL via DXC.
+- [x] 4A: caminho inicial SPIR-V compute para HLSL via SPIRV-Cross,
+      compilado no UWP e conectado a DXC/dispatch/readback no Xbox.
+- [ ] Validar 4A no Series S: `d3d12-shaders`, Diagnostics e retomada.
+- [ ] Ampliar tradução a shaders emitidos pelo recompiler do shadPS4.
+- [ ] Ampliar HLSL/DXIL a vertex/fragment e recursos de jogos.
 - [ ] Reflection e remapeamento de bindings.
 - [ ] Corpus golden Vulkan/D3D12.
 - [ ] Avaliar emissor HLSL direto a partir do IR.
+
+A fundação 3A–3F foi validada no Series S. Na sessão 3F
+`134354472178773688-6484`, todos os 17 probes passaram: buffer/textura
+verificados, três apresentações em Diagnostics, 52 frames/50 reutilizações
+e ticket 76 concluído. Suspensão/retomada no mesmo processo reapresentou o
+shell. Zero falhas de alocação/rejeições; os 65536 bytes DEFAULT restantes
+são o frame retido, com UPLOAD/READBACK zerados. O journal também confirmou
+dois jogos e dois ícones válidos. A conclusão se limita à fundação do host,
+não à integração completa com o renderer PS4.
+
+A 4A usa SPIR-V autoral, não shaders extraídos de um jogo nem saída do
+recompiler. Traduz no console, não gera HLSL antecipadamente no desktop.
+O contrato inicial é compute com tamanho de grupo literal e uma imagem
+R32_UINT em set 0/binding 0. O teste compara os readbacks do HLSL original e
+traduzido aos valores independentes 100–103. Não há boot, PM4 ou tradução
+de ISA PS4 neste bloco. Ver [validação da Fase 4](PHASE4_VALIDATION.md).
 
 ## Fase 5 — Plataforma e primeiro frame
 

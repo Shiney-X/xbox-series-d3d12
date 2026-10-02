@@ -36,6 +36,7 @@ if(MSVC)
 endif()
 
 if(BUILD_TESTING)
+    add_subdirectory(shaders)
     add_executable(xbox_d3d12_videocore_test
         d3d12_videocore_test.cpp
         ../../platform/xbox_uwp/d3d12_device_context.cpp
@@ -83,7 +84,7 @@ if(BUILD_TESTING)
     target_include_directories(xbox_d3d12_pipelines_test PRIVATE ../../platform/xbox_uwp)
     target_compile_definitions(xbox_d3d12_pipelines_test PRIVATE
         WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
-    target_link_libraries(xbox_d3d12_pipelines_test PRIVATE d3d12 d3dcompiler dxgi WindowsApp)
+    target_link_libraries(xbox_d3d12_pipelines_test PRIVATE d3d12 d3dcompiler dxgi WindowsApp xbox_spirv_hlsl)
     if(MSVC)
         target_compile_options(xbox_d3d12_pipelines_test PRIVATE /W4 /WX /permissive- /EHsc)
     endif()
