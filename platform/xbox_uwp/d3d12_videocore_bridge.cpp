@@ -251,7 +251,9 @@ std::string D3D12VideoCoreBridge::Marker(std::string_view label, bool from_guest
 void D3D12VideoCoreBridge::ScopeMarkerBegin(std::string_view label, bool from_guest) {
   const auto text = Marker(label, from_guest);
   BeginRecording();
-  commands_->BeginEvent(0, text.data(), static_cast<UINT>(text.size()));
+  // Direct BeginEvent/SetMarker payloads are reserved for tooling. Keep
+  // diagnostic host metadata; GPU PIX annotations require a separate adapter.
+  OutputDebugStringA(text.c_str());
   ++marker_depth_;
   ++stats_.markers;
 }
@@ -260,16 +262,15 @@ void D3D12VideoCoreBridge::ScopeMarkerEnd(bool) {
   if (!encoder_ || marker_depth_ == 0) {
     Reject();
   }
-  commands_->EndEvent();
   --marker_depth_;
 }
 
 void D3D12VideoCoreBridge::ScopedMarkerInsertColor(std::string_view label, u32 color,
                                                   bool from_guest) {
-  // Raw marker payload, not PIX's binary color protocol.
+  // Color is diagnostic metadata, not a GPU/PIX color annotation.
   const auto text = Marker(label, from_guest) + ";color=" + std::to_string(color);
   BeginRecording();
-  commands_->SetMarker(0, text.data(), static_cast<UINT>(text.size()));
+  OutputDebugStringA(text.c_str());
   ++stats_.markers;
 }
 

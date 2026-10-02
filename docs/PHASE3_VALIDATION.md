@@ -169,7 +169,9 @@ adicionar jogos, sysmodules ou outro conteúdo ao USB.
 `source=synthetic_dma_fixture`, `buffer_verified=1`, `texture_verified=1`,
 `fills=2`, `copies=1`, `flushes=3`, `synchronizations=4`, `downloads=1`,
 `linear_frames=1`, `host_submit_events=2`, `markers=2`, zero rejeições e
-zero comandos não suportados na fixture. `dma_ticket` deve ser positivo,
+zero comandos não suportados na fixture. Marcadores são metadados do host
+(`marker_delivery=host_debug_metadata`, `gpu_marker_annotations=0`), não
+anotações PIX da GPU. `dma_ticket` deve ser positivo,
 `frame_ticket` maior, e o fence concluído deve alcançar ambos. Depois de
 visitar Diagnostics, `diagnostic_frames_presented` deve ser positivo.
 

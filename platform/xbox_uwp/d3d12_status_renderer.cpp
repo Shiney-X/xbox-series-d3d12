@@ -237,6 +237,7 @@ std::string D3D12StatusRenderer::VideoCoreDetails() const {
   const auto &stats = video_core_probe_.stats;
   return "interface=VideoCore.GpuCommandSink;source=synthetic_dma_fixture;"
          "liverpool_bound=0;guest_draw_supported=0;guest_dispatch_supported=0;"
+         "marker_delivery=host_debug_metadata;gpu_marker_annotations=0;"
          "frame_format=linear_bgra8;frame_width=64;frame_height=32;"
          "buffer_verified=" + std::to_string(video_core_probe_.buffer_verified) +
          ";texture_verified=" + std::to_string(video_core_probe_.texture_verified) +

@@ -188,8 +188,9 @@ necessário mesmo com readback aprovado.
 Isso não conecta o adapter a `Liverpool::BindCommandSink` no UWP. O
 decoder, MemoryManager/GpuMemoryTracker, caches de jogo e shaders guest
 continuam fora do host. Draw/dispatch, GDS e ProcessDownloadImages
-retornam E_NOTIMPL: não são no-ops que aparentem sucesso. Marcadores usam
-payload textual nativo, sem protocolo binário de cor PIX. Uma gravação
+retornam E_NOTIMPL: não são no-ops que aparentem sucesso. Marcadores validam
+escopos e emitem metadados textuais no debug output do host; não são
+anotações de GPU/PIX (`gpu_marker_annotations=0`). Uma gravação
 descartada não é submetida pelo destrutor. O renderer Vulkan desktop não
 foi alterado.
 

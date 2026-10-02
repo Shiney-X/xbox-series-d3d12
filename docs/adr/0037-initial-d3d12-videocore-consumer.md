@@ -34,6 +34,10 @@ nem o consumidor Vulkan. Não exige biblioteca nova ou GDK.
 - Draw/dispatch guest, GDS e ProcessDownloadImages retornam E_NOTIMPL.
   Não conectar o consumidor a Liverpool até esses caminhos e o runtime
   necessário terem implementação própria.
+- Manter marcadores como metadados do host via debug output e validação
+  de escopo, não como anotações GPU/PIX. A debug layer rejeitou o uso direto
+  de BeginEvent; o caminho público de anotações GPU exige um adapter PIX
+  próprio. O relatório informa `gpu_marker_annotations=0` explicitamente.
 
 ## Validação e apresentação
 
@@ -64,3 +68,5 @@ Liverpool, MemoryManager/GpuMemoryTracker e caches guest, nem traduz shaders
 GCN ou inicializa jogos. A fixture não é um trace PM4 capturado e o preview
 não é o primeiro frame de um título. Fases 4/5 precisam ligar shaders,
 recursos/estados guest e runtime antes de prometer boot ou compatibilidade.
+
+Referência: [BeginEvent é reservado às ferramentas; usar PIX para anotações](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-beginevent).
