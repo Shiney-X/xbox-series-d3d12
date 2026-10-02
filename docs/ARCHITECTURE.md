@@ -157,6 +157,42 @@ ausência é registrada e não tratada como resolve aprovado. O probe
 filas async/copy, split/enhanced/aliasing barriers ou stencil clear neste
 corte. Também não executa comandos PM4 ou shaders de jogos.
 
+### Consumidor inicial de comandos no host D3D12
+
+Na 3F, `D3D12VideoCoreBridge` implementa a interface existente
+`VideoCore::GpuCommandSink`, compilada no MSIX. O adapter traduz fill/copy
+de buffers registrados para gravações D3D12 e devolve tickets reais em
+Flush. Finish/CpSync aguardam a GPU; OnSubmit conserva staging ainda em
+gravação e só libera pendências já concluídas. Registro rejeita intervalos
+sobrepostos, aliases do mesmo recurso, overflow e buffers de outro device
+ou heap. Endereços registrados são identificadores, nunca ponteiros host
+desreferenciados. Recursos DEFAULT iniciam em COMMON e sua reutilização
+considera decay depois de ExecuteCommandLists.
+
+O registro inicial tem até 16 buffers, transferências de até 16 MiB e
+staging lógico de até 16 MiB por batch, sujeito ao orçamento de recursos da
+3C. A política serial espera o batch anterior antes de reciclar seu
+allocator. Fills aceitam palavras de 32 bits; cópia para o mesmo buffer é
+rejeitada. Importação de frame cobre apenas BGRA8 linear cujo pitch/offset
+correspondam ao footprint D3D12, não superfícies tiled/compressed de PS4.
+Um frame retornado permanece sob posse do chamador até acabar o uso na GPU.
+
+A fixture chama o contrato polimorficamente, confirma readback do buffer
+e da textura e preserva uma textura verde/laranja para o shell apresentar
+em Diagnostics usando seu PSO DXIL existente. São dois slots SRV: ícone e
+frame. O frame/descriptor não é refeito durante navegação/retomada. O
+probe `d3d12-videocore` distingue geração/readback do contador de frames
+Diagnostics efetivamente apresentados; o teste visual no console é
+necessário mesmo com readback aprovado.
+
+Isso não conecta o adapter a `Liverpool::BindCommandSink` no UWP. O
+decoder, MemoryManager/GpuMemoryTracker, caches de jogo e shaders guest
+continuam fora do host. Draw/dispatch, GDS e ProcessDownloadImages
+retornam E_NOTIMPL: não são no-ops que aparentem sucesso. Marcadores usam
+payload textual nativo, sem protocolo binário de cor PIX. Uma gravação
+descartada não é submetida pelo destrutor. O renderer Vulkan desktop não
+foi alterado.
+
 Os contratos neutros deverão cobrir:
 
 - device, queues, command contexts e fences;

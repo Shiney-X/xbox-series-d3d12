@@ -36,6 +36,25 @@ if(MSVC)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(xbox_d3d12_videocore_test
+        d3d12_videocore_test.cpp
+        ../../platform/xbox_uwp/d3d12_device_context.cpp
+        ../../platform/xbox_uwp/d3d12_resource_allocator.cpp
+        ../../platform/xbox_uwp/d3d12_pipeline_cache.cpp
+        ../../platform/xbox_uwp/d3d12_command_encoder.cpp
+        ../../platform/xbox_uwp/d3d12_videocore_bridge.cpp
+        ../../platform/xbox_uwp/d3d12_videocore_probe.cpp)
+    target_include_directories(xbox_d3d12_videocore_test PRIVATE
+        ../../platform/xbox_uwp ../../src)
+    target_compile_definitions(xbox_d3d12_videocore_test PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
+    target_link_libraries(xbox_d3d12_videocore_test PRIVATE d3d12 d3dcompiler dxgi WindowsApp)
+    if(MSVC)
+        target_compile_options(xbox_d3d12_videocore_test PRIVATE /W4 /WX /permissive- /EHsc)
+    endif()
+    add_test(NAME phase3.d3d12-videocore COMMAND xbox_d3d12_videocore_test)
+    set_tests_properties(phase3.d3d12-videocore PROPERTIES TIMEOUT 60)
+
     add_executable(xbox_d3d12_transfers_test
         d3d12_transfers_test.cpp
         ../../platform/xbox_uwp/d3d12_device_context.cpp
