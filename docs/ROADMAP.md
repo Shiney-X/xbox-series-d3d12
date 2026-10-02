@@ -297,9 +297,12 @@ o marco só se encerra após a comparação visual de uma cena de jogo real.
       sintético aprovado e suspensão/retomada com os novos componentes.
 - [x] 3E: encoder com estados explícitos, transition/UAV barriers, cópias
       de buffers/texturas, clears de cor/depth D32 e resolve MSAA de cor.
-- [ ] Validar 3E no Xbox: autoteste de transferências/readback, ícones,
+- [x] Validar 3E no Xbox: autoteste de transferências/readback, ícones,
       apresentação e suspensão/retomada sem regressão.
-- [ ] 3F: integração inicial com VideoCore e apresentação UWP.
+- [x] 3F: consumidor inicial de `VideoCore::GpuCommandSink` para DMA de
+      buffers/sincronização, importação linear BGRA e preview UWP sintético.
+- [ ] Validar 3F no Xbox: readbacks do bridge, preview verde/laranja em
+      Diagnostics, ícones e suspensão/retomada com o frame preservado.
 
 O contexto 3A reorganiza recursos **já usados pelo shell**. Ainda não recebe
 comandos PM4 do shadPS4, não implementa cache de recursos/pipelines de jogo
@@ -335,6 +338,23 @@ enhanced/split/aliasing barriers, copy queue, stencil clear ou rastreamento
 global de subresources. Essas restrições são explícitas, não caminhos mock.
 O autoteste no Xbox inclui clear/resolve MSAA com readback quando suportado;
 o relatório não aprova o gate de resolve se esse suporte estiver ausente.
+
+A 3E foi validada no Series S em 2 de outubro de 2026, sessão
+`134354448962723818-4692`. Todos os 16 probes passaram: resolve MSAA 4×,
+cópias/readbacks, clears de cor/depth, 53 transições, nenhuma rejeição e
+nenhuma falha de alocação. Após voltar à Home, os recursos vivos estavam
+zerados; o pico foi 4915200 bytes. Foram apresentados 20 frames, com 18
+reutilizações e ticket 27 concluído antes de suspender. A retomada no mesmo
+processo reapresentou o shell e também passou.
+
+A 3F fecha o último bloco **da fundação experimental do host** depois do
+teste no console. O adapter implementa a interface real do VideoCore, mas
+a fixture chama essa interface diretamente: `liverpool_bound=0`. Não
+compila o Liverpool no UWP nem conecta draw/dispatch guest, GDS, MMU ou
+caches de memória PS4. Comandos não suportados falham explicitamente.
+O preview é produzido por fill/copy DMA na GPU, não por um jogo. Tradução
+de shaders fica na Fase 4 e boot/PM4/primeiro frame na Fase 5; o backend
+completo e sua integração com o runtime guest continuam pendentes.
 
 A 3C foi validada no Series S em 2 de outubro de 2026, na sessão
 `134354421747283697-2788`. Após alternar ícones e voltar à Home, todos os

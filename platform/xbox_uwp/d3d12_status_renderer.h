@@ -6,6 +6,7 @@
 #include "d3d12_resource_allocator.h"
 #include "d3d12_pipeline_cache.h"
 #include "d3d12_transfer_probe.h"
+#include "d3d12_videocore_probe.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -89,6 +90,8 @@ public:
   [[nodiscard]] std::string PipelineDetails() const;
   [[nodiscard]] bool PipelineProbePassed() const noexcept { return compute_probe_passed_; }
   [[nodiscard]] std::string TransferDetails() const;
+  [[nodiscard]] std::string VideoCoreDetails() const;
+  [[nodiscard]] bool VideoCoreProbePassed() const noexcept { return video_core_probe_.Passed(); }
   [[nodiscard]] bool TransferProbePassed() const noexcept {
     return transfer_probe_.passed && transfer_probe_.resolve_supported &&
            transfer_stats_.rejected_requests == 0;
@@ -137,6 +140,8 @@ private:
   D3D12PipelineCache pipeline_cache_;
   D3D12TransferStats transfer_stats_;
   D3D12TransferProbeResult transfer_probe_;
+  D3D12VideoCoreProbeResult video_core_probe_;
+  UINT64 video_core_presentations_{};
   std::array<FrameContext, FrameCount> frames_;
   // Borrowed only while recording a frame; frames_ owns the command lists.
   ID3D12GraphicsCommandList *command_list_{};

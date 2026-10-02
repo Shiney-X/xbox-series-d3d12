@@ -233,12 +233,37 @@ std::string D3D12StatusRenderer::TransferDetails() const {
          ";rejected_requests=" + std::to_string(transfer_stats_.rejected_requests);
 }
 
+std::string D3D12StatusRenderer::VideoCoreDetails() const {
+  const auto &stats = video_core_probe_.stats;
+  return "interface=VideoCore.GpuCommandSink;source=synthetic_dma_fixture;"
+         "liverpool_bound=0;guest_draw_supported=0;guest_dispatch_supported=0;"
+         "marker_delivery=host_debug_metadata;gpu_marker_annotations=0;"
+         "frame_format=linear_bgra8;frame_width=64;frame_height=32;"
+         "buffer_verified=" + std::to_string(video_core_probe_.buffer_verified) +
+         ";texture_verified=" + std::to_string(video_core_probe_.texture_verified) +
+         ";fills=" + std::to_string(stats.fills) +
+         ";copies=" + std::to_string(stats.copies) +
+         ";flushes=" + std::to_string(stats.flushes) +
+         ";synchronizations=" + std::to_string(stats.synchronizations) +
+         ";host_submit_events=" + std::to_string(stats.host_submit_events) +
+         ";markers=" + std::to_string(stats.markers) +
+         ";downloads=" + std::to_string(stats.downloads) +
+         ";linear_frames=" + std::to_string(stats.linear_frames) +
+         ";dma_ticket=" + std::to_string(video_core_probe_.dma_ticket) +
+         ";frame_ticket=" + std::to_string(video_core_probe_.frame_ticket) +
+         ";frame_allocation_bytes=" + std::to_string(video_core_probe_.frame.AllocationBytes()) +
+         ";diagnostic_frames_presented=" + std::to_string(video_core_presentations_) +
+         ";rejected_requests=" + std::to_string(stats.rejected_requests) +
+         ";unsupported_requests=" + std::to_string(stats.unsupported_requests);
+}
+
 void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
                                      float height) {
   device_context_.Initialize();
   resource_allocator_.Initialize(device_context_.Device(), ResourceBudgetBytes);
   pipeline_cache_.Initialize(device_context_.Device());
   transfer_probe_ = RunD3D12TransferProbe(device_context_, resource_allocator_, transfer_stats_);
+  video_core_probe_ = RunD3D12VideoCoreProbe(device_context_, resource_allocator_, transfer_stats_);
 
   ComPtr<IDXGIFactory4> factory;
   winrt::check_hresult(
@@ -270,9 +295,16 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
                        FrameCount, false);
   (void)rtv_heap_.Allocate(FrameCount);
   icon_srv_heap_.Initialize(device_context_.Device(),
-                            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, true);
-  (void)icon_srv_heap_.Allocate();
+                            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2, true);
+  (void)icon_srv_heap_.Allocate(2);
   ResetGameIcon();
+  D3D12_SHADER_RESOURCE_VIEW_DESC frame_view{};
+  frame_view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  frame_view.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  frame_view.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+  frame_view.Texture2D.MipLevels = 1;
+  device_context_.Device()->CreateShaderResourceView(
+      video_core_probe_.frame.Get(), &frame_view, icon_srv_heap_.Cpu(1));
 
   for (UINT index = 0; index < FrameCount; ++index) {
     winrt::check_hresult(swap_chain_->GetBuffer(
@@ -334,6 +366,9 @@ void D3D12StatusRenderer::Render(const XboxShellState &state) {
   frame.fence_value = device_context_.Submit(command_list_);
   winrt::check_hresult(swap_chain_->Present(1, 0));
   ++submitted_frames_;
+  if (state.page == XboxShellPage::Diagnostics && video_core_probe_.Passed()) {
+    ++video_core_presentations_;
+  }
 }
 
 void D3D12StatusRenderer::DrawRectangle(float x, float y, float width,
@@ -544,6 +579,14 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
     DrawText(state.probes_passed ? "SYSTEM PROBES  PASS"
                                  : "SYSTEM PROBES  FAIL",
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);
+    DrawText(video_core_probe_.Passed() ? "VIDEOCORE DMA  PASS" : "VIDEOCORE DMA  FAIL",
+             0.51F, 0.39F, 3.6F, video_core_probe_.Passed() ? Accent : Failure);
+    if (video_core_probe_.Passed()) {
+      command_list_->SetGraphicsRootDescriptorTable(1, icon_srv_heap_.Gpu(1));
+      DrawGameIcon(0.51F, 0.46F, 0.30F, 0.267F);
+      command_list_->SetGraphicsRootDescriptorTable(1, icon_srv_heap_.Gpu(0));
+    }
+    DrawText("SYNTHETIC FRAME  NOT A GAME", 0.51F, 0.74F, 2.6F, SecondaryText);
   }
 
   DrawText(state.page == XboxShellPage::Games

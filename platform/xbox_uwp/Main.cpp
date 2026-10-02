@@ -1224,6 +1224,11 @@ private:
                                                    ? ERROR_SUCCESS
                                                    : ERROR_INVALID_DATA),
                     renderer_->TransferDetails()});
+      UpsertResult({"d3d12-videocore", renderer_->VideoCoreProbePassed(),
+                    static_cast<std::uint32_t>(renderer_->VideoCoreProbePassed()
+                                                   ? ERROR_SUCCESS
+                                                   : ERROR_INVALID_DATA),
+                    renderer_->VideoCoreDetails()});
     }
     std::erase_if(results_, [](const ProbeResult &result) {
       return result.name == "report-storage";

@@ -25,6 +25,13 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] Iniciar a Fase 2 com coerência de memória GPU desacoplada do Vulkan.
 - [ ] Backend D3D12 integrado ao video core.
 
+A fundação D3D12 do host (3A–3E) foi validada no Series S. A 3F adiciona
+um consumidor experimental da interface `VideoCore::GpuCommandSink` para
+DMA de buffers e um preview sintético em Diagnostics. Isso **não** significa
+que o Liverpool/PM4, shaders guest ou execução de jogos estejam ligados ao
+UWP; o item de backend completo acima permanece pendente. Procedimento:
+[validação da Fase 3](docs/PHASE3_VALIDATION.md).
+
 ## Baseline upstream
 
 O primeiro baseline do core é o release `v.0.18.0`, commit
@@ -78,6 +85,7 @@ O roteiro completo está em
 - [Arquitetura](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Validação da Fase 2L](docs/PHASE2L_VALIDATION.md)
+- [Validação da Fase 3 no Xbox](docs/PHASE3_VALIDATION.md)
 - [Matriz de plataforma](docs/PLATFORM_MATRIX.md)
 - [Teste no Xbox Dev Mode](docs/TESTING_XBOX_DEV_MODE.md)
 - [Baseline upstream](docs/UPSTREAM.md)

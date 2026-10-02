@@ -148,3 +148,55 @@ em WARP, rejeições sem alteração de estado, heaps imutáveis, footprint/boun
 inválidos e buffer copiado entre duas submissões (decay para COMMON). A
 debug layer, quando disponível, deve ficar sem ERROR/CORRUPTION. Os testes
 da 3D continuam executando draw e compute. A CI não substitui o Series S.
+
+## 3F: interface VideoCore e preview UWP
+
+Instale o novo MSIX como Game após os checks Windows verdes. Não é preciso
+adicionar jogos, sysmodules ou outro conteúdo ao USB.
+
+1. Abra **Diagnostics**. Deve aparecer `VIDEOCORE DMA PASS` e uma imagem
+   com a metade superior verde e a inferior laranja, identificada como
+   `SYNTHETIC FRAME NOT A GAME`. Envie uma captura dessa tela.
+2. Volte com B, entre em Games e alterne os ícones/títulos dez vezes.
+   Volte a Diagnostics e confira novamente as duas faixas.
+3. Enquanto estiver em Diagnostics, vá ao Dev Home e reabra. Confira que
+   o preview volta corretamente. Repita três vezes; os journals distinguem
+   retomada no mesmo processo de uma abertura em processo novo.
+4. Termine na Home do app e vá ao Dev Home para persistir. Envie
+   `phase0-results.jsonl` e `phase0-lifecycle.jsonl` junto da captura.
+
+`d3d12-videocore` deve passar, informar `interface=VideoCore.GpuCommandSink`,
+`source=synthetic_dma_fixture`, `buffer_verified=1`, `texture_verified=1`,
+`fills=2`, `copies=1`, `flushes=3`, `synchronizations=4`, `downloads=1`,
+`linear_frames=1`, `host_submit_events=2`, `markers=2`, zero rejeições e
+zero comandos não suportados na fixture. Marcadores são metadados do host
+(`marker_delivery=host_debug_metadata`, `gpu_marker_annotations=0`), não
+anotações PIX da GPU. `dma_ticket` deve ser positivo,
+`frame_ticket` maior, e o fence concluído deve alcançar ambos. Depois de
+visitar Diagnostics, `diagnostic_frames_presented` deve ser positivo.
+
+O autoteste usa o contrato real de forma polimórfica, mas NÃO decodifica
+PM4 nem faz boot. `liverpool_bound=0`, `guest_draw_supported=0` e
+`guest_dispatch_supported=0` são limites esperados, não falhas escondidas.
+Pedidos não suportados são rejeitados na implementação e testados na CI.
+
+**Mudança intencional de baseline de memória nesta build:** o frame de
+preview fica vivo para ser reapresentado, inclusive na Home. Após sair de
+Games, espere `live_resources=1` e `live_bytes=default_bytes` igual a
+`frame_allocation_bytes` informado por `d3d12-videocore`. UPLOAD/READBACK
+devem ser zero; não espere o zero absoluto das builds 3C–3E. Enquanto um
+ícone estiver ativo em Games, haverá uma segunda textura DEFAULT. Fechar o
+renderer libera o frame também. Contadores e baseline devem permanecer
+estáveis durante navegação e retomada no mesmo processo.
+
+O heap do shell passa a ter `srv_slots=2`; roots/PSOs e hits permanecem
+2/1/1/4. Os autotestes somados geram `buffer_copies=6` e pelo menos oito
+`texture_copies`, mais uploads de ícones. Clears/resolve/UAV da 3E continuam
+aprovados. Os contadores não representam execução de jogo ou FPS guest.
+
+`phase3.d3d12-videocore` no Windows/WARP valida dados/frame por readback,
+limites do registro, intervalos parciais, retenção de staging até o fence,
+descarte sem submissão, rejeição de comandos não suportados e amostragem
+da textura em um draw offscreen com comparação de pixels. A debug layer
+fica sem ERROR/CORRUPTION quando disponível. Só o Series S valida o preview
+DXIL no CoreWindow, a navegação e a retomada nesta build.

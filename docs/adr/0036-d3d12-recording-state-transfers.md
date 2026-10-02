@@ -1,6 +1,6 @@
 # ADR 0036 — Estados explícitos e transferências no host D3D12
 
-- Status: aceito; validação no Series S pendente
+- Status: aceito; validado no Series S
 - Data: 2026-10-02
 
 ## Viabilidade e dependências
@@ -49,6 +49,13 @@ fazem o teste falhar. A validação de apresentação/ícones e retomada no
 Series S está em [PHASE3_VALIDATION.md](../PHASE3_VALIDATION.md).
 
 ## Limites
+
+Em 2026-10-02, a sessão `134354448962723818-4692` aprovou todos os 16
+probes no Series S: resolve MSAA 4×, dados/pixels/depth por readback e
+nenhum pedido rejeitado. O pico de recursos foi 4915200 bytes, com zero
+recursos vivos e nenhuma falha ao suspender após voltar à Home. Foram
+apresentados 20 frames; ticket 27 concluído, suspensão drenada e retomada
+com apresentação no mesmo processo aprovadas.
 
 Não há rastreamento global/subresource divergente, split/enhanced barriers,
 aliasing de placed/reserved resources, copy queue, stencil clear, cópia

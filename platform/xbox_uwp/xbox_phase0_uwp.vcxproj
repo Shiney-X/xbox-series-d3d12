@@ -82,6 +82,8 @@
     <ClInclude Include="d3d12_compute_probe.h" />
     <ClInclude Include="d3d12_command_encoder.h" />
     <ClInclude Include="d3d12_transfer_probe.h" />
+    <ClInclude Include="d3d12_videocore_bridge.h" />
+    <ClInclude Include="d3d12_videocore_probe.h" />
     <ClInclude Include="d3d12_status_renderer.h" />
     <ClInclude Include="library_folder_access.h" />
     <ClInclude Include="memory_pressure_probe.h" />
@@ -96,6 +98,8 @@
     <ClCompile Include="d3d12_compute_probe.cpp" />
     <ClCompile Include="d3d12_command_encoder.cpp" />
     <ClCompile Include="d3d12_transfer_probe.cpp" />
+    <ClCompile Include="d3d12_videocore_bridge.cpp" />
+    <ClCompile Include="d3d12_videocore_probe.cpp" />
     <ClCompile Include="d3d12_status_renderer.cpp" />
     <ClCompile Include="library_folder_access.cpp" />
     <ClCompile Include="memory_pressure_probe.cpp" />
