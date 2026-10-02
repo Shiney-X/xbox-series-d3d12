@@ -1,6 +1,6 @@
 # ADR 0034 — Recursos committed com posse e orçamento no host D3D12
 
-- Status: proposto; aguardando teste da 3C no Series S
+- Status: aceito; validado no Series S
 - Data: 2026-10-02
 
 ## Contexto e viabilidade
@@ -43,6 +43,14 @@ No Xbox, a troca de ícones e retorno à Home exercitam a mesma implementação.
 O relatório `d3d12-resources` deve mostrar pico positivo, nenhuma falha e
 zero recursos vivos após sair da biblioteca. O procedimento completo está
 em [PHASE3_VALIDATION.md](../PHASE3_VALIDATION.md).
+
+Em 2026-10-02, a sessão `134354421747283697-2788` passou todos os probes
+no Series S. A primeira captura mostrou uma textura DEFAULT de 262144 bytes
+e nenhum staging vivo, após 34 criações. A segunda, depois de voltar à Home,
+confirmou `live_resources=0`, `live_bytes=0` e todos os heaps contabilizados
+zerados, preservando o mesmo número de criações. O pico foi 524288 bytes,
+sem falhas de alocação. A GPU concluiu o ticket 108; suspensão e retomada
+com reapresentação no mesmo processo foram aprovadas.
 
 ## Consequências e limites
 

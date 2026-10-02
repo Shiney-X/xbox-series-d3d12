@@ -289,7 +289,7 @@ o marco só se encerra após a comparação visual de uma cena de jogo real.
       conferir contadores de submissão e reutilização em `phase0-results.jsonl`.
 - [x] 3C: centralizar buffers/texturas committed, posse RAII e contabilidade
       por heap com teto de memória do host; integrar o upload de ícones.
-- [ ] Validar 3C no Xbox: alternar ícones, voltar à Home e conferir que o
+- [x] Validar 3C no Xbox: alternar ícones, voltar à Home e conferir que o
       orçamento dos recursos liberados retorna a zero no relatório.
 - [ ] 3D: descriptors, root signatures e graphics/compute PSOs com cache.
 - [ ] 3E: barriers, copies, clears e resolves.
@@ -308,6 +308,14 @@ residência implícita, sem eviction/subalocação. Swapchain, descriptors,
 pipelines, dados de CPU e caches Vulkan estão fora dessa contagem. A
 integração com o renderer PS4 ainda precisa tratar sua política de memória
 e vida útil; o trabalho no host não encerra esses requisitos do emulador.
+
+A 3C foi validada no Series S em 2 de outubro de 2026, na sessão
+`134354421747283697-2788`. Após alternar ícones e voltar à Home, todos os
+probes passaram: 34 recursos criados, pico de 524288 bytes (512 KiB),
+nenhuma falha e zero bytes/recursos vivos em todos os heaps contabilizados.
+Foram apresentados 69 frames, com 67 reutilizações de allocator e ticket
+final 108 concluído antes da suspensão. A reapresentação após retomada no
+mesmo processo também passou.
 
 O teste da 3A de 2 de outubro de 2026 passou todos os probes no Series S,
 detectou dois jogos e dois ícones válidos e apresentou o ícone selecionado.
