@@ -23,6 +23,10 @@ void Check(bool condition, const char *message) {
 template <class Action> void Reject(Action action, HRESULT expected) {
   try {
     action();
+  } catch (const std::bad_alloc &) {
+    // C++/WinRT translates E_OUTOFMEMORY into std::bad_alloc.
+    Check(expected == E_OUTOFMEMORY, "unexpected allocation exception");
+    return;
   } catch (const winrt::hresult_error &error) {
     Check(error.code().value == expected, "unexpected rejection HRESULT");
     return;
