@@ -25,12 +25,17 @@ Series S em Dev Mode, usando UWP x64 e um futuro backend Direct3D 12 nativo.
 - [x] Iniciar a Fase 2 com coerência de memória GPU desacoplada do Vulkan.
 - [ ] Backend D3D12 integrado ao video core.
 
-A fundação D3D12 do host (3A–3E) foi validada no Series S. A 3F adiciona
+A fundação D3D12 do host (3A–3F) foi validada no Series S. A 3F adiciona
 um consumidor experimental da interface `VideoCore::GpuCommandSink` para
 DMA de buffers e um preview sintético em Diagnostics. Isso **não** significa
 que o Liverpool/PM4, shaders guest ou execução de jogos estejam ligados ao
 UWP; o item de backend completo acima permanece pendente. Procedimento:
 [validação da Fase 3](docs/PHASE3_VALIDATION.md).
+
+A 4A inicia SPIR-V → HLSL → DXIL no próprio UWP com SPIRV-Cross,
+dispatch compute e readback de uma fixture autoral; validação no console
+pendente. Ainda não traduz shaders de jogos nem compila o core completo.
+Procedimento: [validação da Fase 4](docs/PHASE4_VALIDATION.md).
 
 ## Baseline upstream
 

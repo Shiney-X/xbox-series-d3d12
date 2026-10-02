@@ -67,7 +67,7 @@
       <LanguageStandard>stdcpp23</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <CompileAsWinRT>false</CompileAsWinRT>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\src;$(ProjectDir)..\..\src\phase0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\src;$(ProjectDir)..\..\src\phase0;$(ProjectDir)..\..\out\shader-tools\_deps\spirv_cross-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>d3d12.lib;dxcompiler.lib;dxgi.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -101,6 +101,14 @@
     <ClCompile Include="d3d12_videocore_bridge.cpp" />
     <ClCompile Include="d3d12_videocore_probe.cpp" />
     <ClCompile Include="d3d12_status_renderer.cpp" />
+    <ClCompile Include="shaders\spirv_hlsl_bridge.cpp" />
+    <ClCompile Include="shaders\compute_fixture.cpp" />
+    <ClCompile Include="..\..\out\shader-tools\_deps\spirv_cross-src\spirv_cross.cpp"><WarningLevel>TurnOffAllWarnings</WarningLevel><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="..\..\out\shader-tools\_deps\spirv_cross-src\spirv_parser.cpp"><WarningLevel>TurnOffAllWarnings</WarningLevel><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="..\..\out\shader-tools\_deps\spirv_cross-src\spirv_cross_parsed_ir.cpp"><WarningLevel>TurnOffAllWarnings</WarningLevel><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="..\..\out\shader-tools\_deps\spirv_cross-src\spirv_cfg.cpp"><WarningLevel>TurnOffAllWarnings</WarningLevel><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="..\..\out\shader-tools\_deps\spirv_cross-src\spirv_glsl.cpp"><WarningLevel>TurnOffAllWarnings</WarningLevel><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="..\..\out\shader-tools\_deps\spirv_cross-src\spirv_hlsl.cpp"><WarningLevel>TurnOffAllWarnings</WarningLevel><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
     <ClCompile Include="library_folder_access.cpp" />
     <ClCompile Include="memory_pressure_probe.cpp" />
     <ClCompile Include="..\..\src\core\uwp\core_bridge.cpp" />
@@ -125,6 +133,10 @@
     </None>
     <None Include="$(WindowsSdkDir)Redist\D3D\x64\dxil.dll">
       <Link>dxil.dll</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <None Include="shaders\ThirdPartyNotices.txt">
+      <Link>ThirdParty\SPIRV-Cross-Notices.txt</Link>
       <DeploymentContent>true</DeploymentContent>
     </None>
   </ItemGroup>

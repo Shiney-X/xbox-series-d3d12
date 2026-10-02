@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "d3d12_compute_probe.h"
+#include "spirv_hlsl_bridge.h"
 
 #include <d3dcompiler.h>
 #include <d3d12sdklayers.h>
@@ -219,9 +220,26 @@ int main() {
     const auto shader = Compile(D3D12ComputeProbeShader, "CSMain", "cs_5_0");
     Check(RunD3D12ComputeProbe(context, allocator, cache, Bytes(shader.Get())),
           "compute dispatch/readback values differ");
+    const auto translated = Xbox::Shaders::TranslateCompute(Xbox::Shaders::ComputeFixture());
+    const auto translated_shader = Compile(translated.hlsl.c_str(), "main", "cs_5_1");
+    Check(RunD3D12ComputeProbe(context, allocator, cache, Bytes(translated_shader.Get())),
+          "SPIR-V/HLSL compute readback values differ");
+    auto changed_words = Xbox::Shaders::ComputeFixture();
+    for (std::size_t offset = 5; offset < changed_words.size();) {
+      const auto count = changed_words[offset] >> 16;
+      if ((changed_words[offset] & 0xffff) == 43 && count == 4 &&
+          changed_words[offset + 3] == 100) {
+        changed_words[offset + 3] = 200;
+      }
+      offset += count;
+    }
+    const auto changed_translation = Xbox::Shaders::TranslateCompute(changed_words);
+    const auto changed_shader = Compile(changed_translation.hlsl.c_str(), "main", "cs_5_1");
+    Check(!RunD3D12ComputeProbe(context, allocator, cache, Bytes(changed_shader.Get())),
+          "readback oracle accepted deliberately wrong shader values");
     Check(allocator.Stats().live_resources == 0 && allocator.Stats().live_bytes == 0,
           "test resources leaked");
-    Check(cache.Stats().compute_creations == 1 && cache.Stats().cache_hits >= 4,
+    Check(cache.Stats().compute_creations == 3 && cache.Stats().cache_hits >= 8,
           "compute cache did not reuse the PSO");
     ComPtr<ID3D12InfoQueue> queue;
     if (SUCCEEDED(context.Device()->QueryInterface(IID_PPV_ARGS(queue.ReleaseAndGetAddressOf())))) {

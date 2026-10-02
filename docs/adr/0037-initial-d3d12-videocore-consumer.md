@@ -1,6 +1,6 @@
 # ADR 0037 — Consumidor inicial VideoCore/D3D12 e preview no UWP
 
-- Status: aceito; validação no Series S pendente
+- Status: aceito; validado no Series S
 - Data: 2026-10-02
 
 ## Viabilidade e dependências
@@ -40,6 +40,13 @@ nem o consumidor Vulkan. Não exige biblioteca nova ou GDK.
   próprio. O relatório informa `gpu_marker_annotations=0` explicitamente.
 
 ## Validação e apresentação
+
+Validado em 2026-10-02, sessão `134354472178773688-6484`: os 17 probes
+passaram. Readbacks de buffer/textura e três apresentações em Diagnostics
+aprovados; 52 frames, 50 reutilizações, ticket 76 concluído, retomada no mesmo
+processo e zero rejeições/falhas de alocação. O frame DEFAULT de 65536 bytes
+permaneceu vivo como projetado, com UPLOAD/READBACK zerados. O usuário
+confirmou visualmente as faixas em Diagnostics.
 
 A fixture chama a interface polimorficamente: duas fills, uma copy,
 marcadores e submissão/sincronização. Readback confirma os pixels no buffer.
