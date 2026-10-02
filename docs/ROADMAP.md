@@ -101,7 +101,10 @@ upstream; ela não equivale a portar todos os subsistemas do emulador para UWP.
 ## Fase 2 — Desacoplamento gráfico
 
 **Status: Fases 2J e 2K integradas; ferramentas de regressão da Fase 2L em
-validação; comparação visual de jogo real pendente.**
+validação; comparação visual de jogo real pendente.** DELTARUNE `CUSA15250`
+foi observado em gameplay no shadPS4 SDL/Vulkan após o merge da 2L. É um
+smoke test funcional; uma única captura de janela não constitui o par de
+frames game-only exigido para fechar a regressão visual.
 
 - [x] Introduzir o primeiro contrato neutro para coerência de memória GPU.
 - [x] Remover `Vulkan::Rasterizer` de `Core::MemoryManager` e `PageManager`.
@@ -127,7 +130,7 @@ validação; comparação visual de jogo real pendente.**
       criação, transições, transferências, cópia de região e clear de imagens.
 - [x] Remover declarações de handles e outros tipos `vk::` dos cabeçalhos de
       `amdgpu`, `buffer_cache` e `texture_cache`.
-- [ ] Manter o backend Vulkan funcional.
+- [x] Manter o backend Vulkan funcional.
 - [x] Criar testes de contrato e replay sintético das transições neutras.
 - [ ] Comparar capturas reais do renderer Vulkan antes/depois da 2K.
 
@@ -276,12 +279,21 @@ o marco só se encerra após a comparação visual de uma cena de jogo real.
 
 ## Fase 3 — Backend D3D12
 
+- [x] 3A: extrair a posse de device, fila direta, criação de command lists e
+      fence do shell UWP para um contexto D3D12 reutilizável no host.
+- [ ] Validar 3A em MSIX no Xbox: abrir shell, renderizar ícone, sair ao Dev
+      Home e reabrir; conferir que suspensão/retomada não regrediu.
 - [ ] Device, queues, command lists e fences.
 - [ ] Alocador de recursos e residency.
 - [ ] Descriptors e root signatures.
 - [ ] Barriers, copies, clears e resolves.
 - [ ] Graphics/compute PSOs e cache persistente.
 - [ ] Swapchain UWP.
+
+O contexto 3A reorganiza recursos **já usados pelo shell**. Ainda não recebe
+comandos PM4 do shadPS4, não implementa cache de recursos/pipelines de jogo
+e não permite iniciar um título no Xbox. O checklist geral permanece aberto
+até existir integração com o renderer do emulador.
 
 ## Fase 4 — Shaders
 

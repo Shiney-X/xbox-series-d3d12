@@ -78,6 +78,14 @@ como Shader Model 6/DXIL. `dxcompiler.dll` e o validador `dxil.dll` da versão d
 Windows SDK usada no build são empacotados junto ao MSIX, evitando dependência
 implícita de uma instalação de ferramentas no console.
 
+Na Fase 3A, `platform/xbox_uwp/d3d12_device_context.*` possui o device, a fila
+direta, o fence e o evento de espera. Ele cria pares de allocator/list para o
+shell e para upload de ícones. `D3D12StatusRenderer` continua responsável por
+swapchain, RTV/SRV, recursos da interface e submissão de comandos. A espera
+atual é síncrona após apresentação e upload; é correta para o shell, mas não
+serve como modelo de throughput para o futuro renderer de jogos. O contexto
+não é ligado ao `GpuCommandSink` nem traduz comandos PM4.
+
 O probe usa as interfaces estáveis `IDxcLibrary` e `IDxcCompiler`. O primeiro
 teste com `IDxcCompiler3` retornou `E_NOINTERFACE` no Series S, embora a mesma
 versão compilasse no SDK 26100. A escolha da interface antiga afeta somente a

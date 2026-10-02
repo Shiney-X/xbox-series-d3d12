@@ -76,6 +76,7 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
+    <ClInclude Include="d3d12_device_context.h" />
     <ClInclude Include="d3d12_status_renderer.h" />
     <ClInclude Include="library_folder_access.h" />
     <ClInclude Include="memory_pressure_probe.h" />
@@ -84,6 +85,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="d3d12_device_context.cpp" />
     <ClCompile Include="d3d12_status_renderer.cpp" />
     <ClCompile Include="library_folder_access.cpp" />
     <ClCompile Include="memory_pressure_probe.cpp" />
