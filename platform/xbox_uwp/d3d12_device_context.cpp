@@ -5,6 +5,8 @@
 #include <dxgi1_4.h>
 #include <winrt/base.h>
 
+#include <limits>
+
 using Microsoft::WRL::ComPtr;
 
 D3D12DeviceContext::~D3D12DeviceContext() {
@@ -13,9 +15,12 @@ D3D12DeviceContext::~D3D12DeviceContext() {
   }
 }
 
-void D3D12DeviceContext::Initialize() {
+void D3D12DeviceContext::Initialize(IUnknown *adapter) {
+  if (device_) {
+    winrt::throw_hresult(E_UNEXPECTED);
+  }
   winrt::check_hresult(D3D12CreateDevice(
-      nullptr, D3D_FEATURE_LEVEL_11_0,
+      adapter, D3D_FEATURE_LEVEL_11_0,
       IID_PPV_ARGS(device_.ReleaseAndGetAddressOf())));
 
   D3D12_COMMAND_QUEUE_DESC queue_description{};
@@ -44,14 +49,52 @@ void D3D12DeviceContext::CreateDirectCommands(
       IID_PPV_ARGS(list.ReleaseAndGetAddressOf())));
 }
 
-void D3D12DeviceContext::WaitForGpu() {
-  const UINT64 value = ++fence_value_;
-  winrt::check_hresult(direct_queue_->Signal(fence_.Get(), value));
-  if (fence_->GetCompletedValue() >= value) {
+UINT64 D3D12DeviceContext::Signal() {
+  winrt::check_hresult(submission_error_);
+  // UINT64_MAX is reserved by D3D12 to report device removal.
+  if (fence_value_ >= std::numeric_limits<UINT64>::max() - 1U) {
+    winrt::throw_hresult(E_UNEXPECTED);
+  }
+  const UINT64 value = fence_value_ + 1U;
+  submission_error_ = direct_queue_->Signal(fence_.Get(), value);
+  // A failed signal leaves already-executed lists without a completion ticket.
+  // Do not allow later calls to recycle their allocators using an older ticket.
+  winrt::check_hresult(submission_error_);
+  fence_value_ = value;
+  return value;
+}
+
+UINT64 D3D12DeviceContext::Submit(ID3D12CommandList *list) {
+  winrt::check_hresult(submission_error_);
+  if (list == nullptr) {
+    winrt::throw_hresult(E_INVALIDARG);
+  }
+  ID3D12CommandList *lists[]{list};
+  direct_queue_->ExecuteCommandLists(1, lists);
+  ++submitted_lists_;
+  return Signal();
+}
+
+UINT64 D3D12DeviceContext::CompletedValue() const {
+  winrt::check_hresult(submission_error_);
+  const UINT64 completed = fence_->GetCompletedValue();
+  if (completed == std::numeric_limits<UINT64>::max()) {
+    winrt::check_hresult(device_->GetDeviceRemovedReason());
+    winrt::throw_hresult(DXGI_ERROR_DEVICE_REMOVED);
+  }
+  return completed;
+}
+
+void D3D12DeviceContext::Wait(UINT64 ticket) {
+  if (ticket > fence_value_) {
+    winrt::throw_hresult(E_INVALIDARG);
+  }
+  if (CompletedValue() >= ticket) {
     return;
   }
 
-  winrt::check_hresult(fence_->SetEventOnCompletion(value, fence_event_));
+  winrt::check_hresult(fence_->SetEventOnCompletion(ticket, fence_event_));
+  ++blocking_waits_;
   const DWORD wait_result = WaitForSingleObjectEx(fence_event_, INFINITE, FALSE);
   if (wait_result == WAIT_FAILED) {
     winrt::throw_last_error();
@@ -59,6 +102,13 @@ void D3D12DeviceContext::WaitForGpu() {
   if (wait_result != WAIT_OBJECT_0) {
     winrt::throw_hresult(E_UNEXPECTED);
   }
+  if (CompletedValue() < ticket) {
+    winrt::throw_hresult(E_UNEXPECTED);
+  }
+}
+
+void D3D12DeviceContext::WaitForGpu() {
+  Wait(Signal());
 }
 
 bool D3D12DeviceContext::TryTrim() {

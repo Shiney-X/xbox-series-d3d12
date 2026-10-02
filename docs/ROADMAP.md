@@ -281,8 +281,12 @@ o marco só se encerra após a comparação visual de uma cena de jogo real.
 
 - [x] 3A: extrair a posse de device, fila direta, criação de command lists e
       fence do shell UWP para um contexto D3D12 reutilizável no host.
-- [ ] Validar 3A em MSIX no Xbox: abrir shell, renderizar ícone, sair ao Dev
-      Home e reabrir; conferir que suspensão/retomada não regrediu.
+- [x] Validar 3A em MSIX no Xbox: abrir shell, renderizar ícone, suspender,
+      sair ao Dev Home e reabrir em novo processo.
+- [x] 3B: submeter command lists com tickets de fence, usar dois contextos de
+      frame e drenar a fila ao alterar ícones, suspender ou encerrar o shell.
+- [x] Validar 3B no Xbox com navegação repetida, uploads de ícones e retomada;
+      conferir contadores de submissão e reutilização em `phase0-results.jsonl`.
 - [ ] Device, queues, command lists e fences.
 - [ ] Alocador de recursos e residency.
 - [ ] Descriptors e root signatures.
@@ -294,6 +298,21 @@ O contexto 3A reorganiza recursos **já usados pelo shell**. Ainda não recebe
 comandos PM4 do shadPS4, não implementa cache de recursos/pipelines de jogo
 e não permite iniciar um título no Xbox. O checklist geral permanece aberto
 até existir integração com o renderer do emulador.
+
+O teste da 3A de 2 de outubro de 2026 passou todos os probes no Series S,
+detectou dois jogos e dois ícones válidos e apresentou o ícone selecionado.
+Os journals registraram três processos com suspensão; não contêm evento
+`resume`, portanto não comprovam retomada no mesmo processo para essa build.
+A 3B remove a espera completa ao fim de cada apresentação. A verificação
+Windows usa D3D12/WARP com cópia e readback, e o teste de console está descrito
+em [`PHASE3_VALIDATION.md`](PHASE3_VALIDATION.md).
+
+A 3B foi validada no Series S em 2 de outubro de 2026: todos os probes
+passaram, com 45 frames, 52 listas submetidas, 43 reutilizações de allocator
+e sete esperas bloqueantes. O fence completou o último ticket sinalizado
+(65) e a suspensão confirmou `gpu_drained=1`. O journal desta build contém
+duas suspensões e uma retomada na mesma sessão, com reapresentação aprovada.
+Dois jogos e dois ícones válidos foram detectados, com o selecionado exibido.
 
 ## Fase 4 — Shaders
 

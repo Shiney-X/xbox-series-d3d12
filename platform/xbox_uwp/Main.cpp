@@ -1196,6 +1196,16 @@ private:
   }
 
   void PersistReport() {
+    if (renderer_ && renderer_->SubmissionReady()) {
+      try {
+        UpsertResult({"d3d12-submission", true, ERROR_SUCCESS,
+                      renderer_->SubmissionDetails()});
+      } catch (const hresult_error &error) {
+        UpsertResult({"d3d12-submission", false,
+                      static_cast<std::uint32_t>(error.code().value),
+                      to_string(error.message())});
+      }
+    }
     std::erase_if(results_, [](const ProbeResult &result) {
       return result.name == "report-storage";
     });
@@ -1221,7 +1231,7 @@ private:
                          : "dxgi_trim_supported=0;dxgi_trim_called=0";
       UpsertResult({"lifecycle-suspend", journal_error == ERROR_SUCCESS,
                     journal_error,
-                    "suspending event observed;" + trim_details +
+                    "suspending event observed;gpu_drained=1;" + trim_details +
                         ";session=" + session_id_});
     } catch (const hresult_error &error) {
       UpsertResult({"lifecycle-suspend", false,

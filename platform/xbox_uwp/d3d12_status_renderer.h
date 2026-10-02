@@ -74,9 +74,14 @@ struct XboxShellState {
 
 class D3D12StatusRenderer final {
 public:
+  ~D3D12StatusRenderer();
+
   void Initialize(IUnknown *core_window, float width, float height);
   void Render(const XboxShellState &state);
-  [[nodiscard]] bool TryTrim() { return device_context_.TryTrim(); }
+  void Flush();
+  [[nodiscard]] bool TryTrim();
+  [[nodiscard]] bool SubmissionReady() const noexcept { return initialized_; }
+  [[nodiscard]] std::string SubmissionDetails() const;
   [[nodiscard]] bool SelectedGameIconReady() const noexcept {
     return selected_icon_ready_;
   }
@@ -90,23 +95,41 @@ private:
                 const std::array<float, 4> &color);
   void DrawHome(const XboxShellState &state);
   void DrawPage(const XboxShellState &state);
-  void EnsureSelectedGameIcon(const XboxShellState &state) noexcept;
+  void EnsureSelectedGameIcon(const XboxShellState &state);
   void ResetGameIcon() noexcept;
   [[nodiscard]] bool UploadGameIcon(const XboxGameListEntry &game);
 
   static constexpr UINT FrameCount = 2;
 
+  struct FrameContext {
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commands;
+    UINT64 fence_value{};
+  };
+
+  struct IconUpload {
+    Microsoft::WRL::ComPtr<ID3D12Resource> texture;
+    Microsoft::WRL::ComPtr<ID3D12Resource> staging;
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commands;
+  };
+
   D3D12DeviceContext device_context_;
   Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain_;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtv_heap_;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> icon_srv_heap_;
-  Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator_;
-  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> command_list_;
+  std::array<FrameContext, FrameCount> frames_;
+  // Borrowed only while recording a frame; frames_ owns the command lists.
+  ID3D12GraphicsCommandList *command_list_{};
   Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature_;
   Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline_state_;
   std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, FrameCount>
       render_targets_;
   Microsoft::WRL::ComPtr<ID3D12Resource> selected_icon_texture_;
+  IconUpload pending_icon_upload_;
+  UINT64 submitted_frames_{};
+  UINT64 allocator_reuses_{};
+  bool initialized_{};
   std::uint64_t selected_icon_hash_{};
   bool selected_icon_ready_{};
   UINT rtv_descriptor_size_{};

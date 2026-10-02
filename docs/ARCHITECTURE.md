@@ -81,10 +81,14 @@ implícita de uma instalação de ferramentas no console.
 Na Fase 3A, `platform/xbox_uwp/d3d12_device_context.*` possui o device, a fila
 direta, o fence e o evento de espera. Ele cria pares de allocator/list para o
 shell e para upload de ícones. `D3D12StatusRenderer` continua responsável por
-swapchain, RTV/SRV, recursos da interface e submissão de comandos. A espera
-atual é síncrona após apresentação e upload; é correta para o shell, mas não
-serve como modelo de throughput para o futuro renderer de jogos. O contexto
-não é ligado ao `GpuCommandSink` nem traduz comandos PM4.
+swapchain, RTV/SRV e recursos da interface. Na 3B, o contexto submete listas e
+devolve tickets monotônicos de fence. Cada um dos dois backbuffers possui um
+allocator/list e o ticket de seu último uso; o shell espera esse ticket antes
+de resetar o allocator. A apresentação não faz mais uma espera completa ao
+final de cada frame. A troca do SRV compartilhado de ícone, a suspensão e o
+encerramento drenam a fila; o upload de ícones permanece síncrono. Contadores
+de frames, listas, reutilizações e esperas são persistidos com os probes.
+O contexto não é ligado ao `GpuCommandSink` nem traduz comandos PM4.
 
 O probe usa as interfaces estáveis `IDxcLibrary` e `IDxcCompiler`. O primeiro
 teste com `IDxcCompiler3` retornou `E_NOINTERFACE` no Series S, embora a mesma
