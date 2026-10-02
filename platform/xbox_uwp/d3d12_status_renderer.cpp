@@ -567,6 +567,7 @@ void D3D12StatusRenderer::EnsureSelectedGameIcon(
   // that descriptor or releasing the previous texture. Wait failures must
   // propagate rather than taking the optional-icon fallback path.
   Flush();
+  pending_icon_upload_ = {};
   try {
     ResetGameIcon();
     if (desired_icon) {
@@ -665,7 +666,12 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
   upload_commands->ResourceBarrier(1, &barrier);
   winrt::check_hresult(upload_commands->Close());
-  const UINT64 upload_ticket = device_context_.Submit(upload_commands.Get());
+  // If signaling or waiting fails, keep queued resources and their allocator
+  // alive in the renderer until a later successful drain (or process teardown).
+  pending_icon_upload_ = {std::move(texture), std::move(upload),
+                          std::move(upload_allocator), std::move(upload_commands)};
+  const UINT64 upload_ticket =
+      device_context_.Submit(pending_icon_upload_.commands.Get());
   device_context_.Wait(upload_ticket);
 
   D3D12_SHADER_RESOURCE_VIEW_DESC icon_view{};
@@ -674,9 +680,10 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   icon_view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
   icon_view.Texture2D.MipLevels = 1;
   device_context_.Device()->CreateShaderResourceView(
-      texture.Get(), &icon_view,
+      pending_icon_upload_.texture.Get(), &icon_view,
       icon_srv_heap_->GetCPUDescriptorHandleForHeapStart());
-  selected_icon_texture_ = std::move(texture);
+  selected_icon_texture_ = std::move(pending_icon_upload_.texture);
+  pending_icon_upload_ = {};
   return true;
 }
 

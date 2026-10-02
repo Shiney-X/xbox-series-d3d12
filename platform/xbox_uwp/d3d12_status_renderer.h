@@ -107,6 +107,13 @@ private:
     UINT64 fence_value{};
   };
 
+  struct IconUpload {
+    Microsoft::WRL::ComPtr<ID3D12Resource> texture;
+    Microsoft::WRL::ComPtr<ID3D12Resource> staging;
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commands;
+  };
+
   D3D12DeviceContext device_context_;
   Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain_;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtv_heap_;
@@ -119,6 +126,7 @@ private:
   std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, FrameCount>
       render_targets_;
   Microsoft::WRL::ComPtr<ID3D12Resource> selected_icon_texture_;
+  IconUpload pending_icon_upload_;
   UINT64 submitted_frames_{};
   UINT64 allocator_reuses_{};
   bool initialized_{};

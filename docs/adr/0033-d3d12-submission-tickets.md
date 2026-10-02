@@ -23,7 +23,9 @@ remoção de dispositivo, não como conclusão de todas as submissões.
 O shell possui dois pares de allocator/list, um por backbuffer, e espera
 somente o ticket do par a reutilizar. Ao trocar o ícone compartilhado, drena
 a fila antes de alterar o SRV ou liberar a textura anterior. A cópia do ícone
-continua esperando seu próprio ticket antes de liberar o upload. Suspensão
+continua esperando seu próprio ticket antes de liberar o upload. Se a espera
+ou a sinalização falhar, os recursos da cópia ficam retidos no renderer até
+uma drenagem posterior bem-sucedida ou o encerramento do processo. Suspensão
 e encerramento drenam a fila. As operações continuam serializadas na thread
 da UI; sincronização entre várias filas/threads pertence a trabalho futuro.
 
