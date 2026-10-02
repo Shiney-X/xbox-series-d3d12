@@ -8,7 +8,8 @@
 bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
                            D3D12ResourceAllocator &allocator,
                            D3D12PipelineCache &cache,
-                           D3D12_SHADER_BYTECODE shader) {
+                           D3D12_SHADER_BYTECODE shader,
+                           D3D12TransferStats *stats) {
   D3D12_DESCRIPTOR_RANGE range{};
   range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
   range.NumDescriptors = 1;
@@ -58,27 +59,18 @@ bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
   Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commands_allocator;
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commands;
   context.CreateDirectCommands(commands_allocator, commands);
+  D3D12TransferStats local_stats;
+  D3D12CommandEncoder encoder(commands.Get(), stats ? *stats : local_stats);
+  encoder.Track(output.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+  encoder.Track(readback.Get(), D3D12_RESOURCE_STATE_COPY_DEST);
   commands->SetPipelineState(pipeline.Get());
   commands->SetComputeRootSignature(root->Get());
   ID3D12DescriptorHeap *heaps[]{descriptors.Heap()};
   commands->SetDescriptorHeaps(1, heaps);
   commands->SetComputeRootDescriptorTable(0, descriptors.Gpu(slot));
   commands->Dispatch(1, 1, 1);
-  D3D12_RESOURCE_BARRIER barrier{};
-  barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-  barrier.Transition.pResource = output.Get();
-  barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-  barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-  barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-  commands->ResourceBarrier(1, &barrier);
-  D3D12_TEXTURE_COPY_LOCATION source{};
-  source.pResource = output.Get();
-  source.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-  D3D12_TEXTURE_COPY_LOCATION destination{};
-  destination.pResource = readback.Get();
-  destination.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-  destination.PlacedFootprint = footprint;
-  commands->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
+  encoder.UavBarrier(output.Get());
+  encoder.CopyTextureToBuffer(readback.Get(), output.Get(), footprint);
   winrt::check_hresult(commands->Close());
   context.Wait(context.Submit(commands.Get()));
 

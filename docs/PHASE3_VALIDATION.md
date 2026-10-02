@@ -105,3 +105,46 @@ de executar o mesmo autoteste de compute. Habilita a debug layer quando
 disponível e rejeita mensagens ERROR/CORRUPTION. As fixtures desktop usam
 SM5/DXBC via D3DCompile; o MSIX usa SM6/DXIL via DXC. Só o teste no Series S
 valida o segundo caminho em hardware e a apresentação UWP.
+
+## 3E: estados, cópias, clears e resolve
+
+Instale o novo MSIX da 3E como Game após os dois checks Windows verdes.
+Nenhum arquivo de jogo novo é necessário: os autotestes são internos ao
+host e usam a GPU real do console na abertura de cada processo.
+
+1. Abra o app e confira Home, Games e os ícones dos dois títulos.
+2. Alterne os títulos dez vezes. Volte com B e navegue por Settings e
+   Diagnostics, conferindo que a apresentação continua normal.
+3. Vá ao Dev Home e reabra três vezes. Termine na Home do app e volte ao
+   Dev Home para suspender/persistir o relatório.
+4. Envie `phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+O novo `d3d12-transfers` deve passar, com `probe_passed=1`,
+`resolve_supported=1`, `resolve_sample_count=2` ou `4`, `buffer_copies=2`,
+`depth_clears=1`, `resolves=1`, `uav_barriers=1` e `rejected_requests=0`.
+`texture_copies` deve ser pelo menos 6: cinco do autoteste de transferências
+e uma do compute. Uploads de ícones aumentam esse número. `color_clears`
+deve ser o número de frames apresentados mais dois (clears do autoteste).
+Transições e no-ops são contados separadamente; no-ops não emitem barriers.
+
+O autoteste confirma por readback: os inteiros de duas cópias de buffer com
+offsets, pixels azuis de upload, vermelhos de clear e verdes de resolve, além
+de depth 0.5. A textura é 7×3, com offset 512 e row pitch de footprint, não
+uma cópia linear que ignore padding. Resolve consulta primeiro o suporte
+do formato e MSAA; se ausente, registra `resolve_supported=0` e o probe
+geral não passa. A interface pode continuar funcionando para permitir
+coleta dos logs; isso não autoriza marcar resolve como validado.
+
+O pico de recursos poderá aumentar bastante por causa da granularidade de
+alocação MSAA. Depois de voltar à Home, bytes/recursos vivos continuam zero,
+sem falhas e abaixo do teto de 64 MiB. Na abertura há 13 recursos temporários
+quando resolve é suportado (11 de transferências e dois de compute), mais
+os uploads de ícones. Não são alocações de jogo nem medida de VRAM física.
+Os contadores de PSO/root da 3D permanecem iguais; suspensão deve drenar a
+GPU e retomada deve apresentar a interface sem alterar estados indevidamente.
+
+A CI acrescenta `phase3.d3d12-transfers` com os mesmos testes de readback
+em WARP, rejeições sem alteração de estado, heaps imutáveis, footprint/bounds
+inválidos e buffer copiado entre duas submissões (decay para COMMON). A
+debug layer, quando disponível, deve ficar sem ERROR/CORRUPTION. Os testes
+da 3D continuam executando draw e compute. A CI não substitui o Series S.
