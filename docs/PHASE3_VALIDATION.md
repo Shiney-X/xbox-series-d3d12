@@ -70,3 +70,38 @@ A CI acrescenta `phase3.d3d12-resources`, com teste de limite/posse e readback
 BGRA com row pitch diferente do tamanho lógico da linha. Falta de orçamento
 é exercitada nesse teste de forma controlada, sem exigir um dump corrompido
 ou alocação grande no console.
+
+## 3D: descriptors, roots e pipelines
+
+Este bloco modifica C++ e exige instalar um novo MSIX da PR da 3D, após
+`build-and-test` e `build-uwp-package` verdes. Continue usando Game.
+
+1. Abra o app. O autoteste de compute roda uma vez por processo na abertura;
+   o resultado é registrado automaticamente, sem ação no controle.
+2. Entre em Games, confira os dois títulos/ícones e alterne a seleção dez
+   vezes. Volte com B para a Home e navegue por Settings/Diagnostics.
+3. Vá ao Dev Home e reabra três vezes. Confira interface e ícones em cada
+   retorno. Termine na Home do app e vá ao Dev Home para persistir os logs.
+4. Exporte `phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+O novo resultado `d3d12-pipelines` deve passar, com `compute_passed=1`,
+`root_creations=2`, `graphics_creations=1`, `compute_creations=1`,
+`cache_hits=4`, `rtv_slots=2` e `srv_slots=1`. Os hits incluem a verificação
+deliberada de pedidos repetidos durante a abertura, não uma medida de
+performance de jogos. O dispatch escreve 100–103 em uma textura R32_UINT
+2×2; a CPU verifica esses valores após fence e readback.
+
+O probe de recursos passa a incluir duas criações temporárias desse teste,
+liberadas ao concluir a GPU. Depois de voltar à Home, `live_resources=0`,
+`live_bytes=0` e `failed_allocations=0` continuam sendo esperados. Contadores
+não devem crescer por novas criações de PSO durante a navegação/retomada no
+mesmo processo. Uma nova sessão reinicia contadores e repete o autoteste.
+
+Na CI Windows, `phase3.d3d12-pipelines` verifica limites de descriptors,
+capacidade das roots, rejeição de layout de outro cache, reuso por conteúdo
+mesmo em endereços diferentes e distinção de shader/formato/blend. Também
+renderiza pixels vermelhos em target offscreen e compara o readback, além
+de executar o mesmo autoteste de compute. Habilita a debug layer quando
+disponível e rejeita mensagens ERROR/CORRUPTION. As fixtures desktop usam
+SM5/DXBC via D3DCompile; o MSIX usa SM6/DXIL via DXC. Só o teste no Series S
+valida o segundo caminho em hardware e a apresentação UWP.

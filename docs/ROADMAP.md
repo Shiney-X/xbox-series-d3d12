@@ -291,7 +291,10 @@ o marco só se encerra após a comparação visual de uma cena de jogo real.
       por heap com teto de memória do host; integrar o upload de ícones.
 - [x] Validar 3C no Xbox: alternar ícones, voltar à Home e conferir que o
       orçamento dos recursos liberados retorna a zero no relatório.
-- [ ] 3D: descriptors, root signatures e graphics/compute PSOs com cache.
+- [x] 3D: descriptors com slots limitados, root signatures e PSOs graphics
+      do host/compute com cache em memória por device.
+- [ ] Validar 3D no Xbox: interface/ícones sem regressão, dispatch/readback
+      sintético aprovado e suspensão/retomada com os novos componentes.
 - [ ] 3E: barriers, copies, clears e resolves.
 - [ ] 3F: integração inicial com VideoCore e apresentação UWP.
 
@@ -308,6 +311,12 @@ residência implícita, sem eviction/subalocação. Swapchain, descriptors,
 pipelines, dados de CPU e caches Vulkan estão fora dessa contagem. A
 integração com o renderer PS4 ainda precisa tratar sua política de memória
 e vida útil; o trabalho no host não encerra esses requisitos do emulador.
+
+A 3D possui cache de até 64 entradas por categoria (roots, graphics e
+compute), com chaves por conteúdo e sem persistência em disco. O subconjunto
+graphics inicial é o do host: triângulos, um color target, sem vertex inputs,
+depth ou MSAA. Estados de jogo ainda exigem ampliar API/chave na integração.
+O autoteste de compute executa um shader HLSL sintético, não código PS4.
 
 A 3C foi validada no Series S em 2 de outubro de 2026, na sessão
 `134354421747283697-2788`. Após alternar ícones e voltar à Home, todos os

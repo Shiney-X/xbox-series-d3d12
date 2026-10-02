@@ -111,6 +111,24 @@ teste com `IDxcCompiler3` retornou `E_NOINTERFACE` no Series S, embora a mesma
 versão compilasse no SDK 26100. A escolha da interface antiga afeta somente a
 API de invocação do compilador; a saída continua sendo Shader Model 6/DXIL.
 
+Na 3D, `D3D12DescriptorArena` reserva slots fixos e valida capacidade,
+índices e visibilidade GPU. O shell usa dois RTVs e um SRV; atualizar o SRV
+continua exigindo a drenagem da fila. Não há reciclagem de slots em voo.
+`D3D12PipelineCache` mantém root signatures serializadas e PSOs por conteúdo
+dos shaders, layout, formato e blend. As chaves copiam os bytes relevantes,
+sem depender de ponteiros, padding ou somente de hashes. Cada categoria tem
+até 64 entradas por device; não há eviction, cache em disco nem concorrência.
+O chamador deve serializar acesso e manter o cache vivo até concluir a GPU.
+
+A API graphics expõe apenas o subconjunto inicial do host (triângulo,
+um color target, sem vertex inputs/depth/MSAA); compute aceita bytecode e
+layout. Isso não representa ainda todos os estados gráficos PS4. A interface
+usa o cache para sua root/PSO, e na abertura executa um dispatch 2×2 com
+UAV/readback que verifica os inteiros 100–103. O probe `d3d12-pipelines`
+registra esse resultado e contadores de criação/reuso. Os recursos
+temporários são liberados depois do ticket concluído. Esse teste não é
+shader guest, boot de jogo nem integração com PM4.
+
 ## Fronteira futura do renderer
 
 Os contratos neutros deverão cobrir:

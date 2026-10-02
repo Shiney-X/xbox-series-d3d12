@@ -4,6 +4,7 @@
 
 #include "d3d12_device_context.h"
 #include "d3d12_resource_allocator.h"
+#include "d3d12_pipeline_cache.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -84,6 +85,8 @@ public:
   [[nodiscard]] bool SubmissionReady() const noexcept { return initialized_; }
   [[nodiscard]] std::string SubmissionDetails() const;
   [[nodiscard]] std::string ResourceDetails() const;
+  [[nodiscard]] std::string PipelineDetails() const;
+  [[nodiscard]] bool PipelineProbePassed() const noexcept { return compute_probe_passed_; }
   [[nodiscard]] D3D12ResourceStats ResourceStats() const noexcept {
     return resource_allocator_.Stats();
   }
@@ -123,12 +126,13 @@ private:
   D3D12DeviceContext device_context_;
   D3D12ResourceAllocator resource_allocator_;
   Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain_;
-  Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtv_heap_;
-  Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> icon_srv_heap_;
+  D3D12DescriptorArena rtv_heap_;
+  D3D12DescriptorArena icon_srv_heap_;
+  D3D12PipelineCache pipeline_cache_;
   std::array<FrameContext, FrameCount> frames_;
   // Borrowed only while recording a frame; frames_ owns the command lists.
   ID3D12GraphicsCommandList *command_list_{};
-  Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature_;
+  D3D12PipelineCache::Root root_signature_;
   Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline_state_;
   std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, FrameCount>
       render_targets_;
@@ -139,7 +143,7 @@ private:
   bool initialized_{};
   std::uint64_t selected_icon_hash_{};
   bool selected_icon_ready_{};
-  UINT rtv_descriptor_size_{};
+  bool compute_probe_passed_{};
   D3D12_VIEWPORT viewport_{};
   D3D12_RECT scissor_{};
 };

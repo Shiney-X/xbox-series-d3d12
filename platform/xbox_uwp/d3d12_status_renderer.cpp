@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "d3d12_status_renderer.h"
+#include "d3d12_compute_probe.h"
 
 #include <dxcapi.h>
 #include <winrt/base.h>
@@ -202,10 +203,24 @@ std::string D3D12StatusRenderer::ResourceDetails() const {
          std::to_string(static_cast<std::uint32_t>(stats.last_error));
 }
 
+std::string D3D12StatusRenderer::PipelineDetails() const {
+  const auto stats = pipeline_cache_.Stats();
+  return "cache_scope=device_memory;graphics_scope=host_color_triangle;"
+         "compute_probe=dispatch_readback_2x2;compute_passed=" +
+         std::to_string(compute_probe_passed_) +
+         ";root_creations=" + std::to_string(stats.root_creations) +
+         ";graphics_creations=" + std::to_string(stats.graphics_creations) +
+         ";compute_creations=" + std::to_string(stats.compute_creations) +
+         ";cache_hits=" + std::to_string(stats.cache_hits) +
+         ";rtv_slots=" + std::to_string(rtv_heap_.Used()) +
+         ";srv_slots=" + std::to_string(icon_srv_heap_.Used());
+}
+
 void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
                                      float height) {
   device_context_.Initialize();
   resource_allocator_.Initialize(device_context_.Device(), ResourceBudgetBytes);
+  pipeline_cache_.Initialize(device_context_.Device());
 
   ComPtr<IDXGIFactory4> factory;
   winrt::check_hresult(
@@ -233,31 +248,19 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
   scissor_.right = static_cast<LONG>(swap_chain_description.Width);
   scissor_.bottom = static_cast<LONG>(swap_chain_description.Height);
 
-  D3D12_DESCRIPTOR_HEAP_DESC heap_description{};
-  heap_description.NumDescriptors = FrameCount;
-  heap_description.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-  winrt::check_hresult(device_context_.Device()->CreateDescriptorHeap(
-      &heap_description, IID_PPV_ARGS(rtv_heap_.ReleaseAndGetAddressOf())));
-  rtv_descriptor_size_ =
-      device_context_.Device()->GetDescriptorHandleIncrementSize(
-          D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-  D3D12_DESCRIPTOR_HEAP_DESC icon_heap_description{};
-  icon_heap_description.NumDescriptors = 1;
-  icon_heap_description.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-  icon_heap_description.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-  winrt::check_hresult(device_context_.Device()->CreateDescriptorHeap(
-      &icon_heap_description,
-      IID_PPV_ARGS(icon_srv_heap_.ReleaseAndGetAddressOf())));
+  rtv_heap_.Initialize(device_context_.Device(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+                       FrameCount, false);
+  (void)rtv_heap_.Allocate(FrameCount);
+  icon_srv_heap_.Initialize(device_context_.Device(),
+                            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, true);
+  (void)icon_srv_heap_.Allocate();
   ResetGameIcon();
 
-  auto rtv_handle = rtv_heap_->GetCPUDescriptorHandleForHeapStart();
   for (UINT index = 0; index < FrameCount; ++index) {
     winrt::check_hresult(swap_chain_->GetBuffer(
         index, IID_PPV_ARGS(render_targets_[index].ReleaseAndGetAddressOf())));
     device_context_.Device()->CreateRenderTargetView(
-        render_targets_[index].Get(), nullptr, rtv_handle);
-    rtv_handle.ptr += rtv_descriptor_size_;
+        render_targets_[index].Get(), nullptr, rtv_heap_.Cpu(index));
   }
 
   for (FrameContext &frame : frames_) {
@@ -294,15 +297,14 @@ void D3D12StatusRenderer::Render(const XboxShellState &state) {
   begin_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
   command_list_->ResourceBarrier(1, &begin_barrier);
 
-  auto rtv_handle = rtv_heap_->GetCPUDescriptorHandleForHeapStart();
-  rtv_handle.ptr += static_cast<SIZE_T>(frame_index) * rtv_descriptor_size_;
+  auto rtv_handle = rtv_heap_.Cpu(frame_index);
   constexpr float background[] = {0.012F, 0.022F, 0.042F, 1.0F};
   command_list_->ClearRenderTargetView(rtv_handle, background, 0, nullptr);
-  command_list_->SetGraphicsRootSignature(root_signature_.Get());
-  ID3D12DescriptorHeap *descriptor_heaps[]{icon_srv_heap_.Get()};
+  command_list_->SetGraphicsRootSignature(root_signature_->Get());
+  ID3D12DescriptorHeap *descriptor_heaps[]{icon_srv_heap_.Heap()};
   command_list_->SetDescriptorHeaps(1, descriptor_heaps);
   command_list_->SetGraphicsRootDescriptorTable(
-      1, icon_srv_heap_->GetGPUDescriptorHandleForHeapStart());
+      1, icon_srv_heap_.Gpu(0));
   command_list_->RSSetViewports(1, &viewport_);
   command_list_->RSSetScissorRects(1, &scissor_);
   command_list_->OMSetRenderTargets(1, &rtv_handle, FALSE, nullptr);
@@ -552,7 +554,7 @@ void D3D12StatusRenderer::ResetGameIcon() noexcept {
   selected_icon_texture_.Reset();
   selected_icon_hash_ = 0U;
   selected_icon_ready_ = false;
-  if (!device_context_.Device() || !icon_srv_heap_) {
+  if (!device_context_.Device() || !icon_srv_heap_.Heap()) {
     return;
   }
 
@@ -563,7 +565,7 @@ void D3D12StatusRenderer::ResetGameIcon() noexcept {
   null_view.Texture2D.MipLevels = 1;
   device_context_.Device()->CreateShaderResourceView(
       nullptr, &null_view,
-      icon_srv_heap_->GetCPUDescriptorHandleForHeapStart());
+      icon_srv_heap_.Cpu(0));
 }
 
 void D3D12StatusRenderer::EnsureSelectedGameIcon(
@@ -688,7 +690,7 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   icon_view.Texture2D.MipLevels = 1;
   device_context_.Device()->CreateShaderResourceView(
       pending_icon_upload_.texture.Get(), &icon_view,
-      icon_srv_heap_->GetCPUDescriptorHandleForHeapStart());
+      icon_srv_heap_.Cpu(0));
   selected_icon_texture_ = std::move(pending_icon_upload_.texture);
   pending_icon_upload_ = {};
   return true;
@@ -724,6 +726,20 @@ void D3D12StatusRenderer::CreateShellPipeline() {
 
   const ComPtr<IDxcBlob> vertex_shader = compile_shader(L"VSMain", L"vs_6_0");
   const ComPtr<IDxcBlob> pixel_shader = compile_shader(L"PSMain", L"ps_6_0");
+  // The same DXC interfaces used by the Xbox shell compile this host-only probe.
+  ComPtr<IDxcBlobEncoding> compute_source;
+  winrt::check_hresult(library->CreateBlobWithEncodingFromPinned(
+      D3D12ComputeProbeShader,
+      static_cast<UINT32>(std::strlen(D3D12ComputeProbeShader)), DXC_CP_UTF8,
+      compute_source.ReleaseAndGetAddressOf()));
+  source = compute_source;
+  const auto compute_shader = compile_shader(L"CSMain", L"cs_6_0");
+  compute_probe_passed_ = RunD3D12ComputeProbe(
+      device_context_, resource_allocator_, pipeline_cache_,
+      {compute_shader->GetBufferPointer(), compute_shader->GetBufferSize()});
+  if (!compute_probe_passed_) {
+    winrt::throw_hresult(E_FAIL);
+  }
 
   D3D12_DESCRIPTOR_RANGE icon_range{};
   icon_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -760,55 +776,18 @@ void D3D12StatusRenderer::CreateShellPipeline() {
   root_description.pStaticSamplers = &icon_sampler;
   root_description.Flags =
       D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-  ComPtr<ID3DBlob> serialized_root;
-  ComPtr<ID3DBlob> diagnostics;
-  winrt::check_hresult(D3D12SerializeRootSignature(
-      &root_description, D3D_ROOT_SIGNATURE_VERSION_1,
-      serialized_root.ReleaseAndGetAddressOf(),
-      diagnostics.ReleaseAndGetAddressOf()));
-  winrt::check_hresult(device_context_.Device()->CreateRootSignature(
-      0, serialized_root->GetBufferPointer(), serialized_root->GetBufferSize(),
-      IID_PPV_ARGS(root_signature_.ReleaseAndGetAddressOf())));
-
-  D3D12_BLEND_DESC blend{};
-  blend.RenderTarget[0].BlendEnable = TRUE;
-  blend.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
-  blend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-  blend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-  blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-  blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
-  blend.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
-  blend.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
-  blend.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
-  D3D12_RASTERIZER_DESC rasterizer{};
-  rasterizer.FillMode = D3D12_FILL_MODE_SOLID;
-  rasterizer.CullMode = D3D12_CULL_MODE_NONE;
-  rasterizer.DepthClipEnable = TRUE;
-
-  D3D12_DEPTH_STENCIL_DESC depth_stencil{};
-  depth_stencil.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-  depth_stencil.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-  depth_stencil.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-  depth_stencil.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-  depth_stencil.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
-  depth_stencil.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-  depth_stencil.BackFace = depth_stencil.FrontFace;
-
-  D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline{};
-  pipeline.pRootSignature = root_signature_.Get();
-  pipeline.VS = {vertex_shader->GetBufferPointer(),
-                 vertex_shader->GetBufferSize()};
-  pipeline.PS = {pixel_shader->GetBufferPointer(),
-                 pixel_shader->GetBufferSize()};
-  pipeline.BlendState = blend;
-  pipeline.SampleMask = UINT_MAX;
-  pipeline.RasterizerState = rasterizer;
-  pipeline.DepthStencilState = depth_stencil;
-  pipeline.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  pipeline.NumRenderTargets = 1;
-  pipeline.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
-  pipeline.SampleDesc.Count = 1;
-  winrt::check_hresult(device_context_.Device()->CreateGraphicsPipelineState(
-      &pipeline, IID_PPV_ARGS(pipeline_state_.ReleaseAndGetAddressOf())));
+  root_signature_ = pipeline_cache_.RootSignature(root_description);
+  const D3D12_SHADER_BYTECODE vertex{vertex_shader->GetBufferPointer(),
+                                    vertex_shader->GetBufferSize()};
+  const D3D12_SHADER_BYTECODE pixel{pixel_shader->GetBufferPointer(),
+                                   pixel_shader->GetBufferSize()};
+  pipeline_state_ = pipeline_cache_.Graphics(
+      root_signature_, vertex, pixel, DXGI_FORMAT_B8G8R8A8_UNORM, true);
+  // Startup contract check: a repeated request must return the existing PSO.
+  if (pipeline_cache_.RootSignature(root_description) != root_signature_ ||
+      pipeline_cache_.Graphics(root_signature_, vertex, pixel,
+                               DXGI_FORMAT_B8G8R8A8_UNORM, true).Get() !=
+          pipeline_state_.Get()) {
+    winrt::throw_hresult(E_UNEXPECTED);
+  }
 }
