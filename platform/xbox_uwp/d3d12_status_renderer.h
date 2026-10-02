@@ -3,6 +3,7 @@
 #pragma once
 
 #include "d3d12_device_context.h"
+#include "d3d12_resource_allocator.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -82,6 +83,10 @@ public:
   [[nodiscard]] bool TryTrim();
   [[nodiscard]] bool SubmissionReady() const noexcept { return initialized_; }
   [[nodiscard]] std::string SubmissionDetails() const;
+  [[nodiscard]] std::string ResourceDetails() const;
+  [[nodiscard]] D3D12ResourceStats ResourceStats() const noexcept {
+    return resource_allocator_.Stats();
+  }
   [[nodiscard]] bool SelectedGameIconReady() const noexcept {
     return selected_icon_ready_;
   }
@@ -100,6 +105,7 @@ private:
   [[nodiscard]] bool UploadGameIcon(const XboxGameListEntry &game);
 
   static constexpr UINT FrameCount = 2;
+  static constexpr UINT64 ResourceBudgetBytes = 64ULL * 1024ULL * 1024ULL;
 
   struct FrameContext {
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator;
@@ -108,13 +114,14 @@ private:
   };
 
   struct IconUpload {
-    Microsoft::WRL::ComPtr<ID3D12Resource> texture;
-    Microsoft::WRL::ComPtr<ID3D12Resource> staging;
+    D3D12Resource texture;
+    D3D12Resource staging;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commands;
   };
 
   D3D12DeviceContext device_context_;
+  D3D12ResourceAllocator resource_allocator_;
   Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain_;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtv_heap_;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> icon_srv_heap_;
@@ -125,7 +132,7 @@ private:
   Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline_state_;
   std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, FrameCount>
       render_targets_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> selected_icon_texture_;
+  D3D12Resource selected_icon_texture_;
   IconUpload pending_icon_upload_;
   UINT64 submitted_frames_{};
   UINT64 allocator_reuses_{};

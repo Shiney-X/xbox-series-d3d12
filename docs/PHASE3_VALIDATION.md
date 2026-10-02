@@ -37,3 +37,36 @@ O check `Xbox UWP shell / build-and-test` executa
 readback e reutilização de command allocators reais da API, sem janela.
 `build-uwp-package` compila e empacota o host UWP. Os dois checks complementam
 o teste no Series S; não executam o app no console nem iniciam jogos PS4.
+
+## 3C: buffers, texturas e orçamento
+
+Instale o novo MSIX como Game após os checks verdes. Não é preciso mudar os
+dumps nem formatar o USB.
+
+1. Entre em Games e alterne entre os dois títulos umas dez vezes. Confira
+   que os ícones continuam correspondendo ao título selecionado.
+2. Pressione B para voltar à Home do app, liberando o ícone selecionado.
+3. Volte ao Dev Home, reabra, entre em Games e repita a troca de títulos.
+4. Termine na Home do app (B), depois volte ao Dev Home para suspender e
+   persistir os contadores. Exporte os dois arquivos `phase0-*.jsonl`.
+
+O novo probe `d3d12-resources` deve passar e mostrar:
+
+- `budget_source=host_cap` e `budget_bytes=67108864`;
+- `created_resources` e `peak_bytes` positivos depois de apresentar ícones;
+- `failed_allocations=0` e `last_error=0`;
+- `live_resources=0` e `live_bytes=0` ao suspender depois de voltar à Home;
+- soma de `default_bytes`, `upload_bytes` e `readback_bytes` igual a
+  `live_bytes`, com pico menor ou igual ao teto.
+
+Se suspender ainda em Games, um ícone pronto mantém uma textura DEFAULT
+viva, e bytes vivos positivos são esperados. O staging de uploads concluídos
+deve ter sido liberado (`upload_bytes=0`). Os contadores pertencem apenas ao
+processo atual: uma nova abertura começa uma contagem nova. Não compare bytes
+do alocador com o consumo total do app, pois a swapchain e outros recursos
+não fazem parte desse orçamento.
+
+A CI acrescenta `phase3.d3d12-resources`, com teste de limite/posse e readback
+BGRA com row pitch diferente do tamanho lógico da linha. Falta de orçamento
+é exercitada nesse teste de forma controlada, sem exigir um dump corrompido
+ou alocação grande no console.

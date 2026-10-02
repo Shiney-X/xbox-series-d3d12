@@ -185,9 +185,27 @@ std::string D3D12StatusRenderer::SubmissionDetails() const {
          ";blocking_waits=" + std::to_string(device_context_.BlockingWaits());
 }
 
+std::string D3D12StatusRenderer::ResourceDetails() const {
+  const auto stats = ResourceStats();
+  return "allocation_policy=committed;budget_source=host_cap;"
+         "residency_policy=implicit_no_eviction;tracked_scope=owned_buffer_texture;"
+         "budget_bytes=" + std::to_string(stats.budget_bytes) +
+         ";live_bytes=" + std::to_string(stats.live_bytes) +
+         ";peak_bytes=" + std::to_string(stats.peak_bytes) +
+         ";default_bytes=" + std::to_string(stats.default_bytes) +
+         ";upload_bytes=" + std::to_string(stats.upload_bytes) +
+         ";readback_bytes=" + std::to_string(stats.readback_bytes) +
+         ";live_resources=" + std::to_string(stats.live_resources) +
+         ";created_resources=" + std::to_string(stats.created_resources) +
+         ";failed_allocations=" + std::to_string(stats.failed_allocations) +
+         ";last_error=" +
+         std::to_string(static_cast<std::uint32_t>(stats.last_error));
+}
+
 void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
                                      float height) {
   device_context_.Initialize();
+  resource_allocator_.Initialize(device_context_.Device(), ResourceBudgetBytes);
 
   ComPtr<IDXGIFactory4> factory;
   winrt::check_hresult(
@@ -587,9 +605,6 @@ void D3D12StatusRenderer::EnsureSelectedGameIcon(
 }
 
 bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
-  D3D12_HEAP_PROPERTIES default_heap{};
-  default_heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
   D3D12_RESOURCE_DESC texture_description{};
   texture_description.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
   texture_description.Width = game.icon_width;
@@ -600,11 +615,9 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   texture_description.SampleDesc.Count = 1;
   texture_description.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-  ComPtr<ID3D12Resource> texture;
-  winrt::check_hresult(device_context_.Device()->CreateCommittedResource(
-      &default_heap, D3D12_HEAP_FLAG_NONE, &texture_description,
-      D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-      IID_PPV_ARGS(texture.ReleaseAndGetAddressOf())));
+  D3D12Resource texture;
+  winrt::check_hresult(resource_allocator_.CreateTexture2D(
+      texture_description, D3D12_RESOURCE_STATE_COPY_DEST, texture));
 
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
   UINT row_count = 0;
@@ -618,23 +631,10 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
     return false;
   }
 
-  D3D12_HEAP_PROPERTIES upload_heap{};
-  upload_heap.Type = D3D12_HEAP_TYPE_UPLOAD;
-  D3D12_RESOURCE_DESC upload_description{};
-  upload_description.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-  upload_description.Width = upload_size;
-  upload_description.Height = 1;
-  upload_description.DepthOrArraySize = 1;
-  upload_description.MipLevels = 1;
-  upload_description.Format = DXGI_FORMAT_UNKNOWN;
-  upload_description.SampleDesc.Count = 1;
-  upload_description.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-  ComPtr<ID3D12Resource> upload;
-  winrt::check_hresult(device_context_.Device()->CreateCommittedResource(
-      &upload_heap, D3D12_HEAP_FLAG_NONE, &upload_description,
-      D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-      IID_PPV_ARGS(upload.ReleaseAndGetAddressOf())));
+  D3D12Resource upload;
+  winrt::check_hresult(resource_allocator_.CreateBuffer(
+      upload_size, D3D12_HEAP_TYPE_UPLOAD,
+      D3D12_RESOURCE_STATE_GENERIC_READ, upload));
 
   std::uint8_t *mapped = nullptr;
   const D3D12_RANGE no_read{0, 0};

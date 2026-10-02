@@ -90,6 +90,22 @@ encerramento drenam a fila; o upload de ícones permanece síncrono. Contadores
 de frames, listas, reutilizações e esperas são persistidos com os probes.
 O contexto não é ligado ao `GpuCommandSink` nem traduz comandos PM4.
 
+Na 3C, `D3D12ResourceAllocator` cria buffers DEFAULT/UPLOAD/READBACK e
+texturas 2D DEFAULT como recursos committed. `D3D12Resource` é um proprietário
+movível e não copiável, que libera o recurso e devolve sua contabilidade ao
+ser destruído/resetado. O tamanho cobrado vem de `GetResourceAllocationInfo`,
+incluindo a granularidade de alocação. O estado de contabilidade mantém o
+device vivo mesmo quando um recurso sobrevive ao objeto alocador.
+
+O teto inicial de 64 MiB vale somente para buffers/texturas do host criados
+por esse alocador. Ele rejeita uma criação acima do teto com `E_OUTOFMEMORY`
+e mantém o proprietário de saída anterior quando uma criação falha. O
+renderer usa esse caminho para textura e staging do ícone; a proteção por
+fence da 3B continua sendo responsabilidade do chamador. Recursos liberados
+depois de uma cópia concluída deixam a contagem imediatamente. O probe
+`d3d12-resources` registra uso vivo/pico, heaps e falhas. Esses números não
+equivalem ao uso total do app nem à residência física medida pelo driver.
+
 O probe usa as interfaces estáveis `IDxcLibrary` e `IDxcCompiler`. O primeiro
 teste com `IDxcCompiler3` retornou `E_NOINTERFACE` no Series S, embora a mesma
 versão compilasse no SDK 26100. A escolha da interface antiga afeta somente a
