@@ -10,6 +10,7 @@
 #include <cctype>
 #include <cstring>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -162,6 +163,9 @@ D3D12StatusRenderer::~D3D12StatusRenderer() {
 }
 
 void D3D12StatusRenderer::Flush() {
+  if (!initialized_) {
+    winrt::throw_hresult(E_UNEXPECTED);
+  }
   device_context_.WaitForGpu();
 }
 
@@ -248,6 +252,9 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
 }
 
 void D3D12StatusRenderer::Render(const XboxShellState &state) {
+  if (!initialized_) {
+    winrt::throw_hresult(E_UNEXPECTED);
+  }
   EnsureSelectedGameIcon(state);
   const UINT frame_index = swap_chain_->GetCurrentBackBufferIndex();
   FrameContext &frame = frames_[frame_index];
