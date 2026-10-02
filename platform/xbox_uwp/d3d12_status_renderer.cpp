@@ -151,6 +151,36 @@ std::array<std::uint8_t, 7> Glyph(char character) {
 
 using Microsoft::WRL::ComPtr;
 
+D3D12StatusRenderer::~D3D12StatusRenderer() {
+  if (initialized_) {
+    try {
+      Flush();
+    } catch (...) {
+      // Device removal must not throw from a destructor during shutdown.
+    }
+  }
+}
+
+void D3D12StatusRenderer::Flush() {
+  device_context_.WaitForGpu();
+}
+
+bool D3D12StatusRenderer::TryTrim() {
+  Flush();
+  return device_context_.TryTrim();
+}
+
+std::string D3D12StatusRenderer::SubmissionDetails() const {
+  return "frame_contexts=" + std::to_string(FrameCount) +
+         ";submitted_frames=" + std::to_string(submitted_frames_) +
+         ";submitted_lists=" + std::to_string(device_context_.SubmittedLists()) +
+         ";allocator_reuses=" + std::to_string(allocator_reuses_) +
+         ";last_signaled_ticket=" +
+         std::to_string(device_context_.LastSignaledValue()) +
+         ";completed_ticket=" + std::to_string(device_context_.CompletedValue()) +
+         ";blocking_waits=" + std::to_string(device_context_.BlockingWaits());
+}
+
 void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
                                      float height) {
   device_context_.Initialize();
@@ -208,19 +238,28 @@ void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
     rtv_handle.ptr += rtv_descriptor_size_;
   }
 
-  device_context_.CreateDirectCommands(command_allocator_, command_list_);
-  winrt::check_hresult(command_list_->Close());
+  for (FrameContext &frame : frames_) {
+    device_context_.CreateDirectCommands(frame.allocator, frame.commands);
+    winrt::check_hresult(frame.commands->Close());
+  }
 
   CreateShellPipeline();
+  initialized_ = true;
 }
 
 void D3D12StatusRenderer::Render(const XboxShellState &state) {
   EnsureSelectedGameIcon(state);
-  winrt::check_hresult(command_allocator_->Reset());
-  winrt::check_hresult(
-      command_list_->Reset(command_allocator_.Get(), pipeline_state_.Get()));
-
   const UINT frame_index = swap_chain_->GetCurrentBackBufferIndex();
+  FrameContext &frame = frames_[frame_index];
+  device_context_.Wait(frame.fence_value);
+  winrt::check_hresult(frame.allocator->Reset());
+  winrt::check_hresult(
+      frame.commands->Reset(frame.allocator.Get(), pipeline_state_.Get()));
+  command_list_ = frame.commands.Get();
+  if (frame.fence_value != 0U) {
+    ++allocator_reuses_;
+  }
+
   D3D12_RESOURCE_BARRIER begin_barrier{};
   begin_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
   begin_barrier.Transition.pResource = render_targets_[frame_index].Get();
@@ -257,10 +296,9 @@ void D3D12StatusRenderer::Render(const XboxShellState &state) {
   command_list_->ResourceBarrier(1, &end_barrier);
 
   winrt::check_hresult(command_list_->Close());
-  ID3D12CommandList *command_lists[] = {command_list_.Get()};
-  device_context_.DirectQueue()->ExecuteCommandLists(1, command_lists);
+  frame.fence_value = device_context_.Submit(command_list_);
   winrt::check_hresult(swap_chain_->Present(1, 0));
-  device_context_.WaitForGpu();
+  ++submitted_frames_;
 }
 
 void D3D12StatusRenderer::DrawRectangle(float x, float y, float width,
@@ -504,36 +542,37 @@ void D3D12StatusRenderer::ResetGameIcon() noexcept {
 }
 
 void D3D12StatusRenderer::EnsureSelectedGameIcon(
-    const XboxShellState &state) noexcept {
-  try {
-    if (state.page != XboxShellPage::Games ||
-        state.library_scan_state != LibraryScanState::Ready ||
-        state.games.empty()) {
-      if (selected_icon_ready_) {
-        ResetGameIcon();
-      }
-      return;
-    }
-
+    const XboxShellState &state) {
+  const XboxGameListEntry *desired_icon = nullptr;
+  if (state.page == XboxShellPage::Games &&
+      state.library_scan_state == LibraryScanState::Ready &&
+      !state.games.empty()) {
     const std::size_t selected =
         std::min<std::size_t>(state.selected_game, state.games.size() - 1U);
     const XboxGameListEntry &game = state.games[selected];
-    if (game.icon_state != GameIconState::Ready || game.icon_hash == 0U ||
-        game.icon_width == 0U || game.icon_height == 0U ||
-        game.icon_bgra8.size() !=
+    if (game.icon_state == GameIconState::Ready && game.icon_hash != 0U &&
+        game.icon_width != 0U && game.icon_height != 0U &&
+        game.icon_bgra8.size() ==
             static_cast<std::size_t>(game.icon_width) * game.icon_height * 4U) {
-      if (selected_icon_ready_) {
-        ResetGameIcon();
-      }
-      return;
+      desired_icon = &game;
     }
-    if (selected_icon_ready_ && selected_icon_hash_ == game.icon_hash) {
-      return;
-    }
+  }
+  if ((!desired_icon && !selected_icon_ready_) ||
+      (desired_icon && selected_icon_ready_ &&
+       selected_icon_hash_ == desired_icon->icon_hash)) {
+    return;
+  }
 
+  // Both frame contexts reference the shared SRV. Drain before overwriting
+  // that descriptor or releasing the previous texture. Wait failures must
+  // propagate rather than taking the optional-icon fallback path.
+  Flush();
+  try {
     ResetGameIcon();
-    selected_icon_ready_ = UploadGameIcon(game);
-    selected_icon_hash_ = selected_icon_ready_ ? game.icon_hash : 0U;
+    if (desired_icon) {
+      selected_icon_ready_ = UploadGameIcon(*desired_icon);
+      selected_icon_hash_ = selected_icon_ready_ ? desired_icon->icon_hash : 0U;
+    }
   } catch (...) {
     ResetGameIcon();
   }
@@ -626,9 +665,8 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
   upload_commands->ResourceBarrier(1, &barrier);
   winrt::check_hresult(upload_commands->Close());
-  ID3D12CommandList *lists[]{upload_commands.Get()};
-  device_context_.DirectQueue()->ExecuteCommandLists(1, lists);
-  device_context_.WaitForGpu();
+  const UINT64 upload_ticket = device_context_.Submit(upload_commands.Get());
+  device_context_.Wait(upload_ticket);
 
   D3D12_SHADER_RESOURCE_VIEW_DESC icon_view{};
   icon_view.Format = texture_description.Format;

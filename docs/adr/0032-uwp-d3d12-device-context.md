@@ -1,6 +1,6 @@
 # ADR 0032 — Contexto de dispositivo D3D12 do host UWP
 
-- Status: proposto; aguardando validação no Series S
+- Status: aceito; abertura, ícones, suspensão e nova abertura validados no Series S
 - Data: 2026-10-01
 
 ## Contexto
@@ -33,3 +33,9 @@ o app já instalado no console.
 O fence ainda sincroniza o shell de forma bloqueante. Um backend de jogo
 precisará de múltiplos frames em voo, política de residency, barriers,
 descriptors e pipelines próprios. Este ADR não afirma boot de jogo no Xbox.
+
+Em 2026-10-02, todos os probes passaram no console. O journal registrou três
+processos com suspensão; dois jogos e dois ícones foram reconhecidos, com o
+ícone selecionado apresentado. Não houve evento `resume` no mesmo processo
+nessa amostra. O [ADR 0033](0033-d3d12-submission-tickets.md) substitui a espera
+completa por apresentação por uma política de tickets por frame.
