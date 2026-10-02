@@ -50,6 +50,20 @@ if(BUILD_TESTING)
     add_test(NAME phase3.d3d12-submission COMMAND xbox_d3d12_submission_test)
     set_tests_properties(phase3.d3d12-submission PROPERTIES TIMEOUT 30)
 
+    add_executable(xbox_d3d12_resources_test
+        d3d12_resources_test.cpp
+        ../../platform/xbox_uwp/d3d12_device_context.cpp
+        ../../platform/xbox_uwp/d3d12_resource_allocator.cpp)
+    target_include_directories(xbox_d3d12_resources_test PRIVATE ../../platform/xbox_uwp)
+    target_compile_definitions(xbox_d3d12_resources_test PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
+    target_link_libraries(xbox_d3d12_resources_test PRIVATE d3d12 dxgi WindowsApp)
+    if(MSVC)
+        target_compile_options(xbox_d3d12_resources_test PRIVATE /W4 /WX /permissive- /EHsc)
+    endif()
+    add_test(NAME phase3.d3d12-resources COMMAND xbox_d3d12_resources_test)
+    set_tests_properties(phase3.d3d12-resources PROPERTIES TIMEOUT 30)
+
     add_test(NAME phase0.capabilities COMMAND xbox_phase0_probe --capabilities)
     add_test(NAME phase0.virtual-memory COMMAND xbox_phase0_probe --memory)
     add_test(NAME phase0.memory-aliases COMMAND xbox_phase0_probe --memory-aliases)

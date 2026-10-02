@@ -287,17 +287,27 @@ o marco só se encerra após a comparação visual de uma cena de jogo real.
       frame e drenar a fila ao alterar ícones, suspender ou encerrar o shell.
 - [x] Validar 3B no Xbox com navegação repetida, uploads de ícones e retomada;
       conferir contadores de submissão e reutilização em `phase0-results.jsonl`.
-- [ ] Device, queues, command lists e fences.
-- [ ] Alocador de recursos e residency.
-- [ ] Descriptors e root signatures.
-- [ ] Barriers, copies, clears e resolves.
-- [ ] Graphics/compute PSOs e cache persistente.
-- [ ] Swapchain UWP.
+- [x] 3C: centralizar buffers/texturas committed, posse RAII e contabilidade
+      por heap com teto de memória do host; integrar o upload de ícones.
+- [ ] Validar 3C no Xbox: alternar ícones, voltar à Home e conferir que o
+      orçamento dos recursos liberados retorna a zero no relatório.
+- [ ] 3D: descriptors, root signatures e graphics/compute PSOs com cache.
+- [ ] 3E: barriers, copies, clears e resolves.
+- [ ] 3F: integração inicial com VideoCore e apresentação UWP.
 
 O contexto 3A reorganiza recursos **já usados pelo shell**. Ainda não recebe
 comandos PM4 do shadPS4, não implementa cache de recursos/pipelines de jogo
 e não permite iniciar um título no Xbox. O checklist geral permanece aberto
 até existir integração com o renderer do emulador.
+
+O planejamento agrupa a Fase 3 em seis blocos, 3A–3F. Na 3C, o teto de
+64 MiB é uma política do host para recursos sob posse do alocador. A
+contabilidade usa `GetResourceAllocationInfo`; não mede RAM total, VRAM
+física ou o budget de residência do driver. Recursos committed usam
+residência implícita, sem eviction/subalocação. Swapchain, descriptors,
+pipelines, dados de CPU e caches Vulkan estão fora dessa contagem. A
+integração com o renderer PS4 ainda precisa tratar sua política de memória
+e vida útil; o trabalho no host não encerra esses requisitos do emulador.
 
 O teste da 3A de 2 de outubro de 2026 passou todos os probes no Series S,
 detectou dois jogos e dois ícones válidos e apresentou o ícone selecionado.

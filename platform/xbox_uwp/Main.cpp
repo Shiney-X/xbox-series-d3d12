@@ -1205,6 +1205,15 @@ private:
                       static_cast<std::uint32_t>(error.code().value),
                       to_string(error.message())});
       }
+      const auto stats = renderer_->ResourceStats();
+      const bool resource_accounting_passed =
+          stats.failed_allocations == 0U && stats.live_bytes <= stats.budget_bytes &&
+          stats.peak_bytes <= stats.budget_bytes &&
+          stats.default_bytes + stats.upload_bytes + stats.readback_bytes ==
+              stats.live_bytes;
+      UpsertResult({"d3d12-resources", resource_accounting_passed,
+                    static_cast<std::uint32_t>(stats.last_error),
+                    renderer_->ResourceDetails()});
     }
     std::erase_if(results_, [](const ProbeResult &result) {
       return result.name == "report-storage";
