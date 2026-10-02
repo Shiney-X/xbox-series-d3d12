@@ -131,6 +131,32 @@ shader guest, boot de jogo nem integração com PM4.
 
 ## Fronteira futura do renderer
 
+A 3E introduz `D3D12CommandEncoder` para uma command list direta em gravação.
+O chamador declara os estados iniciais; o encoder emite transições apenas
+quando necessário, aceita UAV barriers e valida estados, flags, heaps,
+limites de cópia e footprints antes de emitir comandos. UPLOAD permanece
+GENERIC_READ e READBACK permanece COPY_DEST. `State()` indica o estado em
+gravação; `StateAfterExecution()` considera decay de buffers DEFAULT e
+texturas simultaneous-access ao fim de ExecuteCommandLists. O chamador
+deve respeitar essa fronteira, a ordem de submissão e os tickets de fence.
+
+Os estados são uniformes por recurso; o encoder não pode ser misturado com
+barriers manuais ou reutilizado após Reset da lista. Cópias completas de
+textura 2D e resolve de cor aceitam apenas um mip/layer/plane. Resolve exige
+formatos/dimensões iguais e MSAA de origem para single-sample de destino.
+Clears cobrem RTV de cor e depth D32_FLOAT; o chamador fornece um descriptor
+válido que referencie o recurso informado e o preserva até concluir a GPU.
+Recursos também devem permanecer vivos até o fence; a posse temporária
+do encoder não substitui esse contrato de submissão.
+
+A swapchain, upload de ícones e readback do compute usam esse componente.
+Na abertura, `RunD3D12TransferProbe` compara cópias com offsets, pixels de
+upload/clear/resolve e depth por readback. O suporte MSAA é consultado; sua
+ausência é registrada e não tratada como resolve aprovado. O probe
+`d3d12-transfers` persiste resultado e contadores. Não há estado global,
+filas async/copy, split/enhanced/aliasing barriers ou stencil clear neste
+corte. Também não executa comandos PM4 ou shaders de jogos.
+
 Os contratos neutros deverão cobrir:
 
 - device, queues, command contexts e fences;

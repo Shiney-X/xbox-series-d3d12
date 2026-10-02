@@ -5,6 +5,7 @@
 #include "d3d12_device_context.h"
 #include "d3d12_resource_allocator.h"
 #include "d3d12_pipeline_cache.h"
+#include "d3d12_transfer_probe.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -87,6 +88,11 @@ public:
   [[nodiscard]] std::string ResourceDetails() const;
   [[nodiscard]] std::string PipelineDetails() const;
   [[nodiscard]] bool PipelineProbePassed() const noexcept { return compute_probe_passed_; }
+  [[nodiscard]] std::string TransferDetails() const;
+  [[nodiscard]] bool TransferProbePassed() const noexcept {
+    return transfer_probe_.passed && transfer_probe_.resolve_supported &&
+           transfer_stats_.rejected_requests == 0;
+  }
   [[nodiscard]] D3D12ResourceStats ResourceStats() const noexcept {
     return resource_allocator_.Stats();
   }
@@ -129,6 +135,8 @@ private:
   D3D12DescriptorArena rtv_heap_;
   D3D12DescriptorArena icon_srv_heap_;
   D3D12PipelineCache pipeline_cache_;
+  D3D12TransferStats transfer_stats_;
+  D3D12TransferProbeResult transfer_probe_;
   std::array<FrameContext, FrameCount> frames_;
   // Borrowed only while recording a frame; frames_ owns the command lists.
   ID3D12GraphicsCommandList *command_list_{};

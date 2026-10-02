@@ -293,9 +293,12 @@ o marco só se encerra após a comparação visual de uma cena de jogo real.
       orçamento dos recursos liberados retorna a zero no relatório.
 - [x] 3D: descriptors com slots limitados, root signatures e PSOs graphics
       do host/compute com cache em memória por device.
-- [ ] Validar 3D no Xbox: interface/ícones sem regressão, dispatch/readback
+- [x] Validar 3D no Xbox: interface/ícones sem regressão, dispatch/readback
       sintético aprovado e suspensão/retomada com os novos componentes.
-- [ ] 3E: barriers, copies, clears e resolves.
+- [x] 3E: encoder com estados explícitos, transition/UAV barriers, cópias
+      de buffers/texturas, clears de cor/depth D32 e resolve MSAA de cor.
+- [ ] Validar 3E no Xbox: autoteste de transferências/readback, ícones,
+      apresentação e suspensão/retomada sem regressão.
 - [ ] 3F: integração inicial com VideoCore e apresentação UWP.
 
 O contexto 3A reorganiza recursos **já usados pelo shell**. Ainda não recebe
@@ -317,6 +320,21 @@ compute), com chaves por conteúdo e sem persistência em disco. O subconjunto
 graphics inicial é o do host: triângulos, um color target, sem vertex inputs,
 depth ou MSAA. Estados de jogo ainda exigem ampliar API/chave na integração.
 O autoteste de compute executa um shader HLSL sintético, não código PS4.
+
+A 3D foi validada no Series S em 2 de outubro de 2026. A captura da sessão
+`134354436005173693-1712` aprovou todos os 14 probes: compute/readback,
+duas roots, um PSO graphics, um compute e quatro hits. Ao suspender, o
+ticket 18 estava concluído, com 13 frames/11 reutilizações e zero recursos
+vivos/falhas. O journal também registrou duas retomadas com apresentação
+na sessão anterior `134354435676283705-3048`, além da nova abertura.
+
+Na 3E, os estados são uniformes por recurso e locais à gravação em fila
+direta. Cópias de textura/resolve são limitadas a uma textura 2D com um mip,
+uma camada e uma plane; cópias usam footprint completo validado. Não há
+enhanced/split/aliasing barriers, copy queue, stencil clear ou rastreamento
+global de subresources. Essas restrições são explícitas, não caminhos mock.
+O autoteste no Xbox inclui clear/resolve MSAA com readback quando suportado;
+o relatório não aprova o gate de resolve se esse suporte estiver ausente.
 
 A 3C foi validada no Series S em 2 de outubro de 2026, na sessão
 `134354421747283697-2788`. Após alternar ícones e voltar à Home, todos os

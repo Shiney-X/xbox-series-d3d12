@@ -1,6 +1,6 @@
 # ADR 0035 — Descriptors e cache de pipelines do host D3D12
 
-- Status: aceito; validação no Series S pendente
+- Status: aceito; validado no Series S
 - Data: 2026-10-02
 
 ## Viabilidade e dependências
@@ -46,6 +46,13 @@ mas execução DXIL e apresentação no Series S precisam do teste manual em
 [PHASE3_VALIDATION.md](../PHASE3_VALIDATION.md).
 
 ## Limites
+
+Em 2026-10-02, a captura da sessão `134354436005173693-1712` aprovou
+compute/readback, criação/reuso dos caches e todos os 14 probes. Foram
+registradas duas roots, um PSO graphics, um compute, quatro hits e nenhum
+recurso vivo/falha após voltar à Home e suspender. O fence concluiu o ticket
+18. O journal também registrou duas retomadas com apresentação na sessão
+anterior `134354435676283705-3048` e uma nova abertura.
 
 Os caches não incluem todos os estados PS4, nem carregam shaders guest.
 Ampliar os estados suportados exige ampliar a chave no mesmo commit e

@@ -216,11 +216,29 @@ std::string D3D12StatusRenderer::PipelineDetails() const {
          ";srv_slots=" + std::to_string(icon_srv_heap_.Used());
 }
 
+std::string D3D12StatusRenderer::TransferDetails() const {
+  return "state_scope=recording;queue=direct;subresources=uniform;"
+         "probe=buffer_texture_clear_depth_resolve_readback;probe_passed=" +
+         std::to_string(transfer_probe_.passed) +
+         ";resolve_supported=" + std::to_string(transfer_probe_.resolve_supported) +
+         ";resolve_sample_count=" + std::to_string(transfer_probe_.sample_count) +
+         ";transitions=" + std::to_string(transfer_stats_.transitions) +
+         ";redundant_transitions=" + std::to_string(transfer_stats_.redundant_transitions) +
+         ";uav_barriers=" + std::to_string(transfer_stats_.uav_barriers) +
+         ";buffer_copies=" + std::to_string(transfer_stats_.buffer_copies) +
+         ";texture_copies=" + std::to_string(transfer_stats_.texture_copies) +
+         ";color_clears=" + std::to_string(transfer_stats_.color_clears) +
+         ";depth_clears=" + std::to_string(transfer_stats_.depth_clears) +
+         ";resolves=" + std::to_string(transfer_stats_.resolves) +
+         ";rejected_requests=" + std::to_string(transfer_stats_.rejected_requests);
+}
+
 void D3D12StatusRenderer::Initialize(IUnknown *core_window, float width,
                                      float height) {
   device_context_.Initialize();
   resource_allocator_.Initialize(device_context_.Device(), ResourceBudgetBytes);
   pipeline_cache_.Initialize(device_context_.Device());
+  transfer_probe_ = RunD3D12TransferProbe(device_context_, resource_allocator_, transfer_stats_);
 
   ComPtr<IDXGIFactory4> factory;
   winrt::check_hresult(
@@ -288,18 +306,11 @@ void D3D12StatusRenderer::Render(const XboxShellState &state) {
     ++allocator_reuses_;
   }
 
-  D3D12_RESOURCE_BARRIER begin_barrier{};
-  begin_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-  begin_barrier.Transition.pResource = render_targets_[frame_index].Get();
-  begin_barrier.Transition.Subresource =
-      D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-  begin_barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-  begin_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-  command_list_->ResourceBarrier(1, &begin_barrier);
-
+  D3D12CommandEncoder encoder(command_list_, transfer_stats_);
+  encoder.Track(render_targets_[frame_index].Get(), D3D12_RESOURCE_STATE_PRESENT);
   auto rtv_handle = rtv_heap_.Cpu(frame_index);
-  constexpr float background[] = {0.012F, 0.022F, 0.042F, 1.0F};
-  command_list_->ClearRenderTargetView(rtv_handle, background, 0, nullptr);
+  encoder.ClearColor(render_targets_[frame_index].Get(), rtv_handle,
+                     {0.012F, 0.022F, 0.042F, 1.0F});
   command_list_->SetGraphicsRootSignature(root_signature_->Get());
   ID3D12DescriptorHeap *descriptor_heaps[]{icon_srv_heap_.Heap()};
   command_list_->SetDescriptorHeaps(1, descriptor_heaps);
@@ -317,10 +328,7 @@ void D3D12StatusRenderer::Render(const XboxShellState &state) {
     DrawPage(state);
   }
 
-  D3D12_RESOURCE_BARRIER end_barrier = begin_barrier;
-  end_barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-  end_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-  command_list_->ResourceBarrier(1, &end_barrier);
+  encoder.Transition(render_targets_[frame_index].Get(), D3D12_RESOURCE_STATE_PRESENT);
 
   winrt::check_hresult(command_list_->Close());
   frame.fence_value = device_context_.Submit(command_list_);
@@ -658,22 +666,11 @@ bool D3D12StatusRenderer::UploadGameIcon(const XboxGameListEntry &game) {
   ComPtr<ID3D12GraphicsCommandList> upload_commands;
   device_context_.CreateDirectCommands(upload_allocator, upload_commands);
 
-  D3D12_TEXTURE_COPY_LOCATION destination{};
-  destination.pResource = texture.Get();
-  destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-  D3D12_TEXTURE_COPY_LOCATION source{};
-  source.pResource = upload.Get();
-  source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-  source.PlacedFootprint = footprint;
-  upload_commands->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
-
-  D3D12_RESOURCE_BARRIER barrier{};
-  barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-  barrier.Transition.pResource = texture.Get();
-  barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-  barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-  barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-  upload_commands->ResourceBarrier(1, &barrier);
+  D3D12CommandEncoder encoder(upload_commands.Get(), transfer_stats_);
+  encoder.Track(texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST);
+  encoder.Track(upload.Get(), D3D12_RESOURCE_STATE_GENERIC_READ);
+  encoder.CopyBufferToTexture(texture.Get(), upload.Get(), footprint);
+  encoder.Transition(texture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
   winrt::check_hresult(upload_commands->Close());
   // If signaling or waiting fails, keep queued resources and their allocator
   // alive in the renderer until a later successful drain (or process teardown).
@@ -736,7 +733,7 @@ void D3D12StatusRenderer::CreateShellPipeline() {
   const auto compute_shader = compile_shader(L"CSMain", L"cs_6_0");
   compute_probe_passed_ = RunD3D12ComputeProbe(
       device_context_, resource_allocator_, pipeline_cache_,
-      {compute_shader->GetBufferPointer(), compute_shader->GetBufferSize()});
+      {compute_shader->GetBufferPointer(), compute_shader->GetBufferSize()}, &transfer_stats_);
   if (!compute_probe_passed_) {
     winrt::throw_hresult(E_FAIL);
   }
