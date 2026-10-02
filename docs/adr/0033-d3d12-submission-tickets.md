@@ -1,6 +1,6 @@
 # ADR 0033 — Tickets de submissão e contextos de frame D3D12
 
-- Status: proposto; aguardando teste da 3B no Series S
+- Status: aceito; validado no Series S
 - Data: 2026-10-02
 
 ## Contexto
@@ -41,6 +41,14 @@ O procedimento de Xbox está em
 [PHASE3_VALIDATION.md](../PHASE3_VALIDATION.md). O relatório inclui contadores
 de submissão, reutilização e esperas. A contagem de esperas bloqueantes pode
 ser zero se a GPU já tiver terminado; isso não é falha.
+
+Em 2026-10-02, a sessão `134354409256573706-1664` no Series S passou todos
+os probes. O relatório registrou dois contextos de frame, 45 frames,
+52 listas, 43 reutilizações e sete esperas bloqueantes. O ticket sinalizado
+e o completado eram ambos 65 após suspensão, com `gpu_drained=1`. O journal
+mostrou duas suspensões e uma retomada no mesmo processo; `lifecycle-resume`
+confirmou reapresentação. A biblioteca detectou dois jogos, dois ícones
+válidos e o ícone selecionado apresentado.
 
 ## Consequências
 
