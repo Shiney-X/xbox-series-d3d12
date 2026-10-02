@@ -1214,6 +1214,11 @@ private:
       UpsertResult({"d3d12-resources", resource_accounting_passed,
                     static_cast<std::uint32_t>(stats.last_error),
                     renderer_->ResourceDetails()});
+      UpsertResult({"d3d12-pipelines", renderer_->PipelineProbePassed(),
+                    static_cast<std::uint32_t>(renderer_->PipelineProbePassed()
+                                                   ? ERROR_SUCCESS
+                                                   : ERROR_INVALID_DATA),
+                    renderer_->PipelineDetails()});
     }
     std::erase_if(results_, [](const ProbeResult &result) {
       return result.name == "report-storage";
