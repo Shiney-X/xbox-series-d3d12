@@ -38,8 +38,11 @@ PushData a root constants, validada no console. A 4C liga o emissor real
 `EmitSPIRV` e a IR do shadPS4 ao UWP: IR autoral → SPIR-V → HLSL → DXIL
 → dispatch/readback, validado no Series S. A 4D acrescenta VS/PS reais a
 partir de IR autoral, reflection e PushData separado por estágio, com
-draw/readback automático no UWP (aceitação no console pendente). Ainda não traduz
-shaders de jogos nem compila o core completo.
+draw/readback automático validado no Series S. A 4E consolida a regressão
+e um validador dos logs reais. Isso fecha a **fundação inicial de shaders**,
+não um backend completo: ainda não traduz shaders de jogos nem compila o
+core completo. Recursos guest e comparação golden Vulkan/D3D12 continuam
+pendentes no roadmap; emissão HLSL direta foi avaliada e adiada (ADR 0042).
 Procedimento: [validação da Fase 4](docs/PHASE4_VALIDATION.md).
 
 ## Baseline upstream

@@ -1,6 +1,6 @@
 # ADR 0041 — VS/PS upstream e constantes separadas por estágio
 
-- Status: implementado; aceitação Series S pendente
+- Status: implementado e validado no Series S (escopo gráfico inicial)
 - Data: 2026-10-02
 
 ## Viabilidade e dependências
@@ -46,3 +46,9 @@ Não suporta guest GCN/frontend/resource tracking, vertex fetch, texturas,
 samplers, SSBOs, MRT, tessellation ou geometria. A imagem visível continua
 DMA sintético. A 4E fecha regressões do escopo inicial, sem declarar backend
 completo ou primeira imagem de um jogo.
+
+Aceitação 4D: 20 probes positivos em `134354665468983635-5052`, incluindo
+32 pixels corretos, bindings por estágio e captura SHAD VS PS PASS.
+UPLOAD/READBACK zerados, zero falhas de alocação. O journal tem resume na
+sessão anterior `134354665134013638-6320`, sem apresentação posterior
+registrada; a sessão de resultados é relaunch. A 4E preserva essa ressalva.
