@@ -631,23 +631,23 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
   } else {
     DrawText(state.core_ready ? "CORE LINKED  PASS" : "CORE LINKED  FAIL",
              0.105F, 0.28F, 3.8F, state.core_ready ? Accent : Failure);
-    DrawText("UPSTREAM  " + std::string(state.upstream_version), 0.105F, 0.35F,
+    DrawText("UPSTREAM  " + std::string(state.upstream_version), 0.105F, 0.34F,
              3.8F, PrimaryText);
-    DrawText("UWP X64  PASS", 0.105F, 0.42F, 3.8F, Accent);
-    DrawText("D3D12 DXIL  PASS", 0.105F, 0.49F, 3.8F, Accent);
+    DrawText("UWP X64  PASS", 0.105F, 0.40F, 3.8F, Accent);
+    DrawText("D3D12 DXIL  PASS", 0.105F, 0.46F, 3.8F, Accent);
     DrawText(shader_probe_passed_ ? "SPIRV HLSL DXIL  PASS"
                                   : "SPIRV HLSL DXIL  FAIL",
-             0.105F, 0.56F, 3.0F, shader_probe_passed_ ? Accent : Failure);
+             0.105F, 0.52F, 3.0F, shader_probe_passed_ ? Accent : Failure);
     DrawText(push_data_probe_passed_ ? "PUSH DATA ABI  PASS"
                                      : "PUSH DATA ABI  FAIL",
-             0.105F, 0.63F, 3.0F, push_data_probe_passed_ ? Accent : Failure);
+             0.105F, 0.58F, 3.0F, push_data_probe_passed_ ? Accent : Failure);
     DrawText(upstream_shader_probe_passed_ ? "SHAD EMITTER  PASS"
                                            : "SHAD EMITTER  FAIL",
-             0.105F, 0.70F, 3.0F,
+             0.105F, 0.64F, 3.0F,
              upstream_shader_probe_passed_ ? Accent : Failure);
     DrawText(
         graphics_shader_probe_passed_ ? "SHAD VS PS  PASS" : "SHAD VS PS  FAIL",
-        0.105F, 0.745F, 2.6F, graphics_shader_probe_passed_ ? Accent : Failure);
+        0.105F, 0.70F, 3.0F, graphics_shader_probe_passed_ ? Accent : Failure);
     DrawText(state.probes_passed ? "SYSTEM PROBES  PASS"
                                  : "SYSTEM PROBES  FAIL",
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);

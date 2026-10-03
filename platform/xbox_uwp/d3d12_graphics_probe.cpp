@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "d3d12_graphics_probe.h"
+#include "shader_recompiler/push_data.h"
 #include <array>
+#include <cstddef>
 #include <cstdio>
 #include <winrt/base.h>
 
@@ -10,12 +12,16 @@ bool RunD3D12GraphicsProbe(D3D12DeviceContext &context,
                            D3D12_SHADER_BYTECODE vertex,
                            D3D12_SHADER_BYTECODE fragment,
                            D3D12TransferStats *stats) {
+  constexpr UINT PushWords = sizeof(Shader::PushData) / sizeof(UINT);
+  constexpr UINT UserDataWord =
+      offsetof(Shader::PushData, ud_regs) / sizeof(UINT);
+  static_assert(PushWords == 30 && UserDataWord == 4 && 2 * PushWords <= 64);
   std::array<D3D12_ROOT_PARAMETER, 2> parameters{};
   for (UINT i = 0; i < 2; ++i) {
     parameters[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
     parameters[i].Constants.ShaderRegister = 0;
     parameters[i].Constants.RegisterSpace = i + 1;
-    parameters[i].Constants.Num32BitValues = 30;
+    parameters[i].Constants.Num32BitValues = PushWords;
     parameters[i].ShaderVisibility =
         i == 0 ? D3D12_SHADER_VISIBILITY_VERTEX : D3D12_SHADER_VISIBILITY_PIXEL;
   }
@@ -66,12 +72,12 @@ bool RunD3D12GraphicsProbe(D3D12DeviceContext &context,
     encoder.Transition(target.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
     commands->SetPipelineState(pipeline.Get());
     commands->SetGraphicsRootSignature(root->Get());
-    std::array<UINT, 30> vs{}, ps{};
+    std::array<UINT, PushWords> vs{}, ps{};
     // PushData.user_data starts at DWORD 4; preserve the exact 120-byte ABI.
-    vs[4] = draw == 0 ? 0x3f800000u : 0u;
-    ps[4] = draw == 0 ? 0u : 0x3f800000u;
-    commands->SetGraphicsRoot32BitConstants(0, 30, vs.data(), 0);
-    commands->SetGraphicsRoot32BitConstants(1, 30, ps.data(), 0);
+    vs[UserDataWord] = draw == 0 ? 0x3f800000u : 0u;
+    ps[UserDataWord] = draw == 0 ? 0u : 0x3f800000u;
+    commands->SetGraphicsRoot32BitConstants(0, PushWords, vs.data(), 0);
+    commands->SetGraphicsRoot32BitConstants(1, PushWords, ps.data(), 0);
     const D3D12_VIEWPORT viewport{0, 0, 4, 4, 0, 1};
     const D3D12_RECT scissor{0, 0, 4, 4};
     commands->RSSetViewports(1, &viewport);
