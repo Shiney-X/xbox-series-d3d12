@@ -87,6 +87,9 @@ falha de alocação/rejeição. Contagens de frames/tickets variam. A tela
 permanece preview DMA sintético, não o primeiro frame de um jogo.
 
 No desenvolvimento, o teste portátil emite/traduz a IR duas vezes e
-verifica determinismo e mutação de constante. WARP compila HLSL para DXBC,
+verifica determinismo e mutação de constante. Para a IR upstream, WARP
+compila HLSL com DXC para DXIL usando `main/cs_6_0/-Ges/-O3`, como no Xbox;
 verifica valores GPU, reprova o oracle 100–103 para IR alterada e verifica
-200–203 com o oracle correto. DXIL e AppContainer dependem da CI/console.
+200–203 com o oracle correto. As fixtures 4A/4B continuam tendo o teste
+legado DXBC; o emissor requer o caminho DXIL. AppContainer e GPU do Xbox
+exigem o console para aceitação.

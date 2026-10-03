@@ -49,10 +49,18 @@ e linkada ao MSIX. Licenças das dependências seguem no pacote.
 ## Verificação e limites
 
 Teste portátil: emissão determinística, ABI real/LocalSize e constante
-alterada muda HLSL. Windows WARP: readback correto; constante 200 rejeita
+alterada muda HLSL. Windows WARP/DXC/DXIL: readback correto; constante 200 rejeita
 oracle original e passa oracle 200–203, sem filtrar erros da debug layer.
 CI precisa compilar o renderer Vulkan após a nova passagem de opções.
 Aceitação Series S segue PHASE4_VALIDATION; não marcada antes do teste.
+
+A CI revelou que FXC/DXBC compila o bit carrier `asuint(float4(asfloat(...)))`
+do emissor em `store_uav_typed ... l(0,0,0,0)`: readback 0/0/0/0, não
+100–103. O teste da IR upstream passa a usar DXC/DXIL com os mesmos entry,
+target, flags e interfaces do Xbox, sem mudar o oracle ou editar o HLSL.
+DXBC permanece apenas nos probes anteriores; sua aprovação não deve ser
+usada como substituto da compatibilidade DXIL. DLLs DXC/DXIL vêm do SDK e
+são copiadas junto ao teste Windows.
 
 Não há GCN extraído, frontend/otimização/resource tracking de shaders guest,
 shader de jogo, Liverpool/PM4, boot ou core completo neste bloco. O uso de

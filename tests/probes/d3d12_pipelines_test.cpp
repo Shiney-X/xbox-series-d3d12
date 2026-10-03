@@ -5,6 +5,7 @@
 
 #include <d3d12sdklayers.h>
 #include <d3dcompiler.h>
+#include <dxcapi.h>
 #include <dxgi1_4.h>
 #include <winrt/base.h>
 
@@ -53,6 +54,42 @@ ComPtr<ID3DBlob> Compile(const char* source, const char* entry, const char* targ
 }
 
 D3D12_SHADER_BYTECODE Bytes(ID3DBlob* blob) {
+    return {blob->GetBufferPointer(), blob->GetBufferSize()};
+}
+
+ComPtr<IDxcBlob> CompileDxil(const std::string& text) {
+    ComPtr<IDxcLibrary> library;
+    ComPtr<IDxcCompiler> compiler;
+    winrt::check_hresult(
+        DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(library.ReleaseAndGetAddressOf())));
+    winrt::check_hresult(
+        DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(compiler.ReleaseAndGetAddressOf())));
+    ComPtr<IDxcBlobEncoding> source;
+    winrt::check_hresult(
+        library->CreateBlobWithEncodingFromPinned(text.data(), static_cast<UINT32>(text.size()),
+                                                  DXC_CP_UTF8, source.ReleaseAndGetAddressOf()));
+    const wchar_t* arguments[]{L"-Ges", L"-O3"};
+    ComPtr<IDxcOperationResult> operation;
+    winrt::check_hresult(compiler->Compile(source.Get(), L"upstream_probe.hlsl", L"main", L"cs_6_0",
+                                           arguments, 2, nullptr, 0, nullptr,
+                                           operation.ReleaseAndGetAddressOf()));
+    HRESULT status{};
+    winrt::check_hresult(operation->GetStatus(&status));
+    if (FAILED(status)) {
+        ComPtr<IDxcBlobEncoding> errors;
+        winrt::check_hresult(operation->GetErrorBuffer(errors.ReleaseAndGetAddressOf()));
+        if (errors) {
+            std::cerr.write(static_cast<const char*>(errors->GetBufferPointer()),
+                            static_cast<std::streamsize>(errors->GetBufferSize()));
+        }
+        winrt::check_hresult(status);
+    }
+    ComPtr<IDxcBlob> result;
+    winrt::check_hresult(operation->GetResult(result.ReleaseAndGetAddressOf()));
+    return result;
+}
+
+D3D12_SHADER_BYTECODE Bytes(IDxcBlob* blob) {
     return {blob->GetBufferPointer(), blob->GetBufferSize()};
 }
 
@@ -235,25 +272,20 @@ int main() {
         Check(RunD3D12ComputeProbe(context, allocator, cache, Bytes(shader.Get())),
               "compute dispatch/readback values differ");
         const auto emitted = Xbox::Shaders::TranslateCompute(Xbox::Shaders::EmitUpstreamCompute());
-        const auto emitted_shader = Compile(emitted.hlsl.c_str(), "main", "cs_5_1");
+        // Match the Xbox production compiler and flags. FXC/DXBC folds this
+        // integer -> float-vector -> integer bit carrier into zero stores.
+        const auto emitted_shader = CompileDxil(emitted.hlsl);
         const auto emitted_push = Xbox::Shaders::EncodePushData(Shader::PushData{});
         Check(emitted.push_constant_words == emitted_push.size(), "upstream PushData reflection");
         const bool emitted_passed = RunD3D12ComputeProbe(
             context, allocator, cache, Bytes(emitted_shader.Get()), nullptr, emitted_push);
         if (!emitted_passed) {
             std::cerr << emitted.hlsl << '\n';
-            ComPtr<ID3DBlob> assembly;
-            if (SUCCEEDED(D3DDisassemble(emitted_shader->GetBufferPointer(),
-                                         emitted_shader->GetBufferSize(), 0, nullptr,
-                                         assembly.ReleaseAndGetAddressOf()))) {
-                std::cerr.write(static_cast<const char*>(assembly->GetBufferPointer()),
-                                static_cast<std::streamsize>(assembly->GetBufferSize()));
-            }
         }
         Check(emitted_passed, "upstream EmitSPIRV readback mismatch");
         const auto changed_emitted =
             Xbox::Shaders::TranslateCompute(Xbox::Shaders::EmitUpstreamCompute(200));
-        const auto changed_emitted_shader = Compile(changed_emitted.hlsl.c_str(), "main", "cs_5_1");
+        const auto changed_emitted_shader = CompileDxil(changed_emitted.hlsl);
         Check(!RunD3D12ComputeProbe(context, allocator, cache, Bytes(changed_emitted_shader.Get()),
                                     nullptr, emitted_push),
               "upstream IR mutation accepted by fixed oracle");
