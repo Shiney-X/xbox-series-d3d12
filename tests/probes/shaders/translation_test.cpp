@@ -22,6 +22,7 @@ int main() {
     try {
         const auto upstream = Xbox::Shaders::EmitUpstreamCompute();
         const auto upstream_translation = Xbox::Shaders::TranslateCompute(upstream);
+        std::cout << "Upstream emitted HLSL:\n" << upstream_translation.hlsl << '\n';
         Check(upstream_translation.push_constant_words == 30);
         Check(upstream_translation.local_size == std::array<std::uint32_t, 3>{2, 2, 1});
         Check(upstream == Xbox::Shaders::EmitUpstreamCompute());

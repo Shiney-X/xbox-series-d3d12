@@ -238,9 +238,19 @@ int main() {
         const auto emitted_shader = Compile(emitted.hlsl.c_str(), "main", "cs_5_1");
         const auto emitted_push = Xbox::Shaders::EncodePushData(Shader::PushData{});
         Check(emitted.push_constant_words == emitted_push.size(), "upstream PushData reflection");
-        Check(RunD3D12ComputeProbe(context, allocator, cache, Bytes(emitted_shader.Get()), nullptr,
-                                   emitted_push),
-              "upstream EmitSPIRV readback mismatch");
+        const bool emitted_passed = RunD3D12ComputeProbe(
+            context, allocator, cache, Bytes(emitted_shader.Get()), nullptr, emitted_push);
+        if (!emitted_passed) {
+            std::cerr << emitted.hlsl << '\n';
+            ComPtr<ID3DBlob> assembly;
+            if (SUCCEEDED(D3DDisassemble(emitted_shader->GetBufferPointer(),
+                                         emitted_shader->GetBufferSize(), 0, nullptr,
+                                         assembly.ReleaseAndGetAddressOf()))) {
+                std::cerr.write(static_cast<const char*>(assembly->GetBufferPointer()),
+                                static_cast<std::streamsize>(assembly->GetBufferSize()));
+            }
+        }
+        Check(emitted_passed, "upstream EmitSPIRV readback mismatch");
         const auto changed_emitted =
             Xbox::Shaders::TranslateCompute(Xbox::Shaders::EmitUpstreamCompute(200));
         const auto changed_emitted_shader = Compile(changed_emitted.hlsl.c_str(), "main", "cs_5_1");

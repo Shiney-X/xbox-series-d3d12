@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "d3d12_compute_probe.h"
+#include <cstdio>
 
 #include <winrt/base.h>
 
-#include <cstring>
 #include <array>
+#include <cstring>
 
 bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
-                           D3D12ResourceAllocator &allocator,
-                           D3D12PipelineCache &cache,
-                           D3D12_SHADER_BYTECODE shader,
-                           D3D12TransferStats *stats,
-                           std::span<const std::uint32_t> push_words,
-                           std::uint32_t expected_base) {
+                          D3D12ResourceAllocator &allocator,
+                          D3D12PipelineCache &cache,
+                          D3D12_SHADER_BYTECODE shader,
+                          D3D12TransferStats *stats,
+                          std::span<const std::uint32_t> push_words,
+                          std::uint32_t expected_base) {
   if (!push_words.empty() && push_words.size() != 30) {
     winrt::throw_hresult(E_INVALIDARG);
   }
@@ -53,18 +54,18 @@ bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
   context.Device()->GetCopyableFootprints(&texture_desc, 0, 1, 0, &footprint,
                                           nullptr, nullptr, &readback_bytes);
   D3D12Resource readback;
-  winrt::check_hresult(allocator.CreateBuffer(
-      readback_bytes, D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_STATE_COPY_DEST,
-      readback));
+  winrt::check_hresult(
+      allocator.CreateBuffer(readback_bytes, D3D12_HEAP_TYPE_READBACK,
+                             D3D12_RESOURCE_STATE_COPY_DEST, readback));
   D3D12DescriptorArena descriptors;
-  descriptors.Initialize(context.Device(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-                         1, true);
+  descriptors.Initialize(context.Device(),
+                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, true);
   const UINT slot = descriptors.Allocate();
   D3D12_UNORDERED_ACCESS_VIEW_DESC view{};
   view.Format = texture_desc.Format;
   view.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
   context.Device()->CreateUnorderedAccessView(output.Get(), nullptr, &view,
-                                             descriptors.Cpu(slot));
+                                              descriptors.Cpu(slot));
   Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commands_allocator;
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commands;
   context.CreateDirectCommands(commands_allocator, commands);
@@ -78,7 +79,8 @@ bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
   commands->SetDescriptorHeaps(1, heaps);
   commands->SetComputeRootDescriptorTable(0, descriptors.Gpu(slot));
   if (!push_words.empty()) {
-    commands->SetComputeRoot32BitConstants(1, static_cast<UINT>(push_words.size()), push_words.data(), 0);
+    commands->SetComputeRoot32BitConstants(
+        1, static_cast<UINT>(push_words.size()), push_words.data(), 0);
   }
   commands->Dispatch(1, 1, 1);
   encoder.UavBarrier(output.Get());
@@ -94,9 +96,14 @@ bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
     for (UINT x = 0; x < 2; ++x) {
       UINT value{};
       const auto *address = static_cast<const std::uint8_t *>(mapped) +
-                            footprint.Offset + y * footprint.Footprint.RowPitch +
-                            x * sizeof(UINT);
+                            footprint.Offset +
+                            y * footprint.Footprint.RowPitch + x * sizeof(UINT);
       std::memcpy(&value, address, sizeof(value));
+      if (value != expected_base + x + 2 * y) {
+        std::fprintf(stderr,
+                     "compute readback (%u,%u): actual=%u expected=%u\n", x, y,
+                     value, expected_base + x + 2 * y);
+      }
       passed = passed && value == expected_base + x + 2 * y;
     }
   }
