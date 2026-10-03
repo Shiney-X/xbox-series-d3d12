@@ -132,7 +132,7 @@ frames game-only exigido para fechar a regressão visual.
       `amdgpu`, `buffer_cache` e `texture_cache`.
 - [x] Manter o backend Vulkan funcional.
 - [x] Criar testes de contrato e replay sintético das transições neutras.
-- [ ] Comparar capturas reais do renderer Vulkan antes/depois da 2K.
+- [x] Comparar capturas reais do renderer Vulkan antes/depois da 2K.
 
 Na Fase 2B, `AmdGpu::Liverpool` entrega draw, dispatch, cópias, sincronização
 e marcadores ao `VideoCore::GpuCommandSink`. O rasterizer Vulkan implementa o
