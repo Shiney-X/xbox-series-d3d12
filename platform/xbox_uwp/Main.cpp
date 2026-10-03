@@ -1236,6 +1236,12 @@ private:
                                           ? ERROR_SUCCESS
                                           : ERROR_INVALID_DATA),
            renderer_->UpstreamShaderDetails()});
+      UpsertResult(
+          {"d3d12-shader-graphics", renderer_->GraphicsShaderProbePassed(),
+           static_cast<std::uint32_t>(renderer_->GraphicsShaderProbePassed()
+                                          ? ERROR_SUCCESS
+                                          : ERROR_INVALID_DATA),
+           renderer_->GraphicsShaderDetails()});
       UpsertResult({"d3d12-transfers", renderer_->TransferProbePassed(),
                     static_cast<std::uint32_t>(renderer_->TransferProbePassed()
                                                    ? ERROR_SUCCESS

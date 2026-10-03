@@ -96,6 +96,7 @@
     <ClCompile Include="d3d12_resource_allocator.cpp" />
     <ClCompile Include="d3d12_pipeline_cache.cpp" />
     <ClCompile Include="d3d12_compute_probe.cpp" />
+    <ClCompile Include="d3d12_graphics_probe.cpp" />
     <ClCompile Include="d3d12_command_encoder.cpp" />
     <ClCompile Include="d3d12_transfer_probe.cpp" />
     <ClCompile Include="d3d12_videocore_bridge.cpp" />

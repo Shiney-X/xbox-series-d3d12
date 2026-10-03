@@ -390,7 +390,10 @@ Dois jogos e dois ícones válidos foram detectados, com o selecionado exibido.
   confirmada pelo teste manual do usuário.
 - [x] 4C: ligar IR e emissor real `EmitSPIRV` ao UWP, sem renderer Vulkan
   ou singleton de settings; compute autoral com dispatch/readback.
-- [ ] Validar 4C no Series S: `SHAD EMITTER PASS` e regressão do host.
+- [x] Validar 4C no Series S: `SHAD EMITTER PASS` e regressão do host.
+- [x] 4D: VS/PS emitidos de IR autoral, varying float4 e PushData por estágio
+  em b0/space1 e b0/space2; draw/readback com dois conjuntos de constantes.
+- [ ] Validar 4D no Series S: `SHAD VS PS PASS`, pixels e retomada.
 - [ ] Ampliar tradução a shaders emitidos pelo recompiler do shadPS4.
 - [ ] Ampliar HLSL/DXIL a vertex/fragment e recursos de jogos.
 - [ ] Reflection e remapeamento de bindings.
@@ -439,6 +442,13 @@ A 4C compila o emissor upstream real e constrói um programa pequeno com
 de guest, PM4 ou runtime. Ver ADR 0040. Planejamento restante: 4D para
 bindings iniciais e vertex/fragment; 4E para comparação/regressão e fechamento
 do escopo inicial, sem promessa de compatibilidade com todos os shaders.
+
+Evidência 4C: sessão `134354649597873641-3192`, 20 probes positivos,
+readback 100–103 do emissor real e journal confirmando suspend/resume na
+mesma sessão. Captura confirma o painel legível, PASS e preview sintético.
+A 4D limita os bindings gráficos a PushData por estágio e um varying;
+texturas, samplers, SSBOs e vertex fetch guest continuam pendentes. Não
+marcar os itens amplos de recursos de jogos/reflection como completos.
 
 ## Fase 5 — Plataforma e primeiro frame
 

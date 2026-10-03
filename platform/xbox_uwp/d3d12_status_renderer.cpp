@@ -2,6 +2,7 @@
 
 #include "d3d12_status_renderer.h"
 #include "d3d12_compute_probe.h"
+#include "d3d12_graphics_probe.h"
 #include "shaders/spirv_hlsl_bridge.h"
 #include "shaders/upstream_compute.h"
 
@@ -232,6 +233,17 @@ std::string D3D12StatusRenderer::ShaderDetails() const {
          "reference_hlsl_passed=" +
          std::to_string(compute_probe_passed_) +
          ";translated_readback_passed=" + std::to_string(shader_probe_passed_);
+}
+
+std::string D3D12StatusRenderer::GraphicsShaderDetails() const {
+  return "emitter=Shader.Backend.SPIRV.EmitSPIRV;source=authored_shadps4_ir;"
+         "guest_isa=0;guest_runtime_linked=0;translation_location=xbox_runtime;"
+         "stages=vertex,fragment;shader_format=DXIL;varying_location=0;varying="
+         "float4;"
+         "vs_cbv=b0_space1;ps_cbv=b0_space2;root_words=60;draws=2;pixels_per_"
+         "draw=16;"
+         "expected_rgba=255,0,0,255|0,255,0,255;readback_passed=" +
+         std::to_string(graphics_shader_probe_passed_);
 }
 
 std::string D3D12StatusRenderer::UpstreamShaderDetails() const {
@@ -633,6 +645,9 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
                                            : "SHAD EMITTER  FAIL",
              0.105F, 0.70F, 3.0F,
              upstream_shader_probe_passed_ ? Accent : Failure);
+    DrawText(
+        graphics_shader_probe_passed_ ? "SHAD VS PS  PASS" : "SHAD VS PS  FAIL",
+        0.105F, 0.745F, 2.6F, graphics_shader_probe_passed_ ? Accent : Failure);
     DrawText(state.probes_passed ? "SYSTEM PROBES  PASS"
                                  : "SYSTEM PROBES  FAIL",
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);
@@ -915,6 +930,31 @@ void D3D12StatusRenderer::CreateShellPipeline() {
   }
 
   D3D12_DESCRIPTOR_RANGE icon_range{};
+  try {
+    const auto vs = Xbox::Shaders::TranslateGraphics(
+        Xbox::Shaders::EmitUpstreamGraphics(true),
+        Xbox::Shaders::GraphicsStage::Vertex);
+    const auto ps = Xbox::Shaders::TranslateGraphics(
+        Xbox::Shaders::EmitUpstreamGraphics(false),
+        Xbox::Shaders::GraphicsStage::Fragment);
+    winrt::check_hresult(library->CreateBlobWithEncodingFromPinned(
+        vs.hlsl.data(), static_cast<UINT32>(vs.hlsl.size()), DXC_CP_UTF8,
+        source.ReleaseAndGetAddressOf()));
+    const auto vertex = compile_shader(L"main", L"vs_6_0");
+    winrt::check_hresult(library->CreateBlobWithEncodingFromPinned(
+        ps.hlsl.data(), static_cast<UINT32>(ps.hlsl.size()), DXC_CP_UTF8,
+        source.ReleaseAndGetAddressOf()));
+    const auto fragment = compile_shader(L"main", L"ps_6_0");
+    graphics_shader_probe_passed_ = RunD3D12GraphicsProbe(
+        device_context_, resource_allocator_, pipeline_cache_,
+        {vertex->GetBufferPointer(), vertex->GetBufferSize()},
+        {fragment->GetBufferPointer(), fragment->GetBufferSize()},
+        &transfer_stats_);
+  } catch (const std::exception &error) {
+    throw winrt::hresult_error(E_FAIL, winrt::to_hstring(error.what()));
+  }
+  if (!graphics_shader_probe_passed_)
+    winrt::throw_hresult(E_FAIL);
   icon_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
   icon_range.NumDescriptors = 1;
   icon_range.BaseShaderRegister = 0;

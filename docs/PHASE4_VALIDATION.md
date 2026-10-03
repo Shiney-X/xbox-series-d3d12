@@ -93,3 +93,34 @@ verifica valores GPU, reprova o oracle 100–103 para IR alterada e verifica
 200–203 com o oracle correto. As fixtures 4A/4B continuam tendo o teste
 legado DXBC; o emissor requer o caminho DXIL. AppContainer e GPU do Xbox
 exigem o console para aceitação.
+
+Validada 4C no Series S: sessão `134354649597873641-3192`, 20 probes
+positivos, captura correta e retomada na mesma sessão demonstrada no journal.
+
+## 4D: vértice, fragmento e bindings por estágio
+
+Após `build-and-test` e `build-uwp-package` verdes, instalar o novo MSIX
+como **Game**. Abrir Diagnostics: conferir **SHAD VS PS PASS**, os PASS
+anteriores e o preview verde/laranja. Navegar Games/ícones/B e testar
+Dev Home/retomada na mesma sessão. Enviar captura e os dois logs habituais.
+
+`d3d12-shader-graphics` deve passar, com `stages=vertex,fragment`,
+`source=authored_shadps4_ir`, `shader_format=DXIL`, `vs_cbv=b0_space1`,
+`ps_cbv=b0_space2`, `root_words=60` e `readback_passed=1`.
+O teste é automático: dois draws fullscreen 4×4, primeiro todos os pixels
+RGBA=255,0,0,255 e depois 0,255,0,255. As constantes são trocadas entre VS
+e PS usando a ABI real; o canal vermelho atravessa location 0/TEXCOORD0.
+Um clear azul permite detectar ausência de desenho. Não precisa de novos
+arquivos PS4 nem apertar botão para executar o probe.
+
+Os draws são offscreen; o preview visível continua sendo o DMA 3F,
+não a imagem desse teste e não um frame de jogo. Baseline: 4 roots,
+2 graphics, 4 compute, pelo menos 13 hits; sem novos UAVs. Após os testes,
+UPLOAD/READBACK=0 e nenhum allocation failure/rejeição. Os recursos do
+probe são temporários; o frame DMA de 65536 bytes continua retido.
+
+O teste portátil verifica emissão determinística, ABI/remap e rejeição de
+estágio/location/layout incompatíveis. Windows WARP usa DXC/DXIL e compara
+os 32 pixels; um PS azul deliberadamente incorreto deve falhar no oracle.
+Isso não substitui a aceitação no Xbox. Não há texturas, samplers, SSBOs,
+vertex buffers guest, GCN de jogo, PM4 ou core completo nesta 4D.
