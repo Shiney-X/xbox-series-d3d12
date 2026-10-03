@@ -100,6 +100,10 @@ public:
     return upstream_shader_probe_passed_;
   }
   [[nodiscard]] std::string UpstreamShaderDetails() const;
+  [[nodiscard]] bool GraphicsShaderProbePassed() const noexcept {
+    return graphics_shader_probe_passed_;
+  }
+  [[nodiscard]] std::string GraphicsShaderDetails() const;
   [[nodiscard]] bool PipelineProbePassed() const noexcept {
     return compute_probe_passed_;
   }
@@ -176,6 +180,7 @@ private:
   bool shader_probe_passed_{};
   bool push_data_probe_passed_{};
   bool upstream_shader_probe_passed_{};
+  bool graphics_shader_probe_passed_{};
   D3D12_VIEWPORT viewport_{};
   D3D12_RECT scissor_{};
 };

@@ -20,6 +20,52 @@ void Reject(Action action) {
 }
 int main() {
     try {
+        using Xbox::Shaders::GraphicsStage;
+        for (bool vertex : {true, false}) {
+            const auto stage = vertex ? GraphicsStage::Vertex : GraphicsStage::Fragment;
+            const auto words = Xbox::Shaders::EmitUpstreamGraphics(vertex);
+            const auto graphics = Xbox::Shaders::TranslateGraphics(words, stage);
+            std::cout << graphics.hlsl << '\n';
+            Check(graphics.push_constant_words == 30);
+            Check(graphics.constant_space == (vertex ? 1u : 2u));
+            Check(graphics.hlsl.find(vertex ? "register(b0, space1)" : "register(b0, space2)") !=
+                  std::string::npos);
+            Check(words == Xbox::Shaders::EmitUpstreamGraphics(vertex));
+            Reject([&] { (void)Xbox::Shaders::TranslateGraphics({}, stage); });
+            Reject([&] {
+                (void)Xbox::Shaders::TranslateGraphics(words, static_cast<GraphicsStage>(9));
+            });
+            for (std::size_t size = 1; size < words.size(); ++size)
+                Reject([&] {
+                    (void)Xbox::Shaders::TranslateGraphics(std::span(words).first(size), stage);
+                });
+            Reject([&] {
+                (void)Xbox::Shaders::TranslateGraphics(words, vertex ? GraphicsStage::Fragment
+                                                                     : GraphicsStage::Vertex);
+            });
+            Reject([&] { (void)Xbox::Shaders::TranslateCompute(words); });
+            Reject([&] {
+                (void)Xbox::Shaders::TranslateGraphics(Xbox::Shaders::EmitUpstreamCompute(), stage);
+            });
+            unsigned mutations = 0;
+            for (std::size_t offset = 5; offset < words.size();) {
+                const auto count = words[offset] >> 16;
+                if ((words[offset] & 0xffff) == 71 && count == 4 && words[offset + 2] == 30) {
+                    auto invalid = words;
+                    invalid[offset + 3] = 7;
+                    Reject([&] { (void)Xbox::Shaders::TranslateGraphics(invalid, stage); });
+                    ++mutations;
+                }
+                if ((words[offset] & 0xffff) == 72 && count == 5 && words[offset + 3] == 35) {
+                    auto invalid = words;
+                    invalid[offset + 4] += 4;
+                    Reject([&] { (void)Xbox::Shaders::TranslateGraphics(invalid, stage); });
+                    ++mutations;
+                }
+                offset += count;
+            }
+            Check(mutations >= 12);
+        }
         const auto upstream = Xbox::Shaders::EmitUpstreamCompute();
         const auto upstream_translation = Xbox::Shaders::TranslateCompute(upstream);
         std::cout << "Upstream emitted HLSL:\n" << upstream_translation.hlsl << '\n';

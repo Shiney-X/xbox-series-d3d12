@@ -36,7 +36,9 @@ A 4A validou SPIR-V → HLSL → DXIL no próprio UWP com SPIRV-Cross,
 dispatch compute e readback de uma fixture autoral. A 4B adapta a ABI real
 PushData a root constants, validada no console. A 4C liga o emissor real
 `EmitSPIRV` e a IR do shadPS4 ao UWP: IR autoral → SPIR-V → HLSL → DXIL
-→ dispatch/readback; validação no console pendente. Ainda não traduz
+→ dispatch/readback, validado no Series S. A 4D acrescenta VS/PS reais a
+partir de IR autoral, reflection e PushData separado por estágio, com
+draw/readback automático no UWP (aceitação no console pendente). Ainda não traduz
 shaders de jogos nem compila o core completo.
 Procedimento: [validação da Fase 4](docs/PHASE4_VALIDATION.md).
 

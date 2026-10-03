@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <vector>
 namespace Xbox::Shaders {
+// Authored IR, not guest ISA. One fullscreen triangle and one float4 varying.
+[[nodiscard]] std::vector<std::uint32_t> EmitUpstreamGraphics(bool vertex);
 // Authored IR, emitted by the unmodified instruction dispatch and real
 // EmitSPIRV backend. Not guest GCN, not a decoded game shader, and no
 // runtime/PM4 integration yet.

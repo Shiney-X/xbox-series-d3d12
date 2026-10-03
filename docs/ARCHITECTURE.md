@@ -35,7 +35,7 @@ flowchart LR
 
 ## Princípios
 
-### Compilador isolado da 4C (implementado, aceitação Xbox pendente)
+### Compilador isolado da 4C (validado no Xbox)
 
 O UWP linka a IR e `EmitSPIRV` reais como biblioteca AppContainer. A entrada
 atual é IR autoral compute, não GCN de jogo. A emissão não consulta settings
@@ -45,6 +45,18 @@ Vulkan preserva suas opções e parser; logging standalone do compilador tem
 erros fatais propagados ao probe. Não há fallback para um binário fixture.
 O teste passa por SPIRV-Cross/DXC e confere valores GPU em R32_UINT 2×2.
 ABI, bindings e escopo continuam restritos à 4B; runtime de guest não está ligado.
+
+### Graphics inicial da 4D (aceitação Xbox pendente)
+
+O mesmo emissor real gera VS/PS de IR autoral. Reflection limita o contrato
+a um varying float4 location 0 e Shader::PushData, sem vertex fetch ou
+recursos guest. SPIRV-Cross remapeia PushData a b0/space1 (VS) e b0/space2
+(PS); duas roots de constantes por estágio custam 60 DWORDs. Não expandir
+esse layout indiscriminadamente: recursos futuros exigirão outro orçamento.
+DXC compila vs_6_0/ps_6_0 no console. Um probe offscreen compartilhado com
+WARP desenha vermelho e verde, trocando constantes e verificando todos os
+pixels por readback. Diagnostics informa o resultado; seu preview continua
+DMA sintético, não frame de jogo. Ver ADR 0041 e PHASE4_VALIDATION.
 
 1. Validar memória e execução antes do renderer.
 2. Manter o backend Vulkan funcional durante o desacoplamento.

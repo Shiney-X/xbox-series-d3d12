@@ -80,6 +80,7 @@ if(BUILD_TESTING)
         ../../platform/xbox_uwp/d3d12_pipeline_cache.cpp
         ../../platform/xbox_uwp/d3d12_compute_probe.cpp)
     target_sources(xbox_d3d12_pipelines_test PRIVATE
+        ../../platform/xbox_uwp/d3d12_graphics_probe.cpp
         ../../platform/xbox_uwp/d3d12_command_encoder.cpp)
     target_include_directories(xbox_d3d12_pipelines_test PRIVATE ../../platform/xbox_uwp)
     target_compile_definitions(xbox_d3d12_pipelines_test PRIVATE

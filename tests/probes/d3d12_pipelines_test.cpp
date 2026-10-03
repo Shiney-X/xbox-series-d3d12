@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "d3d12_compute_probe.h"
+#include "d3d12_graphics_probe.h"
 #include "spirv_hlsl_bridge.h"
 #include "upstream_compute.h"
 
@@ -57,7 +58,7 @@ D3D12_SHADER_BYTECODE Bytes(ID3DBlob* blob) {
     return {blob->GetBufferPointer(), blob->GetBufferSize()};
 }
 
-ComPtr<IDxcBlob> CompileDxil(const std::string& text) {
+ComPtr<IDxcBlob> CompileDxil(const std::string& text, const wchar_t* target = L"cs_6_0") {
     ComPtr<IDxcLibrary> library;
     ComPtr<IDxcCompiler> compiler;
     winrt::check_hresult(
@@ -70,7 +71,7 @@ ComPtr<IDxcBlob> CompileDxil(const std::string& text) {
                                                   DXC_CP_UTF8, source.ReleaseAndGetAddressOf()));
     const wchar_t* arguments[]{L"-Ges", L"-O3"};
     ComPtr<IDxcOperationResult> operation;
-    winrt::check_hresult(compiler->Compile(source.Get(), L"upstream_probe.hlsl", L"main", L"cs_6_0",
+    winrt::check_hresult(compiler->Compile(source.Get(), L"upstream_probe.hlsl", L"main", target,
                                            arguments, 2, nullptr, 0, nullptr,
                                            operation.ReleaseAndGetAddressOf()));
     HRESULT status{};
@@ -335,6 +336,19 @@ int main() {
                                            nullptr, std::span(push_words).first(29), 1066);
             },
             E_INVALIDARG);
+        const auto vs_translation = Xbox::Shaders::TranslateGraphics(
+            Xbox::Shaders::EmitUpstreamGraphics(true), Xbox::Shaders::GraphicsStage::Vertex);
+        const auto ps_translation = Xbox::Shaders::TranslateGraphics(
+            Xbox::Shaders::EmitUpstreamGraphics(false), Xbox::Shaders::GraphicsStage::Fragment);
+        const auto vs = CompileDxil(vs_translation.hlsl, L"vs_6_0");
+        const auto ps = CompileDxil(ps_translation.hlsl, L"ps_6_0");
+        Check(RunD3D12GraphicsProbe(context, allocator, cache, Bytes(vs.Get()), Bytes(ps.Get())),
+              "upstream graphics stage bindings/readback mismatch");
+        const auto wrong_ps =
+            CompileDxil("float4 main() : SV_Target0 { return float4(0,0,1,1); }", L"ps_6_0");
+        Check(!RunD3D12GraphicsProbe(context, allocator, cache, Bytes(vs.Get()),
+                                     Bytes(wrong_ps.Get())),
+              "graphics oracle accepted incorrect shader");
         Check(allocator.Stats().live_resources == 0 && allocator.Stats().live_bytes == 0,
               "test resources leaked");
         Check(cache.Stats().compute_creations == 6 && cache.Stats().cache_hits >= 10,

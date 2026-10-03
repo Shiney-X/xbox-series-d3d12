@@ -1,6 +1,6 @@
 # ADR 0040 — Emissor SPIR-V upstream no UWP, a partir de IR autoral
 
-- Status: implementado; validação no Series S pendente
+- Status: implementado e validado no Series S
 - Data: 2026-10-02
 
 ## Viabilidade e dependências
@@ -67,3 +67,7 @@ shader de jogo, Liverpool/PM4, boot ou core completo neste bloco. O uso de
 descriptor autoral não prova acesso à memória guest. A imagem na tela é
 o preview sintético 3F, não resultado visual deste compute. Próximos blocos
 planejados: 4D bindings/vertex/fragment iniciais e 4E regressão/fechamento.
+
+Aceitação 4C: sessão `134354649597873641-3192`, 20 probes positivos;
+readback 100–103, captura SHAD EMITTER PASS e suspend/resume registrado
+na mesma sessão. Não amplia a conclusão a shaders de jogos.
