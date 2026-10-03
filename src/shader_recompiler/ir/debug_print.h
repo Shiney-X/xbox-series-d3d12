@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "common/bit_field.h"
+#include "common/types.h"
 #include "shader_recompiler/ir/opcodes.h"
-#include "src/common/types.h"
 
 #pragma once
 

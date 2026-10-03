@@ -7,6 +7,7 @@
 #include "common/lru_cache.h"
 #include "common/slot_vector.h"
 #include "common/types.h"
+#include "video_core/buffer_cache/address_layout.h"
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/buffer_cache/range_set.h"
 #include "video_core/multi_level_page_table.h"
@@ -40,8 +41,8 @@ class PageManager;
 
 class BufferCache {
 public:
-    static constexpr u32 CACHING_PAGEBITS = 14;
-    static constexpr u64 CACHING_PAGESIZE = u64{1} << CACHING_PAGEBITS;
+    static constexpr u32 CACHING_PAGEBITS = BufferAddressLayout::CachingPageBits;
+    static constexpr u64 CACHING_PAGESIZE = BufferAddressLayout::CachingPageSize;
     static constexpr u64 DEVICE_PAGESIZE = 16_KB;
     static constexpr u64 CACHING_NUMPAGES = u64{1} << (40 - CACHING_PAGEBITS);
     static constexpr u64 BDA_PAGETABLE_SIZE = CACHING_NUMPAGES * sizeof(u64);

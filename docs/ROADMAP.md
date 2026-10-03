@@ -386,7 +386,11 @@ Dois jogos e dois ícones válidos foram detectados, com o selecionado exibido.
 - [x] Validar 4A no Series S: `d3d12-shaders`, Diagnostics e retomada.
 - [x] 4B: compartilhar a ABI real `Shader::PushData` e adaptar seu layout
       SPIR-V a b0/space0 e 30 root constants, com reflection estrita/readback.
-- [ ] Validar 4B no Series S: todos os campos de PushData e retomada.
+- [x] Validar 4B no Series S: todos os campos de PushData; retomada
+  confirmada pelo teste manual do usuário.
+- [x] 4C: ligar IR e emissor real `EmitSPIRV` ao UWP, sem renderer Vulkan
+  ou singleton de settings; compute autoral com dispatch/readback.
+- [ ] Validar 4C no Series S: `SHAD EMITTER PASS` e regressão do host.
 - [ ] Ampliar tradução a shaders emitidos pelo recompiler do shadPS4.
 - [ ] Ampliar HLSL/DXIL a vertex/fragment e recursos de jogos.
 - [ ] Reflection e remapeamento de bindings.
@@ -423,6 +427,18 @@ de recursos/logging no UWP. O teste ainda usa SPIR-V autoral com esse layout,
 não chama `EmitSPIRV`: `upstream_emitter_linked=0` permanece explícito.
 Ligar o emissor/IR e tratar SSBOs/capabilities continua no próximo gate;
 não interpretar a 4B como suporte a shaders de jogos.
+
+Evidência 4B: sessão `134354603362413650-5884`, 18 probes positivos,
+readback 1066–1069, 3 roots/3 compute/9 hits, nenhum allocation failure
+ou pedido rejeitado e UPLOAD/READBACK zerados. Captura mostra o PASS e
+preview; journal registra suspend e relaunch, enquanto resume foi
+confirmado separadamente pelo usuário, não inferido do journal.
+
+A 4C compila o emissor upstream real e constrói um programa pequeno com
+`IR::IREmitter`. Não usa GCN de jogo, frontend de tradução, resource tracking
+de guest, PM4 ou runtime. Ver ADR 0040. Planejamento restante: 4D para
+bindings iniciais e vertex/fragment; 4E para comparação/regressão e fechamento
+do escopo inicial, sem promessa de compatibilidade com todos os shaders.
 
 ## Fase 5 — Plataforma e primeiro frame
 

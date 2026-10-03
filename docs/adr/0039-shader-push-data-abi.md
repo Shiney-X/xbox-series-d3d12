@@ -1,6 +1,6 @@
 # ADR 0039 — ABI PushData do shadPS4 em root constants D3D12
 
-- Status: aceito; validação no Series S pendente
+- Status: aceito; validado no Series S
 - Data: 2026-10-02
 
 ## Viabilidade e dependências
@@ -37,6 +37,11 @@ do limite D3D12; não é necessário um buffer CBV/upload permanente aqui.
   Preview DMA da 3F é preservado e não representa a saída desse compute.
 
 ## Verificação e limites
+
+Validação Series S: sessão `134354603362413650-5884`, todos os 18 probes
+positivos, readback 1066–1069, captura com PASS e preview correto. Retomada
+confirmada manualmente pelo usuário; o journal enviado documenta relaunch
+e suspensão, não resume na mesma sessão.
 
 Teste portátil valida ABI, packing, reflection, tradução determinística e
 rejeição de offsets/tipos incompatíveis. WARP/DXBC verifica todos os campos,

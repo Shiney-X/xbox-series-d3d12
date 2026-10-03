@@ -8,6 +8,7 @@
 #include <sirit/sirit.h>
 
 #include "shader_recompiler/backend/bindings.h"
+#include "shader_recompiler/backend/spirv/emit_spirv.h"
 #include "shader_recompiler/info.h"
 #include "shader_recompiler/ir/value.h"
 #include "shader_recompiler/profile.h"
@@ -39,7 +40,9 @@ struct VectorIds {
 class EmitContext final : public Sirit::Module {
 public:
     explicit EmitContext(const Profile& profile, const RuntimeInfo& runtime_info, Info& info,
-                         Bindings& binding);
+                         Bindings& binding, const EmissionOptions& options_);
+
+    const EmissionOptions& options;
     ~EmitContext();
 
     Id Def(const IR::Value& value);
@@ -331,14 +334,17 @@ public:
         std::array<Id, u32(PointerSize::NumClass)> offsets;
         std::array<BufferSpv, u32(PointerType::NumAlias)> aliases;
 
-        template <class Self>
-        auto& Alias(this Self& self, PointerType alias) {
-            return self.aliases[u32(alias)];
+        auto& Alias(PointerType alias) {
+            return aliases[u32(alias)];
         }
-
-        template <class Self>
-        auto& Offset(this Self& self, PointerSize size) {
-            return self.offsets[u32(size)];
+        const auto& Alias(PointerType alias) const {
+            return aliases[u32(alias)];
+        }
+        auto& Offset(PointerSize size) {
+            return offsets[u32(size)];
+        }
+        const auto& Offset(PointerSize size) const {
+            return offsets[u32(size)];
         }
     };
 

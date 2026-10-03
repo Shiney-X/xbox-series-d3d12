@@ -6,7 +6,7 @@
 #include "shader_recompiler/backend/spirv/spirv_emit_context.h"
 #include "shader_recompiler/frontend/fetch_shader.h"
 #include "shader_recompiler/runtime_info.h"
-#include "video_core/buffer_cache/buffer_cache.h"
+#include "video_core/buffer_cache/address_layout.h"
 
 #include <boost/container/static_vector.hpp>
 #include <fmt/format.h>
@@ -67,9 +67,10 @@ void Name(EmitContext& ctx, Id object, std::string_view format_str, Args&&... ar
 } // Anonymous namespace
 
 EmitContext::EmitContext(const Profile& profile_, const RuntimeInfo& runtime_info_, Info& info_,
-                         Bindings& binding_)
-    : Sirit::Module(profile_.supported_spirv), info{info_}, runtime_info{runtime_info_},
-      profile{profile_}, stage{info.stage}, l_stage{info.l_stage}, binding{binding_} {
+                         Bindings& binding_, const EmissionOptions& options_)
+    : Sirit::Module(profile_.supported_spirv), options{options_}, info{info_},
+      runtime_info{runtime_info_}, profile{profile_}, stage{info.stage}, l_stage{info.l_stage},
+      binding{binding_} {
     if (info.uses_dma) {
         SetMemoryModel(spv::AddressingModel::PhysicalStorageBuffer64, spv::MemoryModel::GLSL450);
     } else {
@@ -318,7 +319,7 @@ void EmitContext::DefineInputs() {
         base_vertex = DefineVariable(U32[1], spv::BuiltIn::BaseVertex, spv::StorageClass::Input);
         instance_id = DefineVariable(U32[1], spv::BuiltIn::InstanceIndex, spv::StorageClass::Input);
 
-        const auto fetch_shader = Gcn::ParseFetchShader(info);
+        const auto* fetch_shader = options.fetch_shader;
         if (!fetch_shader) {
             break;
         }
@@ -1154,8 +1155,8 @@ Id EmitContext::DefineUfloatM5ToFloat32(u32 mantissa_bits, const std::string_vie
 
 Id EmitContext::DefineGetBdaPointer() {
     const auto caching_pagebits{
-        Constant(U64, static_cast<u64>(VideoCore::BufferCache::CACHING_PAGEBITS))};
-    const auto caching_pagemask{Constant(U64, VideoCore::BufferCache::CACHING_PAGESIZE - 1)};
+        Constant(U64, static_cast<u64>(VideoCore::BufferAddressLayout::CachingPageBits))};
+    const auto caching_pagemask{Constant(U64, VideoCore::BufferAddressLayout::CachingPageSize - 1)};
 
     const auto func_type{TypeFunction(U64, U64)};
     const auto func{OpFunction(U64, spv::FunctionControlMask::MaskNone, func_type)};

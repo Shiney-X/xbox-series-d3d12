@@ -193,7 +193,12 @@ struct Info : InfoPersistent {
         ASSERT(user_data.size() <= NUM_USER_DATA_REGS);
         std::memcpy(flattened_ud_buf.data(), user_data.data(), user_data.size_bytes());
         if (srt_info.walker_func) {
+#ifdef SHAD_STANDALONE_SHADER_EMITTER
+            UNREACHABLE_MSG(
+                "Guest SRT walker execution is not supported by the standalone emitter");
+#else
             srt_info.walker_func(user_data.data(), flattened_ud_buf.data());
+#endif
         }
     }
 

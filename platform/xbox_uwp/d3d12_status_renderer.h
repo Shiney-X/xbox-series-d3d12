@@ -3,8 +3,8 @@
 #pragma once
 
 #include "d3d12_device_context.h"
-#include "d3d12_resource_allocator.h"
 #include "d3d12_pipeline_cache.h"
+#include "d3d12_resource_allocator.h"
 #include "d3d12_transfer_probe.h"
 #include "d3d12_videocore_probe.h"
 
@@ -89,13 +89,25 @@ public:
   [[nodiscard]] std::string ResourceDetails() const;
   [[nodiscard]] std::string PipelineDetails() const;
   [[nodiscard]] std::string ShaderDetails() const;
-  [[nodiscard]] bool ShaderProbePassed() const noexcept { return shader_probe_passed_; }
-  [[nodiscard]] bool PushDataProbePassed() const noexcept { return push_data_probe_passed_; }
+  [[nodiscard]] bool ShaderProbePassed() const noexcept {
+    return shader_probe_passed_;
+  }
+  [[nodiscard]] bool PushDataProbePassed() const noexcept {
+    return push_data_probe_passed_;
+  }
   [[nodiscard]] std::string PushDataDetails() const;
-  [[nodiscard]] bool PipelineProbePassed() const noexcept { return compute_probe_passed_; }
+  [[nodiscard]] bool UpstreamShaderProbePassed() const noexcept {
+    return upstream_shader_probe_passed_;
+  }
+  [[nodiscard]] std::string UpstreamShaderDetails() const;
+  [[nodiscard]] bool PipelineProbePassed() const noexcept {
+    return compute_probe_passed_;
+  }
   [[nodiscard]] std::string TransferDetails() const;
   [[nodiscard]] std::string VideoCoreDetails() const;
-  [[nodiscard]] bool VideoCoreProbePassed() const noexcept { return video_core_probe_.Passed(); }
+  [[nodiscard]] bool VideoCoreProbePassed() const noexcept {
+    return video_core_probe_.Passed();
+  }
   [[nodiscard]] bool TransferProbePassed() const noexcept {
     return transfer_probe_.passed && transfer_probe_.resolve_supported &&
            transfer_stats_.rejected_requests == 0;
@@ -163,6 +175,7 @@ private:
   bool compute_probe_passed_{};
   bool shader_probe_passed_{};
   bool push_data_probe_passed_{};
+  bool upstream_shader_probe_passed_{};
   D3D12_VIEWPORT viewport_{};
   D3D12_RECT scissor_{};
 };
