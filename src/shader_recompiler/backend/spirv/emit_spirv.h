@@ -8,9 +8,20 @@
 #include "shader_recompiler/ir/program.h"
 #include "shader_recompiler/profile.h"
 
+namespace Shader::Gcn {
+struct FetchShaderData;
+}
+
 namespace Shader::Backend::SPIRV {
 
+// Host policy is supplied by the caller; the emitter must not query a desktop singleton.
+struct EmissionOptions {
+    bool direct_memory_access{};
+    const Gcn::FetchShaderData* fetch_shader{};
+};
+
 [[nodiscard]] std::vector<u32> EmitSPIRV(const Profile& profile, const RuntimeInfo& runtime_info,
-                                         const IR::Program& program, Bindings& binding);
+                                         const IR::Program& program, Bindings& binding,
+                                         const EmissionOptions& options = {});
 
 } // namespace Shader::Backend::SPIRV

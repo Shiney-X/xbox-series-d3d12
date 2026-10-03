@@ -17,7 +17,10 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure
-        run: cmake --preset windows-msvc
+        # Only compiler dependencies; do not pull the desktop renderer's dependency tree.
+        run: |
+          git submodule update --init --recursive -- externals/sirit externals/ext-boost externals/fmt externals/magic_enum externals/half
+          cmake --preset windows-msvc
 
       - name: Build
         run: cmake --build --preset windows-msvc-debug

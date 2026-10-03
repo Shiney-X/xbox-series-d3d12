@@ -35,6 +35,17 @@ flowchart LR
 
 ## Princípios
 
+### Compilador isolado da 4C (implementado, aceitação Xbox pendente)
+
+O UWP linka a IR e `EmitSPIRV` reais como biblioteca AppContainer. A entrada
+atual é IR autoral compute, não GCN de jogo. A emissão não consulta settings
+desktop nem inclui BufferCache/Vulkan: opções de DMA/fetch vêm do chamador,
+e constantes de endereçamento são compartilhadas em header sem API gráfica.
+Vulkan preserva suas opções e parser; logging standalone do compilador tem
+erros fatais propagados ao probe. Não há fallback para um binário fixture.
+O teste passa por SPIRV-Cross/DXC e confere valores GPU em R32_UINT 2×2.
+ABI, bindings e escopo continuam restritos à 4B; runtime de guest não está ligado.
+
 1. Validar memória e execução antes do renderer.
 2. Manter o backend Vulkan funcional durante o desacoplamento.
 3. Abstrair semântica do guest, não criar uma cópia da API Vulkan.

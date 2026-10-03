@@ -70,7 +70,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\src;$(ProjectDir)..\..\src\phase0;$(ProjectDir)..\..\out\shader-tools\_deps\spirv_cross-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>d3d12.lib;dxcompiler.lib;dxgi.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(ProjectDir)..\..\out\shader-uwp\$(Configuration)\xbox_upstream_spirv.lib;d3d12.lib;dxcompiler.lib;dxgi.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
     </Link>
   </ItemDefinitionGroup>
@@ -139,6 +139,12 @@
       <Link>ThirdParty\SPIRV-Cross-Notices.txt</Link>
       <DeploymentContent>true</DeploymentContent>
     </None>
+    <None Include="..\..\externals\sirit\LICENSE.txt"><Link>ThirdParty\Sirit-License.txt</Link><DeploymentContent>true</DeploymentContent></None>
+    <None Include="..\..\externals\sirit\externals\SPIRV-Headers\LICENSE"><Link>ThirdParty\SPIRV-Headers-License.txt</Link><DeploymentContent>true</DeploymentContent></None>
+    <None Include="..\..\externals\fmt\LICENSE"><Link>ThirdParty\Fmt-License.txt</Link><DeploymentContent>true</DeploymentContent></None>
+    <None Include="..\..\externals\ext-boost\LICENSE_1_0.txt"><Link>ThirdParty\Boost-License.txt</Link><DeploymentContent>true</DeploymentContent></None>
+    <None Include="..\..\externals\magic_enum\LICENSE"><Link>ThirdParty\MagicEnum-License.txt</Link><DeploymentContent>true</DeploymentContent></None>
+    <None Include="..\..\externals\half\LICENSE.txt"><Link>ThirdParty\Half-License.txt</Link><DeploymentContent>true</DeploymentContent></None>
   </ItemGroup>
 
   <Target Name="GenerateProbeAssets" BeforeTargets="PrepareForBuild">

@@ -3,6 +3,10 @@
 
 #pragma once
 
+#ifdef SHAD_SHADER_TOOL_LOGGING
+#include "common/logging/compiler_log.h"
+#else
+
 #include <iostream>
 #include <unordered_map>
 #include <vector>
@@ -79,3 +83,4 @@ static constexpr std::array level_string_views{"Trace", "Debug",    "Info", "War
     LOG_GENERIC(Common::Log::Class::log_class, spdlog::level::err, __VA_ARGS__)
 #define LOG_CRITICAL(log_class, ...)                                                               \
     LOG_GENERIC(Common::Log::Class::log_class, spdlog::level::critical, __VA_ARGS__)
+#endif

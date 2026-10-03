@@ -30,6 +30,7 @@ processo, resume seguido de apresentação. Nova abertura com outro session
 ## Teste portátil de desenvolvimento
 
 ```sh
+git submodule update --init --recursive -- externals/sirit externals/ext-boost externals/fmt externals/magic_enum externals/half
 cmake -S tests/probes/shaders -B out/shader-tools -DCMAKE_BUILD_TYPE=Debug
 cmake --build out/shader-tools -j 4
 ctest --test-dir out/shader-tools --output-on-failure
@@ -59,3 +60,33 @@ suspender; distinguir resume na mesma sessão de relaunch em novo processo.
 `upstream_emitter_linked=0` é esperado. O tipo PushData é realmente o do
 shadPS4, mas o módulo SPIR-V deste teste ainda é autoral, não foi produzido
 por `EmitSPIRV`. Não comprova execução de shaders guest/PM4.
+
+Validada no Series S, sessão `134354603362413650-5884`, 18 probes positivos
+e captura correta. Retomada confirmada pelo usuário; não inferida do journal
+que contém lançamento em outra sessão.
+
+## 4C: emissor SPIR-V real / IR do shadPS4
+
+Instalar o MSIX novo como **Game**, após os checks UWP passarem. Abrir
+Diagnostics: conferir **SHAD EMITTER PASS**, **PUSH DATA ABI PASS**, os
+demais PASS e o preview verde/laranja. Os sete textos à esquerda agora
+ficam dentro do painel, com espaçamento menor, sem sobrepor o preview.
+Repetir Games/ícones/B/Dev Home/reabertura e retomada. Enviar captura,
+`phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+O novo `d3d12-shader-upstream` deve ter `passed=true`,
+`upstream_emitter_linked=1`, `source=authored_shadps4_ir`, `guest_isa=0`,
+`guest_runtime_linked=0`, `shader_format=DXIL` e `readback_passed=1`.
+A IR autoral é emitida por `Shader::Backend::SPIRV::EmitSPIRV` no Xbox;
+dispatch/readback real confere 100,101,102,103. Não precisa de novos arquivos
+de PS4 nem boot de jogo.
+
+Baseline esperada: 3 roots, 1 graphics, 4 compute, 11 hits e 4 UAV barriers.
+DEFAULT retido=65536 bytes; UPLOAD/READBACK=0 após conclusão; nenhuma
+falha de alocação/rejeição. Contagens de frames/tickets variam. A tela
+permanece preview DMA sintético, não o primeiro frame de um jogo.
+
+No desenvolvimento, o teste portátil emite/traduz a IR duas vezes e
+verifica determinismo e mutação de constante. WARP compila HLSL para DXBC,
+verifica valores GPU, reprova o oracle 100–103 para IR alterada e verifica
+200–203 com o oracle correto. DXIL e AppContainer dependem da CI/console.

@@ -1207,7 +1207,8 @@ private:
       }
       const auto stats = renderer_->ResourceStats();
       const bool resource_accounting_passed =
-          stats.failed_allocations == 0U && stats.live_bytes <= stats.budget_bytes &&
+          stats.failed_allocations == 0U &&
+          stats.live_bytes <= stats.budget_bytes &&
           stats.peak_bytes <= stats.budget_bytes &&
           stats.default_bytes + stats.upload_bytes + stats.readback_bytes ==
               stats.live_bytes;
@@ -1229,6 +1230,12 @@ private:
                                                    ? ERROR_SUCCESS
                                                    : ERROR_INVALID_DATA),
                     renderer_->PushDataDetails()});
+      UpsertResult(
+          {"d3d12-shader-upstream", renderer_->UpstreamShaderProbePassed(),
+           static_cast<std::uint32_t>(renderer_->UpstreamShaderProbePassed()
+                                          ? ERROR_SUCCESS
+                                          : ERROR_INVALID_DATA),
+           renderer_->UpstreamShaderDetails()});
       UpsertResult({"d3d12-transfers", renderer_->TransferProbePassed(),
                     static_cast<std::uint32_t>(renderer_->TransferProbePassed()
                                                    ? ERROR_SUCCESS
