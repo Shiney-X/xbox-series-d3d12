@@ -72,6 +72,9 @@ int main() {
         const auto wrapped = InspectGuestPrefix(self, self.size());
         Check(wrapped.header_valid && wrapped.self_container && wrapped.elf_offset == 64 &&
               wrapped.encrypted_segments && wrapped.compressed_segments);
+        auto extended = self;
+        Put(extended, 64 + 52, 184, 2);
+        Check(InspectGuestPrefix(extended, extended.size()).header_valid);
         for (std::size_t n = 0; n < 128; ++n)
             Check(!InspectGuestPrefix(std::span(self).first(n), self.size()).header_valid);
         Put(self, 24, 0xffff, 2);

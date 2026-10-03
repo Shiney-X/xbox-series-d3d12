@@ -76,7 +76,11 @@ struct GuestPreflight {
     if (bytes[offset + 4] != 2 || bytes[offset + 5] != 1 || bytes[offset + 6] != 1 ||
         read(offset + 18, 2) != 62 || read(offset + 20, 4) != 1)
         return fail("requires_elf64_little_endian_x86_64");
-    if (read(offset + 52, 2) != 64)
+    // SELF can declare an extended header including tables/program ID.
+    // The upstream does not require e_ehsize==64 for these containers.
+    const auto header_size = read(offset + 52, 2);
+    if (header_size < 64 || header_size > file_size ||
+        (!result.self_container && header_size != 64))
         return fail("invalid_elf_header_size");
     result.type = static_cast<std::uint16_t>(read(offset + 16, 2));
     if (result.type != 2 && result.type != 3 && result.type != 0xfe00 && result.type != 0xfe10 &&
