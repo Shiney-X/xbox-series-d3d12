@@ -28,6 +28,9 @@ e linkada ao MSIX. Licenças das dependências seguem no pacote.
 - Compilar todos os TUs do backend SPIR-V e implementações reais de IR e
   Sirit. Métodos deducing-this de duas funções de acesso passam a overloads
   const/não-const equivalentes para GCC 13. Acrescentar includes explícitos.
+- Corrigir quatro spaceship operators defaultados com retorno `bool`,
+  inválido para `<=>`, para retorno `auto`; igualdade membro-a-membro é
+  preservada. Remover constexpr de GetSharp que chama leitura não-constexpr.
 - MSVC exige UTF-8 para fmt e não pode compilar a convenção SysV do
   walker SRT. No compilador standalone o walker é apenas um handle de
   código opaco; tentar executá-lo falha explicitamente. Não trocar a ABI

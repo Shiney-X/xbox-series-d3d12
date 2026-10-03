@@ -641,10 +641,10 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
              0.51F, 0.39F, 3.6F, video_core_probe_.Passed() ? Accent : Failure);
     if (video_core_probe_.Passed()) {
       command_list_->SetGraphicsRootDescriptorTable(1, icon_srv_heap_.Gpu(1));
-      DrawGameIcon(0.51F, 0.46F, 0.30F, 0.267F);
+      DrawGameIcon(0.51F, 0.46F, 0.264F, 0.235F);
       command_list_->SetGraphicsRootDescriptorTable(1, icon_srv_heap_.Gpu(0));
     }
-    DrawText("SYNTHETIC FRAME  NOT A GAME", 0.51F, 0.74F, 2.6F, SecondaryText);
+    DrawText("SYNTHETIC FRAME  NOT A GAME", 0.51F, 0.715F, 2.6F, SecondaryText);
   }
 
   DrawText(state.page == XboxShellPage::Games
