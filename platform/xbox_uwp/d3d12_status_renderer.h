@@ -50,6 +50,7 @@ struct XboxGameListEntry {
   std::string title;
   std::string title_id;
   std::string app_version;
+  std::string guest_header_status;
   GameIconState icon_state{GameIconState::Missing};
   std::uint32_t icon_width{};
   std::uint32_t icon_height{};

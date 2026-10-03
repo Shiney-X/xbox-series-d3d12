@@ -578,6 +578,8 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
                  3.4F, PrimaryText);
         DrawText("VERSION  " + state.games[selected].app_version, 0.65F, 0.66F,
                  3.4F, SecondaryText);
+        DrawText(state.games[selected].guest_header_status, 0.33F, 0.71F, 2.7F,
+                 SecondaryText);
       } else {
         DrawText(state.library_selection_confirmed ? "LIBRARY FOLDER SELECTED"
                                                    : "USB FOLDER BROWSER",

@@ -481,6 +481,21 @@ essas duas evidências nem exigir recompilar para repetir o teste de retomada.
 
 ## Fase 5 — Plataforma e primeiro frame
 
+Planejamento inicial de 5A–5G: auditoria/preflight, loader controlado,
+execução/ABI, HLE/TLS/input, boot Deltarune, integração gráfica e primeiro
+frame reproduzível. São gates, não promessa de sete PRs ou sucesso do jogo.
+Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
+
+- [x] 5A: auditar dependências do runtime e implementar inspeção read-only
+  ELF/SELF de eboot no UWP, com relatório; não carrega nem executa guest.
+- [ ] Validar 5A no Xbox com eboot real e regressão de UI/lifecycle.
+- [ ] 5B: carregar fixture guest controlada, validar ranges e permissões.
+- [ ] 5C: executar fixture guest com boundary SysV e diagnóstico de faults.
+- [ ] 5D: HLE/threads/TLS/filesystem e gamepad guest básico.
+- [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
+- [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
+- [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.
+
 - [ ] Filesystem e importação de conteúdo.
 - [ ] Áudio e gamepad.
 - [ ] Threads, TLS e tratamento de exceções.
