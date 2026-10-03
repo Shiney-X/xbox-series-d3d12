@@ -13,7 +13,7 @@ add_library(xbox_upstream_spirv STATIC ${emitter_sources} ${sirit_sources}
     ${shader_repo}/platform/xbox_uwp/shaders/upstream_compute.cpp
     ${shader_repo}/platform/xbox_uwp/shaders/compiler_support.cpp)
 target_compile_features(xbox_upstream_spirv PUBLIC cxx_std_23)
-target_compile_definitions(xbox_upstream_spirv PRIVATE SHAD_SHADER_TOOL_LOGGING
+target_compile_definitions(xbox_upstream_spirv PRIVATE SHAD_SHADER_TOOL_LOGGING SHAD_STANDALONE_SHADER_EMITTER
     FMT_HEADER_ONLY NOMINMAX _CRT_SECURE_NO_WARNINGS)
 target_include_directories(xbox_upstream_spirv PUBLIC ${shader_repo}/platform/xbox_uwp/shaders)
 target_include_directories(xbox_upstream_spirv PRIVATE ${shader_repo}/src
@@ -22,7 +22,7 @@ target_include_directories(xbox_upstream_spirv PRIVATE ${shader_repo}/src
     ${shader_repo}/externals/ext-boost ${shader_repo}/externals/half/include
     ${shader_repo}/externals/fmt/include ${shader_repo}/externals/magic_enum/include)
 if(MSVC)
-    target_compile_options(xbox_upstream_spirv PRIVATE /W4 /permissive- /EHsc)
+    target_compile_options(xbox_upstream_spirv PRIVATE /W4 /permissive- /EHsc /utf-8)
 else()
     target_compile_options(xbox_upstream_spirv PRIVATE -Wall -Wextra -Wno-unused-parameter)
 endif()

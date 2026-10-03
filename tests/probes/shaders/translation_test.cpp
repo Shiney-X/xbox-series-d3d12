@@ -12,13 +12,6 @@ void Check(bool condition) {
 template <class Action>
 void Reject(Action action) {
     try {
-        const auto upstream = Xbox::Shaders::EmitUpstreamCompute();
-        const auto upstream_translation = Xbox::Shaders::TranslateCompute(upstream);
-        Check(upstream_translation.push_constant_words == 30);
-        Check(upstream_translation.local_size == std::array<std::uint32_t, 3>{2, 2, 1});
-        Check(upstream == Xbox::Shaders::EmitUpstreamCompute());
-        Check(Xbox::Shaders::TranslateCompute(Xbox::Shaders::EmitUpstreamCompute(200)).hlsl !=
-              upstream_translation.hlsl);
         action();
     } catch (const std::exception&) {
         return;
@@ -27,6 +20,13 @@ void Reject(Action action) {
 }
 int main() {
     try {
+        const auto upstream = Xbox::Shaders::EmitUpstreamCompute();
+        const auto upstream_translation = Xbox::Shaders::TranslateCompute(upstream);
+        Check(upstream_translation.push_constant_words == 30);
+        Check(upstream_translation.local_size == std::array<std::uint32_t, 3>{2, 2, 1});
+        Check(upstream == Xbox::Shaders::EmitUpstreamCompute());
+        Check(Xbox::Shaders::TranslateCompute(Xbox::Shaders::EmitUpstreamCompute(200)).hlsl !=
+              upstream_translation.hlsl);
         const auto fixture = Xbox::Shaders::ComputeFixture();
         const auto result = Xbox::Shaders::TranslateCompute(fixture);
         Check(result.local_size == std::array<std::uint32_t, 3>{2, 2, 1});

@@ -28,6 +28,12 @@ e linkada ao MSIX. Licenças das dependências seguem no pacote.
 - Compilar todos os TUs do backend SPIR-V e implementações reais de IR e
   Sirit. Métodos deducing-this de duas funções de acesso passam a overloads
   const/não-const equivalentes para GCC 13. Acrescentar includes explícitos.
+- MSVC exige UTF-8 para fmt e não pode compilar a convenção SysV do
+  walker SRT. No compilador standalone o walker é apenas um handle de
+  código opaco; tentar executá-lo falha explicitamente. Não trocar a ABI
+  guest por ABI Windows nem alegar que SRT/JIT está portado. Desktop
+  mantém seu tipo SysV sem esse define privado. O probe libera use lists
+  e destrói instruções antes de liberar o armazenamento do ObjectPool.
 - Construir IR compute autoral com LocalInvocationId, multiplicação,
   adição, bitcast e ImageWrite. Descriptor PS4 autoral representa uma
   imagem R32_UINT 2×2; grupo 2×2×1. O shader escreve 100+x+2y.

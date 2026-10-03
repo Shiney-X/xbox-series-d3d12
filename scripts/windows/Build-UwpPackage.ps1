@@ -27,7 +27,7 @@ if ($LASTEXITCODE -ne 0) {
 # Compile the actual emitter and IR implementation for AppContainer, not desktop Win32.
 $emitterBuild = Join-Path $repositoryRoot 'out\shader-uwp'
 & cmake -S $shaderSource -B $emitterBuild -G 'Visual Studio 17 2022' -A x64 `
-    -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DBUILD_TESTING=OFF
+    '-DCMAKE_SYSTEM_NAME=WindowsStore' '-DCMAKE_SYSTEM_VERSION=10.0' -DBUILD_TESTING=OFF
 if ($LASTEXITCODE -ne 0) { throw 'UWP shader emitter configuration failed.' }
 & cmake --build $emitterBuild --config $Configuration --target xbox_upstream_spirv --parallel 2
 if ($LASTEXITCODE -ne 0) { throw 'UWP shader emitter compilation failed.' }

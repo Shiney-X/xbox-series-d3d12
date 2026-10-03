@@ -25,6 +25,19 @@ std::vector<std::uint32_t> EmitUpstreamCompute(std::uint32_t base) {
   info.loads.Set(IR::Attribute::LocalInvocationId, 1);
   Common::ObjectPool<IR::Inst> pool{64};
   IR::Block block{pool};
+  // ObjectPool stores objects in union slots; the standalone probe explicitly
+  // releases IR use lists before releasing its storage, including on
+  // exceptions.
+  struct BlockLifetime {
+    IR::Block &block;
+    ~BlockLifetime() {
+      for (auto &inst : block.Instructions()) {
+        inst.ClearArgs();
+      }
+      block.Instructions().clear_and_dispose(
+          [](IR::Inst *inst) { std::destroy_at(inst); });
+    }
+  } lifetime{block};
   IR::Program program{info};
   program.blocks.push_back(&block);
   program.post_order_blocks.push_back(&block);

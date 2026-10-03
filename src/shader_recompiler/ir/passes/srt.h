@@ -13,7 +13,12 @@ struct Archive;
 
 namespace Shader {
 
+#ifdef SHAD_STANDALONE_SHADER_EMITTER
+// Opaque code handle only: the standalone emitter cannot execute a guest-ABI walker.
+using PFN_SrtWalker = void (*)();
+#else
 using PFN_SrtWalker = void PS4_SYSV_ABI (*)(const u32* /*user_data*/, u32* /*flat_dst*/);
+#endif
 PFN_SrtWalker RegisterWalkerCode(const u8* ptr, size_t size);
 
 struct PersistentSrtInfo {
