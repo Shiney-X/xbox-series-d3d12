@@ -46,7 +46,7 @@ erros fatais propagados ao probe. Não há fallback para um binário fixture.
 O teste passa por SPIRV-Cross/DXC e confere valores GPU em R32_UINT 2×2.
 ABI, bindings e escopo continuam restritos à 4B; runtime de guest não está ligado.
 
-### Graphics inicial da 4D (aceitação Xbox pendente)
+### Graphics inicial da 4D (validado no Xbox)
 
 O mesmo emissor real gera VS/PS de IR autoral. Reflection limita o contrato
 a um varying float4 location 0 e Shader::PushData, sem vertex fetch ou
@@ -57,6 +57,18 @@ DXC compila vs_6_0/ps_6_0 no console. Um probe offscreen compartilhado com
 WARP desenha vermelho e verde, trocando constantes e verificando todos os
 pixels por readback. Diagnostics informa o resultado; seu preview continua
 DMA sintético, não frame de jogo. Ver ADR 0041 e PHASE4_VALIDATION.
+
+### Gate de regressão da 4E
+
+O contrato inicial é testado em três níveis: emissão/reflection portátil,
+GPU WARP/DXC/DXIL em CI e probes no Xbox. `scripts/validate_phase4.py`
+confere os logs exportados, ABI, readbacks declarados, bindings e estados
+do journal; não executa GPU nem atesta criptograficamente a origem dos logs.
+Relaunch em outro processo não é resume, e um evento de resume isolado não
+prova apresentação posterior. Captura e testes do console continuam necessários.
+O corpus inicial usa resultados independentes, não comparações com Vulkan.
+O corpus cross-backend de shaders guest continua bloqueando a alegação de
+compatibilidade de jogos. ADR 0042 mantém SPIRV-Cross/DXC como caminho inicial.
 
 1. Validar memória e execução antes do renderer.
 2. Manter o backend Vulkan funcional durante o desacoplamento.

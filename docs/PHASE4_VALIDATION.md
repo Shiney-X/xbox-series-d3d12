@@ -37,7 +37,8 @@ ctest --test-dir out/shader-tools --output-on-failure
 ```
 
 Isso testa o tradutor e os limites, sem emular Xbox. A CI Windows complementa
-com WARP/DXBC; a validação DXIL/UWP exige o console. A 4A não valida shaders
+com WARP (fixtures antigas DXBC; emissor upstream DXC/DXIL); a validação
+UWP/GPU do Xbox exige o console. A 4A não valida shaders
 guest, compatibilidade de jogos ou o compilador de ISA PS4.
 
 ## 4B: ABI PushData / root constants
@@ -124,3 +125,69 @@ estágio/location/layout incompatíveis. Windows WARP usa DXC/DXIL e compara
 os 32 pixels; um PS azul deliberadamente incorreto deve falhar no oracle.
 Isso não substitui a aceitação no Xbox. Não há texturas, samplers, SSBOs,
 vertex buffers guest, GCN de jogo, PM4 ou core completo nesta 4D.
+
+Validada 4D: 20 probes positivos em `134354665468983635-5052`, 32 pixels
+corretos, 4 roots/2 graphics/4 compute/14 hits, UPLOAD/READBACK zerados
+e captura SHAD VS PS PASS. O journal registra resume anterior em
+`134354665134013638-6320`, sem apresentação posterior registrada. A sessão
+dos resultados é outra abertura; não comprova retomada por si só.
+
+## 4E: regressão e fechamento do contrato inicial
+
+Esta etapa não altera o executável UWP: o pacote da PR 41 continua sendo
+o alvo de teste. Não é necessário reinstalar um MSIX só para validar logs
+ou atualizar documentação. A CI recompila para verificar a integração.
+
+Gate inicial:
+
+- Testes portáteis de emissão/reflection/determinismo e rejeição de layouts.
+- Windows WARP/DXC/DXIL: compute, ABI completa e últimos campos, draws VS/PS,
+  mudanças de constantes, PSO cache e oracles negativos.
+- Logs/captura do Xbox: PASS nos probes, pixels declarados corretos,
+  nenhum allocation failure e nenhum UPLOAD/READBACK retido após os probes.
+- Ciclo de vida: registrar sessão, distinguir relaunch de resume e não
+  inferir apresentação a partir de um resume isolado.
+- Pendências guest e golden cross-backend explicitamente preservadas.
+
+### Conferir os logs exportados
+
+Requer Python 3, somente biblioteca padrão; não modifica arquivos ou console.
+
+```sh
+python3 scripts/validate_phase4.py \
+  --results "/home/henrique/Área de trabalho/phase0-results.jsonl" \
+  --lifecycle "/home/henrique/Área de trabalho/phase0-lifecycle.jsonl" \
+  --require-resume
+python3 -m unittest discover -s tests/phase4 -v
+```
+
+Retorna JSON e exit code 0 para evidências consistentes; exit code 1 para
+erro, probe ausente/duplicado/falhando, ABI/oracle/binding incorreto ou
+journal incompatível. `--require-resume` exige suspend/resume ordenado em
+alguma sessão conhecida do journal, não necessariamente a de resultados.
+O relatório separa `results_session`, `resume_sessions` e
+`presentation_after_resume_sessions`. Warning sobre apresentação é uma
+limitação de evidência, não falha do shader. Os detalhes são declarações
+do probe; o script não repete o readback nem valida autenticidade do arquivo.
+
+Para acrescentar evidência de apresentação após resume, usar o mesmo MSIX:
+abrir Diagnostics, voltar ao Dev Home, reabrir e navegar após a retomada.
+Exportar novamente o journal e conferir as sessões. Se surgir um novo
+processo, é relaunch; não registrar como resume.
+
+### Corpus de regressão disponível
+
+| Caso | Oracle independente | Onde é verificado |
+| --- | --- | --- |
+| Compute original e SPIR-V autoral | 100–103 | WARP e Xbox |
+| PushData completo / campos finais | 1066–1069 / 117–120 | WARP; completo no Xbox |
+| Compute IR upstream / constante alterada | 100–103 / 200–203 | WARP; original no Xbox |
+| VS/PS IR upstream, constantes por estágio | 16 pixels vermelhos, depois 16 verdes | WARP e Xbox |
+| Compute ou PS deliberadamente incorretos | Rejeição do oracle correto | WARP |
+| Layout/ABI/estágio/location incompatíveis | Rejeição antes da GPU | Teste portátil |
+
+Isso é corpus **sintético com oracles**, não corpus golden Vulkan/D3D12.
+Comparação cross-backend e shaders GCN reais continuam pendentes. Não
+redistribuir jogos/sysmodules para preencher o corpus. A fundação pode
+avançar à integração guest; suporte a um jogo só será declarado após gates
+de loader/CPU/HLE, PM4, shaders e recursos reais.

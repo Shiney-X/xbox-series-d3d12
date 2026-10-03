@@ -379,7 +379,10 @@ e sete esperas bloqueantes. O fence completou o último ticket sinalizado
 duas suspensões e uma retomada na mesma sessão, com reapresentação aprovada.
 Dois jogos e dois ícones válidos foram detectados, com o selecionado exibido.
 
-## Fase 4 — Shaders
+## Fase 4 — Fundação inicial de shaders (4A–4E)
+
+**Escopo inicial implementado e validado no Series S até 4D; a 4E consolida
+os gates de regressão. Isso não declara suporte a shaders de jogos.**
 
 - [x] 4A: caminho inicial SPIR-V compute para HLSL via SPIRV-Cross,
       compilado no UWP e conectado a DXC/dispatch/readback no Xbox.
@@ -393,12 +396,30 @@ Dois jogos e dois ícones válidos foram detectados, com o selecionado exibido.
 - [x] Validar 4C no Series S: `SHAD EMITTER PASS` e regressão do host.
 - [x] 4D: VS/PS emitidos de IR autoral, varying float4 e PushData por estágio
   em b0/space1 e b0/space2; draw/readback com dois conjuntos de constantes.
-- [ ] Validar 4D no Series S: `SHAD VS PS PASS`, pixels e retomada.
-- [ ] Ampliar tradução a shaders emitidos pelo recompiler do shadPS4.
-- [ ] Ampliar HLSL/DXIL a vertex/fragment e recursos de jogos.
-- [ ] Reflection e remapeamento de bindings.
-- [ ] Corpus golden Vulkan/D3D12.
-- [ ] Avaliar emissor HLSL direto a partir do IR.
+- [x] Validar 4D no Series S: `SHAD VS PS PASS` e 32 pixels corretos;
+  journal registra resume anterior, sem apresentação pós-resume registrada.
+- [x] 4E: consolidar regressões compute/VS/PS, validador de evidências
+  com testes negativos em CI e critérios explícitos de fechamento.
+- [x] Avaliar emissor HLSL direto a partir do IR: adiado por ADR 0042;
+  não implementado nem medido como alternativa de performance.
+
+### Extensões pendentes — não incluídas no fechamento inicial
+
+Estes eram os itens amplos da Fase 4. São preservados, agora decompostos;
+não foram concluídos nem descartados para encerrar a fundação.
+
+- [x] Traduzir saída do emissor real com IR autoral compute e VS/PS.
+- [ ] Traduzir saída do frontend/recompiler de shaders GCN reais de jogos.
+- [x] HLSL/DXIL vertex/fragment com um varying e constantes por estágio.
+- [ ] Recursos de jogos: vertex fetch, buffers, texturas, samplers e layouts adicionais.
+- [x] Reflection/remapeamento restrito à ABI PushData e fixtures iniciais.
+- [ ] Reflection/remapeamento dos layouts de recursos guest suportados.
+- [x] Corpus sintético inicial com oracles independentes e testes negativos.
+- [ ] Corpus golden Vulkan/D3D12 dos mesmos shaders/dados, incluindo guest.
+
+As extensões devem ser retomadas conforme os primeiros shaders/recursos
+alcançados pela integração guest. Fase 5 não pode pular esses bloqueios
+nem tratar a conclusão inicial como garantia de boot ou primeiro frame.
 
 A fundação 3A–3F foi validada no Series S. Na sessão 3F
 `134354472178773688-6484`, todos os 17 probes passaram: buffer/textura
@@ -439,9 +460,9 @@ confirmado separadamente pelo usuário, não inferido do journal.
 
 A 4C compila o emissor upstream real e constrói um programa pequeno com
 `IR::IREmitter`. Não usa GCN de jogo, frontend de tradução, resource tracking
-de guest, PM4 ou runtime. Ver ADR 0040. Planejamento restante: 4D para
-bindings iniciais e vertex/fragment; 4E para comparação/regressão e fechamento
-do escopo inicial, sem promessa de compatibilidade com todos os shaders.
+de guest, PM4 ou runtime. Ver ADR 0040. A 4D validou bindings iniciais e
+vertex/fragment; a 4E consolida regressão e fechamento do escopo inicial,
+sem alegar comparação golden Vulkan/D3D12 ou compatibilidade com jogos.
 
 Evidência 4C: sessão `134354649597873641-3192`, 20 probes positivos,
 readback 100–103 do emissor real e journal confirmando suspend/resume na
@@ -449,6 +470,14 @@ mesma sessão. Captura confirma o painel legível, PASS e preview sintético.
 A 4D limita os bindings gráficos a PushData por estágio e um varying;
 texturas, samplers, SSBOs e vertex fetch guest continuam pendentes. Não
 marcar os itens amplos de recursos de jogos/reflection como completos.
+
+Evidência 4D: sessão de resultados `134354665468983635-5052`, 20 probes
+positivos, draws vermelho/verde com 16 pixels cada e bindings VS/PS separados.
+4 roots, 2 graphics, 4 compute e 14 hits; UPLOAD/READBACK=0, zero falhas
+de alocação, frame DMA retido de 65536 bytes. Captura mostra SHAD VS PS PASS.
+O journal registra resume em `134354665134013638-6320` e relaunch na sessão
+de resultados; não contém apresentação após aquele resume. Não confundir
+essas duas evidências nem exigir recompilar para repetir o teste de retomada.
 
 ## Fase 5 — Plataforma e primeiro frame
 
