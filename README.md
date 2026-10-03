@@ -32,9 +32,10 @@ que o Liverpool/PM4, shaders guest ou execução de jogos estejam ligados ao
 UWP; o item de backend completo acima permanece pendente. Procedimento:
 [validação da Fase 3](docs/PHASE3_VALIDATION.md).
 
-A 4A inicia SPIR-V → HLSL → DXIL no próprio UWP com SPIRV-Cross,
-dispatch compute e readback de uma fixture autoral; validação no console
-pendente. Ainda não traduz shaders de jogos nem compila o core completo.
+A 4A validou SPIR-V → HLSL → DXIL no próprio UWP com SPIRV-Cross,
+dispatch compute e readback de uma fixture autoral. A 4B adapta a ABI real
+PushData a root constants, com validação no console pendente. Ainda não
+traduz shaders de jogos nem compila o core completo.
 Procedimento: [validação da Fase 4](docs/PHASE4_VALIDATION.md).
 
 ## Baseline upstream

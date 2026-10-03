@@ -25,6 +25,30 @@ int main() {
     Check(result.hlsl.find("register(u0") != std::string::npos);
     Check(result.hlsl.find("SV_DispatchThreadID") != std::string::npos);
     Check(result.hlsl == Xbox::Shaders::TranslateCompute(fixture).hlsl);
+    Check(result.push_constant_words == 0);
+    const auto push_fixture = Xbox::Shaders::PushDataFixture();
+    const auto push_translation = Xbox::Shaders::TranslateCompute(push_fixture);
+    Check(push_translation.push_constant_words == 30);
+    Check(push_translation.hlsl.find("register(b0, space0)") != std::string::npos);
+    Check(push_translation.hlsl == Xbox::Shaders::TranslateCompute(push_fixture).hlsl);
+    const auto packed = Xbox::Shaders::EncodePushData(Xbox::Shaders::ProbePushData());
+    Check(packed[0] == 0x3f800000 && packed[4] == 1 && packed[19] == 16);
+    Check(packed[20] == 0x04030201 && packed[29] == 0x28272625);
+    for (std::size_t offset = 5; offset < push_fixture.size();) {
+      const auto count = push_fixture[offset] >> 16;
+      const auto opcode = push_fixture[offset] & 0xffff;
+      if (opcode == 72 && count == 5 && push_fixture[offset + 3] == 35) {
+        auto bad_layout = push_fixture;
+        bad_layout[offset + 4] += 4;
+        Reject([&] { (void)Xbox::Shaders::TranslateCompute(bad_layout); });
+      }
+      if (opcode == 30 && count == 13) {
+        auto bad_type = push_fixture;
+        bad_type[offset + 2] = 2; // uint instead of float xoffset.
+        Reject([&] { (void)Xbox::Shaders::TranslateCompute(bad_type); });
+      }
+      offset += count;
+    }
     Reject([] { (void)Xbox::Shaders::TranslateCompute({}); });
     for (std::size_t size = 1; size < fixture.size(); ++size) {
       Reject([&] { (void)Xbox::Shaders::TranslateCompute(std::span(fixture).first(size)); });

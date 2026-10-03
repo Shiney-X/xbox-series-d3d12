@@ -38,11 +38,16 @@ template <class Action> void Reject(Action action, HRESULT expected) {
 ComPtr<ID3DBlob> Compile(const char *source, const char *entry, const char *target) {
   ComPtr<ID3DBlob> result;
   ComPtr<ID3DBlob> errors;
-  winrt::check_hresult(D3DCompile(source, std::strlen(source), nullptr, nullptr,
+  const HRESULT status = D3DCompile(source, std::strlen(source), nullptr, nullptr,
                                  nullptr, entry, target,
                                  D3DCOMPILE_ENABLE_STRICTNESS, 0,
                                  result.ReleaseAndGetAddressOf(),
-                                 errors.ReleaseAndGetAddressOf()));
+                                 errors.ReleaseAndGetAddressOf());
+  if (FAILED(status) && errors) {
+    std::cerr.write(static_cast<const char *>(errors->GetBufferPointer()),
+                    static_cast<std::streamsize>(errors->GetBufferSize()));
+  }
+  winrt::check_hresult(status);
   return result;
 }
 
@@ -237,9 +242,28 @@ int main() {
     const auto changed_shader = Compile(changed_translation.hlsl.c_str(), "main", "cs_5_1");
     Check(!RunD3D12ComputeProbe(context, allocator, cache, Bytes(changed_shader.Get())),
           "readback oracle accepted deliberately wrong shader values");
+    const auto push_translation = Xbox::Shaders::TranslateCompute(Xbox::Shaders::PushDataFixture());
+    const auto push_shader = Compile(push_translation.hlsl.c_str(), "main", "cs_5_1");
+    const auto push_words = Xbox::Shaders::EncodePushData(Xbox::Shaders::ProbePushData());
+    Check(push_translation.push_constant_words == push_words.size(), "PushData root size mismatch");
+    Check(RunD3D12ComputeProbe(context, allocator, cache, Bytes(push_shader.Get()), nullptr, push_words, 1066),
+          "PushData full ABI readback mismatch");
+    Shader::PushData edge_data{};
+    edge_data.xoffset = 1;
+    edge_data.ud_regs[15] = 9;
+    edge_data.buf_offsets[39] = 7;
+    const auto edge_words = Xbox::Shaders::EncodePushData(edge_data);
+    Check(RunD3D12ComputeProbe(context, allocator, cache, Bytes(push_shader.Get()), nullptr, edge_words, 117),
+          "PushData last register/packed byte or root update mismatch");
+    Check(!RunD3D12ComputeProbe(context, allocator, cache, Bytes(push_shader.Get()), nullptr, edge_words, 1066),
+          "PushData oracle accepted stale values");
+    Reject([&] {
+      (void)RunD3D12ComputeProbe(context, allocator, cache, Bytes(push_shader.Get()), nullptr,
+                               std::span(push_words).first(29), 1066);
+    }, E_INVALIDARG);
     Check(allocator.Stats().live_resources == 0 && allocator.Stats().live_bytes == 0,
           "test resources leaked");
-    Check(cache.Stats().compute_creations == 3 && cache.Stats().cache_hits >= 8,
+    Check(cache.Stats().compute_creations == 4 && cache.Stats().cache_hits >= 10,
           "compute cache did not reuse the PSO");
     ComPtr<ID3D12InfoQueue> queue;
     if (SUCCEEDED(context.Device()->QueryInterface(IID_PPV_ARGS(queue.ReleaseAndGetAddressOf())))) {

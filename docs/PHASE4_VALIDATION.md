@@ -18,7 +18,7 @@ No resultado `d3d12-shaders`, esperar `passed=true`,
 Não é necessário fornecer shader, sysmodule ou iniciar jogo.
 
 Os demais probes devem passar. Baseline de pipelines: duas roots, um graphics,
-dois compute e seis hits. Transferências incluem um dispatch/readback extra,
+dois compute e sete hits. Transferências incluem um dispatch/readback extra,
 portanto dois UAV barriers e uma cópia de textura adicional. O frame 3F
 permanece vivo: um recurso DEFAULT/65536 bytes após Home, com UPLOAD/READBACK
 zerados, sem falhas de alocação. Contagens de frames e navegação variam.
@@ -38,3 +38,24 @@ ctest --test-dir out/shader-tools --output-on-failure
 Isso testa o tradutor e os limites, sem emular Xbox. A CI Windows complementa
 com WARP/DXBC; a validação DXIL/UWP exige o console. A 4A não valida shaders
 guest, compatibilidade de jogos ou o compilador de ISA PS4.
+
+## 4B: ABI PushData / root constants
+
+Instalar o MSIX novo como Game e repetir navegação/ícones/Dev Home/reabertura
+da 4A. Em Diagnostics, conferir **PUSH DATA ABI PASS**, os PASS anteriores
+e as faixas. Enviar captura, `phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+O probe `d3d12-shader-push-data` deve passar: ABI 120 bytes, 30 root words,
+b0/space0, 16 user registers e 40 offsets compactados. O shader lê os
+quatro floats, todos os registradores e todos os bytes de offsets; os
+resultados são 1066,1067,1068,1069 em 2×2. Verificação é automática; não
+é preciso colocar novos arquivos de PS4 no USB.
+
+Baseline da 4B: três roots, um graphics, três compute, nove hits e três
+UAV barriers. O frame 3F continua retido; após Home, DEFAULT=65536,
+UPLOAD/READBACK=0 e nenhuma falha/rejeição. Tickets devem concluir ao
+suspender; distinguir resume na mesma sessão de relaunch em novo processo.
+
+`upstream_emitter_linked=0` é esperado. O tipo PushData é realmente o do
+shadPS4, mas o módulo SPIR-V deste teste ainda é autoral, não foi produzido
+por `EmitSPIRV`. Não comprova execução de shaders guest/PM4.

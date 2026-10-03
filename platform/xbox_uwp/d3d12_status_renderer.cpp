@@ -228,6 +228,15 @@ std::string D3D12StatusRenderer::ShaderDetails() const {
          ";translated_readback_passed=" + std::to_string(shader_probe_passed_);
 }
 
+std::string D3D12StatusRenderer::PushDataDetails() const {
+  return "abi=Shader.PushData;abi_bytes=120;root_words=30;cbv_register=0;"
+         "register_space=0;ud_regs=16;packed_buffer_offsets=40;"
+         "source=authored_spirv_push_data_fixture;upstream_emitter_linked=0;"
+         "translation_location=xbox_runtime;shader_format=DXIL;"
+         "expected=1066,1067,1068,1069;readback_passed=" +
+         std::to_string(push_data_probe_passed_);
+}
+
 std::string D3D12StatusRenderer::TransferDetails() const {
   return "state_scope=recording;queue=direct;subresources=uniform;"
          "probe=buffer_texture_clear_depth_resolve_readback;probe_passed=" +
@@ -590,6 +599,8 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
     DrawText("D3D12 DXIL  PASS", 0.105F, 0.59F, 4.5F, Accent);
     DrawText(shader_probe_passed_ ? "SPIRV HLSL DXIL  PASS" : "SPIRV HLSL DXIL  FAIL",
              0.105F, 0.69F, 3.0F, shader_probe_passed_ ? Accent : Failure);
+    DrawText(push_data_probe_passed_ ? "PUSH DATA ABI  PASS" : "PUSH DATA ABI  FAIL",
+             0.105F, 0.76F, 3.0F, push_data_probe_passed_ ? Accent : Failure);
     DrawText(state.probes_passed ? "SYSTEM PROBES  PASS"
                                  : "SYSTEM PROBES  FAIL",
              0.51F, 0.29F, 4.5F, state.probes_passed ? Accent : Failure);
@@ -771,6 +782,15 @@ void D3D12StatusRenderer::CreateShellPipeline() {
         nullptr, 0, nullptr, result.ReleaseAndGetAddressOf()));
     HRESULT status = E_FAIL;
     winrt::check_hresult(result->GetStatus(&status));
+    if (FAILED(status)) {
+      ComPtr<IDxcBlobEncoding> errors;
+      if (SUCCEEDED(result->GetErrorBuffer(errors.ReleaseAndGetAddressOf())) && errors &&
+          errors->GetBufferSize() != 0) {
+        const std::string message(static_cast<const char *>(errors->GetBufferPointer()),
+                                  errors->GetBufferSize());
+        throw winrt::hresult_error(status, winrt::to_hstring(message));
+      }
+    }
     winrt::check_hresult(status);
 
     ComPtr<IDxcBlob> shader;
@@ -811,6 +831,25 @@ void D3D12StatusRenderer::CreateShellPipeline() {
       device_context_, resource_allocator_, pipeline_cache_,
       {translated_shader->GetBufferPointer(), translated_shader->GetBufferSize()}, &transfer_stats_);
   if (!shader_probe_passed_) {
+    winrt::throw_hresult(E_FAIL);
+  }
+  try {
+    translated = Xbox::Shaders::TranslateCompute(Xbox::Shaders::PushDataFixture());
+  } catch (const std::exception &error) {
+    throw winrt::hresult_error(E_FAIL, winrt::to_hstring(error.what()));
+  }
+  winrt::check_hresult(library->CreateBlobWithEncodingFromPinned(
+      translated.hlsl.data(), static_cast<UINT32>(translated.hlsl.size()), DXC_CP_UTF8,
+      source.ReleaseAndGetAddressOf()));
+  const auto push_shader = compile_shader(L"main", L"cs_6_0");
+  const auto push_words = Xbox::Shaders::EncodePushData(Xbox::Shaders::ProbePushData());
+  if (translated.push_constant_words != push_words.size()) {
+    winrt::throw_hresult(E_UNEXPECTED);
+  }
+  push_data_probe_passed_ = RunD3D12ComputeProbe(
+      device_context_, resource_allocator_, pipeline_cache_,
+      {push_shader->GetBufferPointer(), push_shader->GetBufferSize()}, &transfer_stats_, push_words, 1066);
+  if (!push_data_probe_passed_) {
     winrt::throw_hresult(E_FAIL);
   }
 

@@ -4,22 +4,31 @@
 #include <winrt/base.h>
 
 #include <cstring>
+#include <array>
 
 bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
                            D3D12ResourceAllocator &allocator,
                            D3D12PipelineCache &cache,
                            D3D12_SHADER_BYTECODE shader,
-                           D3D12TransferStats *stats) {
+                           D3D12TransferStats *stats,
+                           std::span<const std::uint32_t> push_words,
+                           std::uint32_t expected_base) {
+  if (!push_words.empty() && push_words.size() != 30) {
+    winrt::throw_hresult(E_INVALIDARG);
+  }
   D3D12_DESCRIPTOR_RANGE range{};
   range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
   range.NumDescriptors = 1;
-  D3D12_ROOT_PARAMETER parameter{};
-  parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-  parameter.DescriptorTable.NumDescriptorRanges = 1;
-  parameter.DescriptorTable.pDescriptorRanges = &range;
+  std::array<D3D12_ROOT_PARAMETER, 2> parameters{};
+  parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+  parameters[0].DescriptorTable.NumDescriptorRanges = 1;
+  parameters[0].DescriptorTable.pDescriptorRanges = &range;
+  parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+  parameters[1].Constants.ShaderRegister = 0;
+  parameters[1].Constants.Num32BitValues = 30;
   D3D12_ROOT_SIGNATURE_DESC desc{};
-  desc.NumParameters = 1;
-  desc.pParameters = &parameter;
+  desc.NumParameters = push_words.empty() ? 1 : 2;
+  desc.pParameters = parameters.data();
   const auto root = cache.RootSignature(desc);
   const auto pipeline = cache.Compute(root, shader);
   if (cache.RootSignature(desc) != root ||
@@ -68,6 +77,9 @@ bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
   ID3D12DescriptorHeap *heaps[]{descriptors.Heap()};
   commands->SetDescriptorHeaps(1, heaps);
   commands->SetComputeRootDescriptorTable(0, descriptors.Gpu(slot));
+  if (!push_words.empty()) {
+    commands->SetComputeRoot32BitConstants(1, static_cast<UINT>(push_words.size()), push_words.data(), 0);
+  }
   commands->Dispatch(1, 1, 1);
   encoder.UavBarrier(output.Get());
   encoder.CopyTextureToBuffer(readback.Get(), output.Get(), footprint);
@@ -85,7 +97,7 @@ bool RunD3D12ComputeProbe(D3D12DeviceContext &context,
                             footprint.Offset + y * footprint.Footprint.RowPitch +
                             x * sizeof(UINT);
       std::memcpy(&value, address, sizeof(value));
-      passed = passed && value == 100 + x + 2 * y;
+      passed = passed && value == expected_base + x + 2 * y;
     }
   }
   const D3D12_RANGE no_write{0, 0};

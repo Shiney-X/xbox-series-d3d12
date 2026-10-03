@@ -5,15 +5,14 @@
 
 #include "common/types.h"
 #include "shader_recompiler/ir/type.h"
+#include "shader_recompiler/push_data.h"
 #include "video_core/amdgpu/resource.h"
 
 #include <boost/container/static_vector.hpp>
 
 namespace Shader {
 
-static constexpr u32 NUM_USER_DATA_REGS = 16;
 static constexpr u32 NUM_IMAGES = 64;
-static constexpr u32 NUM_BUFFERS = 40;
 static constexpr u32 NUM_SAMPLERS = 16;
 static constexpr u32 NUM_FMASKS = 8;
 
@@ -140,26 +139,10 @@ struct FMaskResource {
 };
 using FMaskResourceList = boost::container::static_vector<FMaskResource, NUM_FMASKS>;
 
-struct PushData {
-    static constexpr u32 XOffsetIndex = 0;
-    static constexpr u32 YOffsetIndex = 1;
-    static constexpr u32 XScaleIndex = 2;
-    static constexpr u32 YScaleIndex = 3;
-    static constexpr u32 UdRegsIndex = 4;
-    static constexpr u32 BufOffsetIndex = UdRegsIndex + NUM_USER_DATA_REGS / 4;
-
-    float xoffset;
-    float yoffset;
-    float xscale;
-    float yscale;
-    std::array<u32, NUM_USER_DATA_REGS> ud_regs;
-    std::array<u8, NUM_BUFFERS> buf_offsets;
-
-    void AddOffset(u32 binding, u32 offset) {
-        ASSERT(offset < 256 && binding < buf_offsets.size());
-        buf_offsets[binding] = offset;
-    }
-};
+inline void PushData::AddOffset(u32 binding, u32 offset) {
+    ASSERT(offset < 256 && binding < buf_offsets.size());
+    buf_offsets[binding] = offset;
+}
 static_assert(sizeof(PushData) <= 128,
               "PushData size is greater than minimum size guaranteed by Vulkan spec");
 
