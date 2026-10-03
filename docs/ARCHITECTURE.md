@@ -352,6 +352,15 @@ não representa a saída do recompiler PS4; adaptar `EmitSPIRV`, reflection
 geral, bindings guest, vertex/fragment e waves continua pendente. Ver
 [ADR 0038](adr/0038-initial-spirv-hlsl-dxil.md).
 
+A 4B compartilha o tipo `Shader::PushData` em um header de ABI sem Vulkan,
+Boost ou logging. `resource.h` preserva a definição inline de AddOffset e
+sua política ASSERT. O layout continua 120 bytes: quatro floats, 16 uints
+e 40 bytes de offsets. Reflection aceita apenas os 11 membros/offsets
+exatos emitidos por `DefinePushDataBlock`, mapeados para b0/space0 e 30
+root constants. A root compute custa 31 DWORDs, incluindo a tabela UAV.
+O módulo de teste com esse layout é autoral; o emissor completo ainda não
+está ligado. Ver [ADR 0039](adr/0039-shader-push-data-abi.md).
+
 ## Fronteira do host
 
 `Frontend::Window` é o contrato entre o ciclo de execução do emulador e a

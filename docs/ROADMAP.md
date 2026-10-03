@@ -383,7 +383,10 @@ Dois jogos e dois ícones válidos foram detectados, com o selecionado exibido.
 
 - [x] 4A: caminho inicial SPIR-V compute para HLSL via SPIRV-Cross,
       compilado no UWP e conectado a DXC/dispatch/readback no Xbox.
-- [ ] Validar 4A no Series S: `d3d12-shaders`, Diagnostics e retomada.
+- [x] Validar 4A no Series S: `d3d12-shaders`, Diagnostics e retomada.
+- [x] 4B: compartilhar a ABI real `Shader::PushData` e adaptar seu layout
+      SPIR-V a b0/space0 e 30 root constants, com reflection estrita/readback.
+- [ ] Validar 4B no Series S: todos os campos de PushData e retomada.
 - [ ] Ampliar tradução a shaders emitidos pelo recompiler do shadPS4.
 - [ ] Ampliar HLSL/DXIL a vertex/fragment e recursos de jogos.
 - [ ] Reflection e remapeamento de bindings.
@@ -405,6 +408,21 @@ O contrato inicial é compute com tamanho de grupo literal e uma imagem
 R32_UINT em set 0/binding 0. O teste compara os readbacks do HLSL original e
 traduzido aos valores independentes 100–103. Não há boot, PM4 ou tradução
 de ISA PS4 neste bloco. Ver [validação da Fase 4](PHASE4_VALIDATION.md).
+
+A 4A foi validada no Series S, sessão `134354583014913662-4508`:
+18 probes passaram, incluindo tradução no Xbox, DXIL e readbacks 100–103
+do shader original/traduzido. Ticket 26 concluído, 14 frames/12 reutilizações,
+dois PSOs compute e sete hits. Suspensão/retomada no mesmo processo passou;
+UPLOAD/READBACK zerados, zero falhas/rejeições e frame 3F DEFAULT de 65536
+bytes retido. O contador de Diagnostics dessa última sessão foi zero;
+a captura enviada separadamente confirmou SPIRV HLSL DXIL PASS e as faixas.
+
+A 4B trata um bloqueio concreto do emissor: `DefinePushDataBlock` sempre
+declara a ABI PushData. Seu tipo real é compartilhado sem carregar dependências
+de recursos/logging no UWP. O teste ainda usa SPIR-V autoral com esse layout,
+não chama `EmitSPIRV`: `upstream_emitter_linked=0` permanece explícito.
+Ligar o emissor/IR e tratar SSBOs/capabilities continua no próximo gate;
+não interpretar a 4B como suporte a shaders de jogos.
 
 ## Fase 5 — Plataforma e primeiro frame
 

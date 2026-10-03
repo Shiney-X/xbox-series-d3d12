@@ -90,6 +90,8 @@ public:
   [[nodiscard]] std::string PipelineDetails() const;
   [[nodiscard]] std::string ShaderDetails() const;
   [[nodiscard]] bool ShaderProbePassed() const noexcept { return shader_probe_passed_; }
+  [[nodiscard]] bool PushDataProbePassed() const noexcept { return push_data_probe_passed_; }
+  [[nodiscard]] std::string PushDataDetails() const;
   [[nodiscard]] bool PipelineProbePassed() const noexcept { return compute_probe_passed_; }
   [[nodiscard]] std::string TransferDetails() const;
   [[nodiscard]] std::string VideoCoreDetails() const;
@@ -160,6 +162,7 @@ private:
   bool selected_icon_ready_{};
   bool compute_probe_passed_{};
   bool shader_probe_passed_{};
+  bool push_data_probe_passed_{};
   D3D12_VIEWPORT viewport_{};
   D3D12_RECT scissor_{};
 };

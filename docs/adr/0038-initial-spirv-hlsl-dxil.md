@@ -1,6 +1,6 @@
 # ADR 0038 — Primeiro caminho SPIR-V/HLSL/DXIL no UWP
 
-- Status: aceito; validação no Series S pendente
+- Status: aceito; validado no Series S
 - Data: 2026-10-02
 
 ## Viabilidade e dependências
@@ -35,6 +35,12 @@ distribuídos no pacote. O build exige rede no primeiro download.
   mascara falha de tradução/compilação/readback.
 
 ## Verificação e limites
+
+Validado em 2026-10-02: sessão `134354583014913662-4508` com 18 probes
+aprovados, tradução no console, DXIL/readback 100–103, retomada no mesmo
+processo, dois PSOs compute e sete hits; nenhuma falha de alocação/rejeição.
+A captura enviada separadamente confirmou Diagnostics/PASS e o preview.
+O contador zero da última sessão não foi usado como evidência de preview.
 
 Teste portátil: tradução determinística, reflection do grupo e rejeições
 de truncamento/header/instrução/binding/grupo. Windows/WARP compila o HLSL

@@ -121,6 +121,8 @@ path = [
     ".github/workflows/windows-probes.yml",
     "README.md",
     "docs/ARCHITECTURE.md",
+    "docs/PHASE3_VALIDATION.md",
+    "docs/PHASE4_VALIDATION.md",
     "docs/PLATFORM_MATRIX.md",
     "docs/REFERENCES.md",
     "docs/ROADMAP.md",
@@ -135,6 +137,10 @@ path = [
     "platform/xbox_uwp/Package.appxmanifest.in",
     "platform/xbox_uwp/d3d12_status_renderer.cpp",
     "platform/xbox_uwp/d3d12_status_renderer.h",
+    "platform/xbox_uwp/d3d12_*.cpp",
+    "platform/xbox_uwp/d3d12_*.h",
+    "platform/xbox_uwp/shaders/*.cpp",
+    "platform/xbox_uwp/shaders/*.h",
     "platform/xbox_uwp/memory_pressure_probe.cpp",
     "platform/xbox_uwp/memory_pressure_probe.h",
     "platform/xbox_uwp/xbox_phase0_uwp.vcxproj",
@@ -143,7 +149,20 @@ path = [
     "src/phase0/probes.h",
     "tests/probes/CMakeLists.txt",
     "tests/probes/desktop_main.cpp",
+    "tests/probes/d3d12_*.cpp",
+    "tests/probes/shaders/**",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Shiney-X and xbox-series-d3d12 contributors"
 SPDX-License-Identifier = "GPL-2.0-or-later"
+
+[[annotations]]
+path = "platform/xbox_uwp/shaders/ThirdPartyNotices.txt"
+precedence = "aggregate"
+SPDX-FileCopyrightText = [
+    "2015-2021 Arm Limited",
+    "2016-2021 Robert Konrad",
+    "2019-2021 Hans-Kristian Arntzen",
+    "2014-2024 The Khronos Group Inc.",
+]
+SPDX-License-Identifier = "MIT"

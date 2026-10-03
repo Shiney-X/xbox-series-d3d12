@@ -36,7 +36,7 @@ ComputeTranslation TranslateCompute(std::span<const std::uint32_t> words) {
   if (resources.storage_images.size() != 1 || !resources.uniform_buffers.empty() ||
       !resources.storage_buffers.empty() || !resources.sampled_images.empty() ||
       !resources.separate_images.empty() || !resources.separate_samplers.empty() ||
-      !resources.push_constant_buffers.empty() || !resources.subpass_inputs.empty() ||
+      resources.push_constant_buffers.size() > 1 || !resources.subpass_inputs.empty() ||
       !resources.atomic_counters.empty() || !resources.acceleration_structures.empty() ||
       !resources.stage_inputs.empty() || !resources.stage_outputs.empty()) {
     throw std::invalid_argument("unsupported compute resource layout");
@@ -54,6 +54,28 @@ ComputeTranslation TranslateCompute(std::span<const std::uint32_t> words) {
     throw std::invalid_argument("expected scalar R32_UINT image at set 0 binding 0");
   }
   ComputeTranslation result;
+  if (!resources.push_constant_buffers.empty()) {
+    const auto &push_type = compiler.get_type(resources.push_constant_buffers.front().base_type_id);
+    constexpr std::array<std::uint32_t, 11> offsets{0, 4, 8, 12, 16, 32, 48, 64, 80, 96, 112};
+    if (push_type.member_types.size() != offsets.size() ||
+        compiler.get_declared_struct_size(push_type) != sizeof(Shader::PushData) ||
+        !compiler.has_decoration(push_type.self, spv::DecorationBlock)) {
+      throw std::invalid_argument("push constants do not match Shader::PushData");
+    }
+    for (std::uint32_t member = 0; member < offsets.size(); ++member) {
+      const auto &member_type = compiler.get_type(push_type.member_types[member]);
+      const auto expected_type = member < 4 ? spirv_cross::SPIRType::Float : spirv_cross::SPIRType::UInt;
+      const std::uint32_t expected_vector = member < 4 ? 1 : (member == 10 ? 2 : 4);
+      if (!compiler.has_member_decoration(push_type.self, member, spv::DecorationOffset) ||
+          compiler.type_struct_member_offset(push_type, member) != offsets[member] ||
+          member_type.basetype != expected_type || member_type.width != 32 ||
+          member_type.vecsize != expected_vector || member_type.columns != 1 ||
+          !member_type.array.empty()) {
+        throw std::invalid_argument("incompatible PushData member offset/type");
+      }
+    }
+    result.push_constant_words = static_cast<std::uint32_t>(sizeof(Shader::PushData) / 4);
+  }
   if (!compiler.get_execution_mode_bitset().get(spv::ExecutionModeLocalSize) ||
       compiler.get_execution_mode_bitset().get(spv::ExecutionModeLocalSizeId)) {
     throw std::invalid_argument("literal local size required");
@@ -79,6 +101,15 @@ ComputeTranslation TranslateCompute(std::span<const std::uint32_t> words) {
   mapping.uav.register_binding = 0;
   mapping.uav.register_space = 0;
   compiler.add_hlsl_resource_binding(mapping);
+  if (result.push_constant_words != 0) {
+    spirv_cross::HLSLResourceBinding push_mapping{};
+    push_mapping.stage = spv::ExecutionModelGLCompute;
+    push_mapping.desc_set = spirv_cross::ResourceBindingPushConstantDescriptorSet;
+    push_mapping.binding = spirv_cross::ResourceBindingPushConstantBinding;
+    push_mapping.cbv.register_binding = 0;
+    push_mapping.cbv.register_space = 0;
+    compiler.add_hlsl_resource_binding(push_mapping);
+  }
   result.hlsl = compiler.compile();
   if (result.hlsl.empty()) {
     throw std::runtime_error("SPIRV-Cross emitted empty HLSL");

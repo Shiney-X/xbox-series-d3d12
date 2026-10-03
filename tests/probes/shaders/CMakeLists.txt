@@ -20,7 +20,7 @@ add_library(xbox_spirv_hlsl STATIC
     ../../../platform/xbox_uwp/shaders/spirv_hlsl_bridge.cpp
     ../../../platform/xbox_uwp/shaders/compute_fixture.cpp)
 target_compile_features(xbox_spirv_hlsl PUBLIC cxx_std_20)
-target_include_directories(xbox_spirv_hlsl PUBLIC ../../../platform/xbox_uwp/shaders)
+target_include_directories(xbox_spirv_hlsl PUBLIC ../../../platform/xbox_uwp/shaders ../../../src)
 target_link_libraries(xbox_spirv_hlsl PRIVATE spirv-cross-hlsl)
 if(MSVC)
     target_compile_options(xbox_spirv_hlsl PRIVATE /W4 /WX /permissive- /EHsc)
