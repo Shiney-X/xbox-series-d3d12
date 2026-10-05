@@ -505,6 +505,18 @@ registry vazio deixa todos os imports pendentes e mantém os fingerprints da
 etapa anterior. Não há ponteiros host chamáveis, carregamento de dependências
 ou HLE real. `phase5-imports.jsonl` mede namespace, não boot (ADR 0052).
 
+O runner fechado autoral agora também usa o resolver: uma worker ELF raw e
+outra SELF têm uma função importada e JUMP_SLOT. O único export é o thunk
+SysV/Win64 criado e mantido pela própria worker; não há endereço escolhido
+por jogo/usuário. O bias corresponde à alocação guardada da fixture. Link
+estrito, readback integral da cópia, RX e unwind registrado/validado são gates
+antes de chamar. A relativa aponta para o entry real; o slot importado chama
+o serviço autoral existente e verifica retorno 42/rejeições/contexto TLS.
+Ausência de export, versão incompatível e tipo objeto impedem escritas e
+execução. Isso substitui o patch manual, sem oferecer ABI geral ou HLE Orbis.
+`phase5-execution.jsonl` identifica `closed_authored_raw_self`; o scanner de
+jogos permanece só em dados, com registry vazio (ADR 0053).
+
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e
 resolvida novamente por objetos `StorageFolder` a cada ativação.

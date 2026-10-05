@@ -391,7 +391,35 @@ dos jogos devem continuar iguais à evidência anterior, com
 
 `imports_resolved=0`, `runtime_exports_callable=0`, `ready_for_boot=0`,
 `guest_executed=0` e `game_frame=0` são obrigatórios. ADR 0052;
-validação Xbox deste gate ainda pendente, 5D permanece aberta.
+Este gate foi validado no Xbox na sessão `134357125360003938-3028`: 25 probes,
+oracle de imports, namespaces dos dois títulos, fingerprints e retomada
+passaram. Os eventos `guest-imports` registraram `valid=2;report_error=0`
+antes e após resume. A 5D permanece aberta.
+
+## Teste 5D — chamada autoral via import resolvido
+
+Instalar o novo pacote como Game e abrir Diagnostics: o teste é automático
+na inicialização, sem conteúdo adicional no USB. Voltar ao Dev Home/reabrir
+e confirmar apresentação normal. Em Games usar X RESCAN para conferir que
+a inspeção dos títulos continua sem regressão.
+
+Enviar os mesmos sete arquivos do bloco anterior, especialmente
+`phase5-execution.jsonl`, `phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+Não esperar uma nova tela de jogo ou aumento das linhas em Diagnostics.
+
+Esperado no probe de execução: `passed=true`, retorno 42, workers/contextos
+100/101 e cleanup/unwind positivos. Novos campos agregados das duas workers
+raw/SELF devem valer 1: `import_link_verified`, `import_slot_verified`,
+`import_relative_verified`, `import_call_verified`, `import_missing_rejected`,
+`import_version_rejected`, `import_type_rejected`.
+
+Exigir `import_execution_scope=closed_authored_raw_self`,
+`import_binding_source=typed_resolver_jump_slot`, `import_manual_patch=0`,
+`game_runtime_exports_callable=0`, `game_executed=0`, `game_frame=0`.
+A fixture executa o destino autoral via resolver/relocation; jogos continuam
+com registry vazio, mesmas relativas/fingerprints e imports unresolved.
+ABI/serviço/corpus fechados não certificam runtime geral ou HLE Orbis.
+ADR 0053; validação deste novo gate no console ainda pendente.
 
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
