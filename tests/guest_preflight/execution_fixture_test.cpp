@@ -2,15 +2,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <iostream>
 #include <stdexcept>
-#include "core/uwp/guest_execution_fixture.h"
+#include "core/uwp/guest_hle_fixture.h"
 #if defined(__linux__) && defined(__x86_64__)
 #include <cstring>
 #include <sys/mman.h>
+std::uint64_t __attribute__((ms_abi)) HostCallback(std::uint64_t operation,
+                                                   std::uint64_t argument) noexcept {
+    return Core::Uwp::DispatchFixtureHle(operation, argument);
+}
 #endif
 
 int main() {
     using namespace Core::Uwp;
-    const auto staged = StageRawGuest(MakeGuestExecutionFixture());
+    const auto staged = StageRawGuest(MakeGuestHleFixture());
     const auto bridge = MakeFixtureBridge();
     constexpr std::array<std::uint8_t, 52> expected_unwind{
         0x01, 0x6e, 0x18, 0x00, 0x6e, 0xf8, 0x11, 0x00, 0x64, 0xe8, 0x10, 0x00, 0x5a,
@@ -28,17 +32,32 @@ int main() {
         std::cerr << "fixture/bridge layout failed\n";
         return 1;
     }
+    const auto hle = MakeFixtureHleThunk(0x1122334455667788ULL);
+    constexpr std::array<std::uint8_t, 8> hle_unwind{1, 4, 1, 0, 4, 0x42, 0, 0};
+    if (hle.code.size() != 28 || hle.epilogue_offset != 23 ||
+        !std::equal(hle.unwind.begin(), hle.unwind.end(), hle_unwind.begin(), hle_unwind.end()) ||
+        hle.code[13] != 0x88 || hle.code[20] != 0x11 || DispatchFixtureHle(1, 41) != 42 ||
+        DispatchFixtureHle(1, 0) != 1 || DispatchFixtureHle(0, 41) != FixtureHleUnsupported ||
+        DispatchFixtureHle(99, 41) != FixtureHleUnsupported ||
+        DispatchFixtureHle(1, UINT64_MAX) != FixtureHleOverflow) {
+        std::cerr << "HLE thunk/dispatch contract failed\n";
+        return 1;
+    }
 #if defined(__linux__) && defined(__x86_64__)
     // Execute exactly the same Win64->SysV byte bridge, not a game/runtime mock.
     // This does not test Windows API availability, fault recovery or AppContainer.
-    void* code = mmap(nullptr, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void* code = mmap(nullptr, 32768, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (code == MAP_FAILED)
         return 1;
     auto* bytes = static_cast<std::uint8_t*>(code);
-    std::memcpy(bytes, staged.bytes.data(), 512);
+    std::memcpy(bytes, staged.bytes.data(), staged.bytes.size());
     std::memcpy(bytes + 512, bridge.code.data(), bridge.code.size());
+    const auto native_hle = MakeFixtureHleThunk(reinterpret_cast<std::uint64_t>(&HostCallback));
+    std::memcpy(bytes + 1024, native_hle.code.data(), native_hle.code.size());
+    const auto target = reinterpret_cast<std::uint64_t>(bytes + 1024);
+    std::memcpy(bytes + FixtureHlePointerOffset, &target, sizeof(target));
     if (mprotect(code, 4096, PROT_READ | PROT_EXEC) != 0) {
-        munmap(code, 4096);
+        munmap(code, 32768);
         return 1;
     }
     using Bridge = std::uint64_t(__attribute__((ms_abi))*)(std::uint64_t, std::uint64_t,
@@ -47,8 +66,13 @@ int main() {
     const auto invoke = reinterpret_cast<Bridge>(bytes + 512);
     const auto first = invoke(19, 23, bytes + 0x100, &saved_rsp);
     const auto second = invoke(7, 11, bytes + 0x100, &saved_rsp);
-    munmap(code, 4096);
-    if (first != 42 || second != 18 || saved_rsp == 0) {
+    const auto roundtrip = invoke(1, 41, bytes + FixtureHleEntryOffset, &saved_rsp);
+    const auto unknown = invoke(99, 41, bytes + FixtureHleEntryOffset, &saved_rsp);
+    const auto overflow = invoke(1, UINT64_MAX, bytes + FixtureHleEntryOffset, &saved_rsp);
+    const auto repeat = invoke(1, 0, bytes + FixtureHleEntryOffset, &saved_rsp);
+    munmap(code, 32768);
+    if (first != 42 || second != 18 || saved_rsp == 0 || roundtrip != 42 ||
+        unknown != FixtureHleUnsupported || overflow != FixtureHleOverflow || repeat != 1) {
         std::cerr << "Win64->SysV authored leaf call failed\n";
         return 1;
     }

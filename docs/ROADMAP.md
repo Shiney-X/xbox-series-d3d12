@@ -502,10 +502,14 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
   proteções/cleanup e 25 probes com apresentação após retomada, sem alertas.
 - [x] Implementar metadados dinâmicos da bridge, oracle de contexto e fault
   da leaf SysV através da bridge; gate de build/hardware independente.
-- [ ] Validar unwind da bridge com leaf SysV no Xbox.
+- [x] Validar unwind da bridge com leaf SysV no Xbox: retornos 42,
+  recuperação Win64/SysV, tabelas removidas e 25 probes com retomada.
 - [ ] Resolver unwind/faults de funções guest gerais, não leafs e startup
   Orbis antes de executar guest geral; fixture não certifica esses caminhos.
 - [ ] 5D: HLE/threads/TLS/filesystem e gamepad guest básico.
+  - [x] Implementar chamada autoral guest→host→guest com thunk SysV/Win64,
+    serviço inteiro limitado, rejeição de operação/overflow e unwind registrado.
+  - [ ] Validar esse round-trip HLE no Xbox; não equivale a imports/HLE Orbis.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
 - [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
 - [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.

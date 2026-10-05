@@ -192,6 +192,29 @@ metadados vivem na alocação própria até a remoção. Se remoção falhar, o 
 falha e mantém essa alocação residente, em vez de deixar o OS apontando para
 memória liberada. Detalhes no ADR 0046.
 
+## 5D inicial: round-trip HLE autoral
+
+O complemento 5C passou no Series S: fault SysV/Win64, contexto de unwind,
+remoção de tabela e soma 42; 25 probes e apresentação após retomada, sem alertas.
+
+Instalar o novo MSIX como Game e abrir; o teste continua automático.
+Voltar ao Dev Home/reabrir e testar navegação/X RESCAN. Enviar os mesmos três
+arquivos: `phase5-execution.jsonl`, `phase0-results.jsonl`, `phase0-lifecycle.jsonl`.
+
+Esperar todos os campos 5C positivos e também:
+
+- `hle_scope=authored_integer_tailcall`, `orbis_hle_linked=0`.
+- `hle_roundtrip_verified=1`, `hle_return=42`.
+- `hle_unknown_rejected=1`, `hle_overflow_rejected=1`.
+- `hle_unwind_verified=1`, `hle_table_removed=1`, `allocations_released=1`.
+- `game_executed=0`, `game_frame=0`, `loader_linked=0`.
+
+O guest autoral chama um serviço C++ nativo através de thunk SysV→Win64 e
+retorna à bridge inicial. Não abre Sonic/Deltarune, não resolve imports Orbis,
+não implementa filesystem/TLS/threads/scePad. Não esperar uma tela nova.
+O oracle de unwind é sintético; não provoca fault dentro do callback HLE.
+Detalhes e dependências no ADR 0047. Esse gate não conclui toda a 5D.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |
