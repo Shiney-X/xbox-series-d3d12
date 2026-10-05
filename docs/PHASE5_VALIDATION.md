@@ -215,6 +215,33 @@ não implementa filesystem/TLS/threads/scePad. Não esperar uma tela nova.
 O oracle de unwind é sintético; não provoca fault dentro do callback HLE.
 Detalhes e dependências no ADR 0047. Esse gate não conclui toda a 5D.
 
+## 5D: duas workers e contexto host TLS
+
+O round-trip inicial 5D passou no Series S, com 25 probes e retomada sem
+alertas. O novo pacote executa o mesmo código em duas workers e adiciona
+serviços de contexto autorais. Não adiciona linha em Diagnostics.
+
+Instalar como Game, abrir, voltar ao Dev Home/reabrir e testar navegação.
+Enviar `phase5-execution.jsonl`, `phase0-results.jsonl`, `phase0-lifecycle.jsonl`.
+O teste continua automático e não precisa de jogos/sysmodules novos.
+
+Esperado, além dos campos positivos anteriores:
+
+- `worker_threads=2`, `workers_passed=1`, `thread_context_isolated=1`.
+- `thread_rendezvous_verified=1` e IDs de worker distintos.
+- `worker0_tls_value=100`, `worker1_tls_value=101`.
+- `tls_scope=host_slot_not_orbis`, `tls_parent_isolated=1`.
+- `tls_missing_context_rejected=1`, `tls_foreign_context_rejected=1`,
+  `tls_invalid_key_rejected=1`.
+- `tls_bindings_cleared=1`, `tls_slot_released=1`, `thread_handles_released=1`.
+- `worker0_error=0`, `worker1_error=0`, `allocations_released=1`.
+- `game_executed=0`, `game_frame=0`, `orbis_hle_linked=0`.
+
+As duas workers gravam valores distintos por HLE antes da leitura, com
+rendezvous pelo coordenador. Contextos não usam GS/TEB guest e não são TCB/DTV
+Orbis. Não há pthreads guest, filesystem ou scePad nesse gate (ADR 0048).
+A 5D permanece aberta; não confundir contexto host com TLS de um jogo.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |
