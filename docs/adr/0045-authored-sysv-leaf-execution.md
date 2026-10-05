@@ -28,21 +28,28 @@ necessárias ficam RX/RW. Bridge própria RW→RX, FlushInstructionCache,
 VirtualQuery e nenhuma alocação RWX. Endereços guest permanecem metadados;
 a fixture não exige relocations ou acesso absoluto ao seu endereço virtual.
 
-VEH local ao escopo do probe e filtrado por TLS, RIP, leitura e endereço
-reservado esperado. Ao fault conhecido, CONTEXT aponta ao epílogo próprio
-com RSP salvo. Sem unwind pelo código emitido e sem absorver outras falhas.
-Remover o handler antes de liberar as alocações. Executar novamente a soma
-após a recuperação para comprovar que a boundary retorna ao host.
+O primeiro build AppContainer rejeitou Add/RemoveVectoredExceptionHandler
+(C3861); o protótipo VEH foi removido, sem redeclarar APIs fora da família UWP.
+Usar helper nativo SEH e uma leaf Win64 auxiliar do mesmo ELF autoral, chamada
+diretamente, sem passar pela bridge SysV. A leaf lê o endereço reservado e não
+altera RSP/não voláteis; unwind de leaf usa o retorno para o frame nativo
+com metadata do compilador. O filtro só trata RIP/read/endereço esperados.
+
+Sete controles negativos rejeitam registros fora do escopo. Reexecutar a soma
+SysV depois do fault Win64. Isso **não** valida faults/unwind através da
+bridge SysV; esse caminho permanece bloqueio antes de guest geral.
 
 Consultar mitigações antes de executar; não desativar CFG/dynamic-code policy.
 APIs devem compilar/linkar no SDK AppContainer e ser testadas em hardware;
-documentação desktop de VEH não é garantia de suporte Xbox.
+O caminho final usa SEH compilado, já empregado no probe de executable-memory.
 
 ## Referências e validação
 
 - [VirtualProtectFromApp](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotectfromapp): RX exige codeGeneration, RWX não permitido e cache deve ser sincronizado.
 - [GetCurrentThreadStackLimits](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentthreadstacklimits): limites da stack da thread gerenciada pelo sistema.
 - [AddVectoredExceptionHandler](https://learn.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-addvectoredexceptionhandler): registro/remoção; sua lista desktop não comprova compatibilidade UWP.
+- [x64 calling convention](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention): leafs sem estado não volátil alterado não exigem metadata de unwind; não generalizar à bridge não leaf.
+- [try-except](https://learn.microsoft.com/en-us/cpp/cpp/try-except-statement): filtro local de SEH compilado.
 
 Teste portátil compara o layout e executa a mesma bridge Win64→SysV em
 Linux x64 com dois resultados distintos. Não testa APIs Windows/faults.

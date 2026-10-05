@@ -117,6 +117,7 @@ Esperado no registro `guest-execution-fixture`:
 - `stack=windows_worker_thread`, `stack_verified=1`.
 - `fault_recovered=1`, `fault_code=3221225477` (access violation esperada).
 - `fault_filter_verified=1`: sete casos fora do escopo não são absorvidos.
+- `fault_boundary=win64_leaf_seh`, `sysv_fault_unwind_supported=0`.
 - `return_after_fault=42`, `allocations_released=1`.
 - `game_executed=0`, `game_frame=0`, `loader_linked=0`.
 
@@ -132,11 +133,18 @@ limites verificados, não uma stack de processo Orbis montada pelo linker.
 Não há troca manual de RSP da UI nem alteração de TEB. A proteção/expansão
 da stack é gerenciada pelo Windows; o probe não simula stack overflow.
 
-A segunda entrada autoral lê um endereço reservado pertencente ao probe.
-O VEH trata exclusivamente esse RIP/read/endereço/thread enquanto armado,
-redireciona para o epílogo da bridge e restaura o estado salvo. Não faz
-unwind SEH genérico de código emitido. Outras exceções seguem seus handlers
-normais; não existe recuperação geral de crashes de jogos.
+A segunda entrada autoral é uma **leaf Win64 separada**, chamada diretamente
+por helper nativo com `__try/__except`. Lê um endereço reservado pertencente
+ao probe. O filtro SEH trata exclusivamente esse RIP/read/endereço enquanto
+armado no escopo da chamada. A leaf não altera RSP/não voláteis; não precisa
+de tabela de unwind própria. Não passa pela bridge SysV. O SDK AppContainer
+rejeitou Add/RemoveVectoredExceptionHandler no primeiro build; o caminho VEH
+foi removido, sem redeclarar/importar APIs desktop à força.
+
+Outras exceções continuam sua busca normal. **Recuperação de faults através
+da bridge SysV não está implementada**, e não há handler geral de jogos.
+O segundo retorno 42 comprova chamada SysV após recuperação da leaf Win64,
+não recuperação de fault ocorrido no corpo SysV.
 
 Não aceita paths, entrys ou instruções externas. A execução tem código fixo
 sem loops e espera a thread terminar; não é um executor com timeout/cancelamento

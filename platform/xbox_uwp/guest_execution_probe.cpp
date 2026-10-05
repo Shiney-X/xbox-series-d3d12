@@ -17,39 +17,29 @@ struct Allocation {
 };
 struct WorkerState {
   std::uint64_t saved_rsp{};
-  std::uintptr_t fault_ip{}, recovery_ip{}, guard_address{};
+  std::uintptr_t fault_ip{}, guard_address{};
   ULONG_PTR stack_low{}, stack_high{};
   std::uint64_t value{}, recovery_value{};
   DWORD error{}, fault_code{};
   bool armed{}, recovered{}, protections{}, stack_verified{}, cleanup{},
       filter_verified{};
 };
-thread_local WorkerState *active_state{};
-
-LONG CALLBACK FixtureException(EXCEPTION_POINTERS *exception) {
-  auto *state = active_state;
-  if (!state || !state->armed || state->recovered ||
+LONG FixtureException(EXCEPTION_POINTERS *exception, WorkerState *state) {
+  if (!state->armed || state->recovered ||
       exception->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION ||
       exception->ContextRecord->Rip != state->fault_ip ||
       exception->ExceptionRecord->NumberParameters < 2 ||
       exception->ExceptionRecord->ExceptionInformation[0] != 0 ||
       exception->ExceptionRecord->ExceptionInformation[1] !=
           state->guard_address ||
-      state->saved_rsp < state->stack_low + FixtureBridgeFrame ||
-      state->saved_rsp >= state->stack_high)
+      (exception->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE))
     return EXCEPTION_CONTINUE_SEARCH;
   state->fault_code = exception->ExceptionRecord->ExceptionCode;
   state->recovered = true;
-  // Continue into the owned bridge epilogue, no stack unwind through emitted
-  // code.
-  exception->ContextRecord->Rip = state->recovery_ip;
-  exception->ContextRecord->Rsp = state->saved_rsp - FixtureBridgeFrame;
-  exception->ContextRecord->Rax = 0;
-  return EXCEPTION_CONTINUE_EXECUTION;
+  return EXCEPTION_EXECUTE_HANDLER;
 }
 
 bool RejectOtherFaults(WorkerState &state) {
-  const auto saved_rsp = state.saved_rsp;
   for (unsigned variant = 0; variant < 7; ++variant) {
     EXCEPTION_RECORD record{};
     CONTEXT context{};
@@ -79,13 +69,12 @@ bool RejectOtherFaults(WorkerState &state) {
       record.NumberParameters = 0;
       break;
     case 6:
-      state.saved_rsp = 0;
+      record.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
       break;
     }
     const bool rejected =
-        FixtureException(&pointers) == EXCEPTION_CONTINUE_SEARCH &&
+        FixtureException(&pointers, &state) == EXCEPTION_CONTINUE_SEARCH &&
         !state.recovered;
-    state.saved_rsp = saved_rsp;
     state.armed = false;
     if (!rejected)
       return false;
@@ -93,13 +82,17 @@ bool RejectOtherFaults(WorkerState &state) {
   return true;
 }
 
-struct Handler {
-  void *handle{};
-  ~Handler() {
-    if (handle)
-      RemoveVectoredExceptionHandler(handle);
+// Compiler-generated SEH metadata on this native frame. The fault fixture is
+// a Win64 leaf (no stack/nonvolatile changes), so no dynamic unwind table is
+// needed.
+void InvokeFaultLeaf(const void *entry, const void *guard, WorkerState *state) {
+  __try {
+    using Leaf = std::uint64_t (*)(const void *);
+    (void)reinterpret_cast<Leaf>(entry)(guard);
+  } __except (FixtureException(GetExceptionInformation(), state)) {
+    // Only the exact expected read fault reaches this clause.
   }
-};
+}
 
 bool Protect(void *address, SIZE_T bytes, ULONG flags) {
   ULONG old{};
@@ -177,17 +170,9 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
       state.error = ERROR_INVALID_DATA;
       return 0;
     }
-    Handler handler{AddVectoredExceptionHandler(1, FixtureException)};
-    if (!handler.handle) {
-      state.error = ERROR_NOT_SUPPORTED;
-      return 0;
-    }
     state.fault_ip =
         reinterpret_cast<std::uintptr_t>(payload + FixtureFaultOffset);
     state.guard_address = reinterpret_cast<std::uintptr_t>(image.base);
-    state.recovery_ip =
-        reinterpret_cast<std::uintptr_t>(thunk.base) + bridge.recovery_offset;
-    active_state = &state;
     using BridgeFunction = std::uint64_t (*)(std::uint64_t, std::uint64_t,
                                              const void *, std::uint64_t *);
     const auto invoke = reinterpret_cast<BridgeFunction>(thunk.base);
@@ -195,23 +180,15 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
         invoke(19, 23, payload + staged.plan.entry_offset, &state.saved_rsp);
     state.filter_verified = RejectOtherFaults(state);
     if (!state.filter_verified) {
-      active_state = nullptr;
       state.error = ERROR_INVALID_DATA;
       return 0;
     }
     state.armed = true;
-    (void)invoke(state.guard_address, 0, payload + FixtureFaultOffset,
-                 &state.saved_rsp);
+    InvokeFaultLeaf(payload + FixtureFaultOffset, image.base, &state);
     state.armed = false;
     // Prove the return boundary still works after handling the expected fault.
     state.recovery_value =
         invoke(19, 23, payload + staged.plan.entry_offset, &state.saved_rsp);
-    active_state = nullptr;
-    if (!RemoveVectoredExceptionHandler(handler.handle)) {
-      state.error = ERROR_FUNCTION_FAILED;
-      return 0;
-    }
-    handler.handle = nullptr;
     const bool image_freed = VirtualFree(image.base, 0, MEM_RELEASE) != FALSE;
     if (image_freed)
       image.base = nullptr;
@@ -220,7 +197,6 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
       thunk.base = nullptr;
     state.cleanup = image_freed && thunk_freed;
   } catch (...) {
-    active_state = nullptr;
     state.error = ERROR_GEN_FAILURE;
   }
   return 0;
@@ -269,6 +245,7 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
           << ";stack=windows_worker_thread;stack_verified="
           << state.stack_verified << ";fault_recovered=" << state.recovered
           << ";fault_filter_verified=" << state.filter_verified
+          << ";fault_boundary=win64_leaf_seh;sysv_fault_unwind_supported=0"
           << ";fault_code=" << state.fault_code
           << ";allocations_released=" << state.cleanup;
   return {"guest-execution-fixture", passed,

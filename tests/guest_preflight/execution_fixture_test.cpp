@@ -14,7 +14,7 @@ int main() {
     const auto bridge = MakeFixtureBridge();
     if (!staged.plan.valid || !staged.error.empty() || staged.bytes.size() != 32768 ||
         staged.bytes[0x100] != 0x48 || staged.bytes[0x180] != 0x48 || staged.bytes[0x181] != 0x8b ||
-        bridge.code.size() != 229 || bridge.recovery_offset != 120 || bridge.code.back() != 0xc3) {
+        bridge.code.size() != 229 || bridge.epilogue_offset != 120 || bridge.code.back() != 0xc3) {
         std::cerr << "fixture/bridge layout failed\n";
         return 1;
     }

@@ -18,8 +18,9 @@ inline constexpr std::size_t FixtureFaultOffset = 0x180;
         0x7c, 0x24, 0x80, 0x48, 0x8b, 0x44, 0x24, 0x80, 0x48, 0x01, 0xf0, 0x66, 0x0f,
         0xef, 0xf6, 0x31, 0xff, 0x31, 0xf6, 0xc3, 0xb8, 0xff, 0xff, 0xff, 0xff, 0xc3};
     std::copy(code.begin(), code.end(), file.begin() + 0x100);
-    // mov rax,[rdi]; ret. Used only with the owned uncommitted guard address.
-    constexpr std::array<std::uint8_t, 4> fault{0x48, 0x8b, 0x07, 0xc3};
+    // Separate Win64 fault leaf: mov rax,[rcx]; ret. It does not pass through
+    // the SysV bridge; compiler SEH can unwind this leaf without dynamic metadata.
+    constexpr std::array<std::uint8_t, 4> fault{0x48, 0x8b, 0x01, 0xc3};
     std::copy(fault.begin(), fault.end(), file.begin() + FixtureFaultOffset);
     for (unsigned i = 0; i < 8; ++i) {
         file[96 + i] = static_cast<std::uint8_t>(std::uint64_t{0x100} >> (8 * i));
@@ -30,7 +31,7 @@ inline constexpr std::size_t FixtureFaultOffset = 0x180;
 
 struct FixtureBridge {
     std::vector<std::uint8_t> code;
-    std::size_t recovery_offset{};
+    std::size_t epilogue_offset{};
 };
 
 // Win64 signature: uint64(a, b, entry, saved_rsp*).
@@ -61,7 +62,7 @@ struct FixtureBridge {
                              0x48, 0x89, 0xcf,   // mov rdi,rcx
                              0x48, 0x89, 0xd6,   // mov rsi,rdx
                              0x41, 0xff, 0xd0}); // call r8
-    bridge.recovery_offset = code.size();
+    bridge.epilogue_offset = code.size();
     xmm(true);
     code.insert(code.end(), {0xfc, 0x48, 0x81, 0xc4, 0x28, 0x01, 0, 0, 0x5e, 0x5f,
                              0xc3}); // cld; add rsp,296; pop rsi/rdi; ret
