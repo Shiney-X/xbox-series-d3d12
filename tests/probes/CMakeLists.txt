@@ -36,6 +36,7 @@ if(MSVC)
 endif()
 
 if(BUILD_TESTING)
+    add_subdirectory(../guest_preflight guest_preflight)
     add_subdirectory(shaders)
     add_executable(xbox_d3d12_videocore_test
         d3d12_videocore_test.cpp

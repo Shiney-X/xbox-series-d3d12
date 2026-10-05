@@ -35,6 +35,16 @@ flowchart LR
 
 ## Princípios
 
+### Entrada guest da Fase 5
+
+5A lê somente o prefixo de eboot pelo StorageFile da biblioteca, no máximo
+16 KiB. `Core::Uwp::InspectGuestPrefix` é um inspector independente, não
+`Core::Loader::Elf` linkado ao UWP. Não mapeia PT_LOAD nem executa entry.
+O formato e os bounds iniciais são reportados sem certificar o boot.
+Loader/memória, boundary SysV, TLS/exceções, HLE e input guest exigem gates
+separados. A auditoria do código atual e alternativas estão no ADR 0043;
+procedimento/testes em PHASE5_VALIDATION.
+
 ### Compilador isolado da 4C (validado no Xbox)
 
 O UWP linka a IR e `EmitSPIRV` reais como biblioteca AppContainer. A entrada

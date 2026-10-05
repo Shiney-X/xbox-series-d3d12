@@ -14,6 +14,7 @@
 #include <winrt/Windows.UI.Core.h>
 
 #include "core/uwp/core_bridge.h"
+#include "core/uwp/guest_preflight.h"
 #include "d3d12_status_renderer.h"
 #include "library_folder_access.h"
 #include "memory_pressure_probe.h"
@@ -803,6 +804,7 @@ private:
     constexpr std::size_t maximum_games = 32U;
     std::vector<PendingFolder> pending{{current_folder_, 0U}};
     std::vector<DiscoveredGame> discovered;
+    std::vector<ProbeResult> guest_preflight_results;
     std::size_t next_folder = 0U;
     std::size_t directories_scanned = 0U;
     std::size_t invalid_metadata = 0U;
@@ -853,6 +855,48 @@ private:
                   game.display.app_version =
                       CreateFolderLabel(metadata.app_version);
                   game.folder_name = to_string(candidate.folder.Name());
+
+                  // Read at most 16 KiB, never load executable segments or call
+                  // the entry point. Inspection failure must not hide a game.
+                  try {
+                    const StorageFile executable = eboot_item.as<StorageFile>();
+                    const IRandomAccessStream stream =
+                        co_await executable.OpenReadAsync();
+                    const auto size = stream.Size();
+                    const auto requested =
+                        static_cast<std::uint32_t>(std::min<std::uint64_t>(
+                            size, ::Core::Uwp::GuestPrefixLimit));
+                    const DataReader header_reader(stream.GetInputStreamAt(0));
+                    const auto loaded =
+                        co_await header_reader.LoadAsync(requested);
+                    std::vector<std::uint8_t> prefix(loaded);
+                    header_reader.ReadBytes(prefix);
+                    header_reader.DetachStream();
+                    stream.Close();
+                    const auto inspection =
+                        ::Core::Uwp::InspectGuestPrefix(prefix, size);
+                    game.display.guest_header_status =
+                        inspection.header_valid
+                            ? (inspection.self_container
+                                   ? "SELF HEADER OK  NOT BOOTED"
+                                   : "ELF HEADER OK  NOT BOOTED")
+                            : "EBOOT HEADER UNSUPPORTED";
+                    guest_preflight_results.push_back(
+                        {game.display.title_id, inspection.header_valid,
+                         static_cast<std::uint32_t>(inspection.header_valid
+                                                        ? ERROR_SUCCESS
+                                                        : ERROR_BAD_EXE_FORMAT),
+                         inspection.Details() +
+                             ";file_bytes=" + std::to_string(size) +
+                             ";prefix_bytes=" + std::to_string(loaded)});
+                  } catch (const hresult_error &error) {
+                    game.display.guest_header_status = "EBOOT READ FAILED";
+                    guest_preflight_results.push_back(
+                        {game.display.title_id, false,
+                         static_cast<std::uint32_t>(error.code().value),
+                         "stage=header_inspection;guest_executed=0;error="
+                         "storage_read_failed"});
+                  }
 
                   try {
                     const IStorageItem icon_item =
@@ -986,6 +1030,18 @@ private:
       const std::uint32_t report_error = WriteLibraryScanReport(
           true, discovered.empty() ? "no_games_found" : "games_found",
           ERROR_SUCCESS, directories_scanned, invalid_metadata, discovered);
+      const auto preflight_report_error =
+          WriteReport(ApplicationData::Current().LocalFolder(),
+                      L"phase5-preflight.jsonl", guest_preflight_results,
+                      {"guest-preflight-scan", true, ERROR_SUCCESS,
+                       "stage=header_inspection;guest_executed=0;inspected=" +
+                           std::to_string(guest_preflight_results.size())});
+      AppendLifecycleEvent(
+          session_id_, "guest-preflight",
+          ("stage=header_inspection;guest_executed=0;inspected=" +
+           std::to_string(guest_preflight_results.size()) +
+           ";report_error=" + std::to_string(preflight_report_error))
+              .c_str());
       const std::size_t icons_ready = std::count_if(
           discovered.begin(), discovered.end(), [](const DiscoveredGame &game) {
             return game.display.icon_state == GameIconState::Ready;
