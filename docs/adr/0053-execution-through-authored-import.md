@@ -1,6 +1,6 @@
 # ADR 0053 — Execução autoral através de import resolvido
 
-Status: implementado; validação Xbox pendente.
+Status: implementado e validado no Xbox (sessão `134357133173433935-3916`).
 
 ## Contexto
 
@@ -66,3 +66,8 @@ workers; validar também no Series S e após retomada. Jogos continuam com
 zero exports runtime, imports pendentes e `game_executed=0;game_frame=0`.
 Próximos gates: HLE Orbis real/ABI/serviços mínimos, VA/startup e faults/unwind
 gerais. A 5D permanece aberta; não há tentativa de boot nesta entrega.
+
+Evidência Series S: sete gates `import_*` em 1, retorno 42, workers 100/101,
+IDs distintos, unwind/cleanup positivos, 25 probes e apresentação após resume
+aprovados. Relocations/fingerprints/imports dos jogos preservados, zero exports
+runtime e relatórios sem erro, inclusive na varredura após retomada.

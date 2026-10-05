@@ -3,6 +3,7 @@
 #include "guest_execution_probe.h"
 #include "core/uwp/guest_hle_fixture.h"
 #include "core/uwp/guest_hle_import_fixture.h"
+#include "core/uwp/kernel_clock_fixture.h"
 #include <Windows.h>
 #include <array>
 #include <cstring>
@@ -218,6 +219,221 @@ bool IsProtection(const void *address, DWORD protection,
   return VirtualQuery(address, &info, sizeof(info)) != 0 &&
          info.State == state &&
          (state == MEM_RESERVE || info.Protect == protection);
+}
+
+struct KernelClockContext {
+  KernelClock clock;
+  DWORD owner{};
+  bool failed{};
+  std::uint64_t calls{};
+};
+std::uint64_t ReadKernelClock(KernelClockContext *context,
+                              KernelClockService service) noexcept {
+  if (!context || context->owner != GetCurrentThreadId())
+    return 0;
+  ++context->calls;
+  LARGE_INTEGER now{};
+  std::uint64_t value{};
+  if (!QueryPerformanceCounter(&now) || now.QuadPart < 0 ||
+      !context->clock.Read(static_cast<std::uint64_t>(now.QuadPart), service,
+                           value)) {
+    context->failed = true;
+    return 0; // Harness must fail; this is not a runtime success stub.
+  }
+  return value;
+}
+std::uint64_t KernelProcessTime(KernelClockContext *context) noexcept {
+  return ReadKernelClock(context, KernelClockService::Microseconds);
+}
+std::uint64_t KernelProcessCounter(KernelClockContext *context) noexcept {
+  return ReadKernelClock(context, KernelClockService::Counter);
+}
+std::uint64_t KernelProcessFrequency(KernelClockContext *context) noexcept {
+  return ReadKernelClock(context, KernelClockService::Frequency);
+}
+
+// Real Orbis clock APIs, but only called by a closed generated corpus. They do
+// not register exports for games, create a general runtime or read guest
+// memory.
+bool VerifyKernelClockImports(std::uint64_t &frequency, const char *&stage) {
+  stage = "qpc_initialize";
+  LARGE_INTEGER rate{}, epoch{};
+  if (!QueryPerformanceFrequency(&rate) || !QueryPerformanceCounter(&epoch) ||
+      rate.QuadPart <= 0 || epoch.QuadPart < 0)
+    return false;
+  KernelClockContext context{{static_cast<std::uint64_t>(rate.QuadPart),
+                              static_cast<std::uint64_t>(epoch.QuadPart)},
+                             GetCurrentThreadId(),
+                             false,
+                             0};
+  if (!context.clock.Valid())
+    return false;
+  frequency = context.clock.frequency;
+  const std::array callbacks{&KernelProcessTime, &KernelProcessCounter,
+                             &KernelProcessFrequency};
+  SYSTEM_INFO info{};
+  GetSystemInfo(&info);
+  if (info.dwPageSize != 4096)
+    return false;
+  constexpr SIZE_T page = 4096;
+  for (const bool self : {false, true}) {
+    stage = "fixture_staging";
+    const auto file = MakeKernelClockFixture(self);
+    const auto staged = StageGuestPayload(file);
+    if (!staged.Ready() || staged.image.bytes.size() != 32768)
+      return false;
+    Allocation image, bridge_memory, services;
+    stage = "owned_allocations";
+    image.base = VirtualAllocFromApp(nullptr, 32768 + 2 * page, MEM_RESERVE,
+                                     PAGE_NOACCESS);
+    bridge_memory.base = VirtualAllocFromApp(
+        nullptr, page, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    services.base = VirtualAllocFromApp(nullptr, page, MEM_RESERVE | MEM_COMMIT,
+                                        PAGE_READWRITE);
+    if (!image.base || !bridge_memory.base || !services.base)
+      return false;
+    auto *payload = static_cast<std::uint8_t *>(image.base) + page;
+    if (VirtualAllocFromApp(payload, 32768, MEM_COMMIT, PAGE_READWRITE) !=
+            payload ||
+        reinterpret_cast<std::uint64_t>(payload) < staged.image.plan.base)
+      return false;
+    const auto bridge = MakeFixtureBridge();
+    if (bridge.code.size() > FixtureRuntimeTableOffset ||
+        FixtureRuntimeTableOffset + sizeof(RUNTIME_FUNCTION) >
+            FixtureUnwindOffset ||
+        FixtureUnwindOffset + bridge.unwind.size() > page)
+      return false;
+    std::memcpy(bridge_memory.base, bridge.code.data(), bridge.code.size());
+    auto *bridge_function =
+        new (static_cast<std::uint8_t *>(bridge_memory.base) +
+             FixtureRuntimeTableOffset) RUNTIME_FUNCTION{};
+    bridge_function->EndAddress = static_cast<DWORD>(bridge.code.size());
+    bridge_function->UnwindData = FixtureUnwindOffset;
+    std::memcpy(static_cast<std::uint8_t *>(bridge_memory.base) +
+                    FixtureUnwindOffset,
+                bridge.unwind.data(), bridge.unwind.size());
+    auto *functions = reinterpret_cast<RUNTIME_FUNCTION *>(
+        static_cast<std::uint8_t *>(services.base) + 512);
+    std::array<GuestDataExport, 3> registry;
+    std::array<FixtureBridge, 3> thunks;
+    for (unsigned i = 0; i < 3; ++i) {
+      thunks[i] =
+          MakeKernelClockThunk(reinterpret_cast<std::uint64_t>(callbacks[i]),
+                               reinterpret_cast<std::uint64_t>(&context));
+      if (thunks[i].code.size() > 64 || thunks[i].unwind.size() != 8)
+        return false;
+      auto *code = static_cast<std::uint8_t *>(services.base) + i * 64;
+      std::memcpy(code, thunks[i].code.data(), thunks[i].code.size());
+      new (&functions[i]) RUNTIME_FUNCTION{
+          i * 64, i * 64 + static_cast<DWORD>(thunks[i].code.size()),
+          560 + i * 8};
+      std::memcpy(static_cast<std::uint8_t *>(services.base) +
+                      functions[i].UnwindData,
+                  thunks[i].unwind.data(), 8);
+      registry[i] = {KernelClockKey(i), reinterpret_cast<std::uint64_t>(code)};
+    }
+    const auto bias =
+        reinterpret_cast<std::uint64_t>(payload) - staged.image.plan.base;
+    stage = "strict_import_link";
+    const auto linked = StageGuestDataLink(file, bias, true, registry);
+    if (!linked.valid || !linked.complete || linked.imports.matched != 3 ||
+        linked.relative_applied != 1 || linked.data_import_applied != 3 ||
+        !linked.writes_verified || !linked.untouched_verified)
+      return false;
+    stage = "mapped_readback_and_protections";
+    std::memcpy(payload, linked.payload.image.bytes.data(), 32768);
+    if (std::memcmp(payload, linked.payload.image.bytes.data(), 32768) != 0 ||
+        !Protect(payload, 32768, PAGE_NOACCESS) ||
+        !Protect(payload, page, PAGE_EXECUTE_READ) ||
+        !Protect(payload + 0x4000, page, PAGE_READWRITE) ||
+        !Protect(bridge_memory.base, page, PAGE_EXECUTE_READ) ||
+        !Protect(services.base, page, PAGE_EXECUTE_READ) ||
+        !IsProtection(payload, PAGE_EXECUTE_READ) ||
+        !IsProtection(payload + 0x4000, PAGE_READWRITE) ||
+        !IsProtection(payload + page, PAGE_NOACCESS) ||
+        !IsProtection(bridge_memory.base, PAGE_EXECUTE_READ) ||
+        !IsProtection(services.base, PAGE_EXECUTE_READ) ||
+        !IsProtection(image.base, 0, MEM_RESERVE) ||
+        !IsProtection(payload + 32768, 0, MEM_RESERVE) ||
+        !FlushInstructionCache(GetCurrentProcess(), payload, page) ||
+        !FlushInstructionCache(GetCurrentProcess(), bridge_memory.base,
+                               bridge.code.size()) ||
+        !FlushInstructionCache(GetCurrentProcess(), services.base, page))
+      return false;
+    FunctionTable bridge_table{bridge_function, &bridge_memory, false};
+    stage = "unwind_registration_and_verification";
+    FunctionTable services_table{functions, &services, false};
+    const auto service_base = reinterpret_cast<DWORD64>(services.base);
+    if (!RtlAddFunctionTable(bridge_function, 1,
+                             reinterpret_cast<DWORD64>(bridge_memory.base)))
+      return false;
+    bridge_table.registered = true;
+    if (!RtlAddFunctionTable(functions, 3, service_base))
+      return false;
+    services_table.registered = true;
+    if (!VerifyUnwind(bridge_memory.base, bridge_function, bridge))
+      return false;
+    for (unsigned i = 0; i < 3; ++i) {
+      std::array<std::uint64_t, 6> stack{};
+      stack[5] = 0x12345678;
+      CONTEXT unwind{};
+      unwind.ContextFlags = CONTEXT_FULL;
+      unwind.Rsp = reinterpret_cast<DWORD64>(stack.data());
+      unwind.Rip = service_base + functions[i].BeginAddress +
+                   thunks[i].epilogue_offset - 2;
+      DWORD64 found_base{};
+      const auto *found =
+          RtlLookupFunctionEntry(unwind.Rip, &found_base, nullptr);
+      if (!found || found_base != service_base ||
+          found->BeginAddress != functions[i].BeginAddress ||
+          found->UnwindData != functions[i].UnwindData)
+        return false;
+      void *handler{};
+      DWORD64 establisher{};
+      (void)RtlVirtualUnwind(0, service_base, unwind.Rip, &functions[i],
+                             &unwind, &handler, &establisher, nullptr);
+      if (unwind.Rip != stack[5] ||
+          unwind.Rsp != reinterpret_cast<DWORD64>(stack.data()) + sizeof(stack))
+        return false;
+    }
+    stage = "host_bracketed_calls";
+    const auto invoke = reinterpret_cast<BridgeFunction>(bridge_memory.base);
+    std::uint64_t saved_rsp{};
+    for (unsigned i = 0; i < 3; ++i) {
+      std::uint64_t previous{};
+      for (unsigned sample = 0; sample < 2; ++sample) {
+        LARGE_INTEGER before{}, after{};
+        if (!QueryPerformanceCounter(&before) || before.QuadPart < 0)
+          return false;
+        const auto value = invoke(UINT64_MAX, UINT64_MAX,
+                                  payload + 0x140 + i * 16, &saved_rsp);
+        if (!QueryPerformanceCounter(&after) || after.QuadPart < 0 ||
+            context.failed)
+          return false;
+        std::uint64_t minimum{}, maximum{};
+        const auto service = static_cast<KernelClockService>(i);
+        if (!context.clock.Read(static_cast<std::uint64_t>(before.QuadPart),
+                                service, minimum) ||
+            !context.clock.Read(static_cast<std::uint64_t>(after.QuadPart),
+                                service, maximum) ||
+            value < minimum || value > maximum || value < previous)
+          return false;
+        previous = value;
+      }
+    }
+    stage = "unwind_and_allocation_cleanup";
+    if (!services_table.Remove() || !bridge_table.Remove())
+      return false;
+    for (auto *allocation : {&image, &bridge_memory, &services}) {
+      if (!VirtualFree(allocation->base, 0, MEM_RELEASE))
+        return false;
+      allocation->base = nullptr;
+    }
+  }
+  const bool passed = !context.failed && context.calls == 12;
+  if (passed)
+    stage = "complete";
+  return passed;
 }
 
 DWORD WINAPI ExecuteFixture(void *argument) noexcept {
@@ -627,7 +843,18 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
       state.context_verified && peer.context_verified &&
       state.context.owner != peer.context.owner && state.context.value == 100 &&
       peer.context.value == 101;
-  const bool passed = coordination_error == ERROR_SUCCESS && both_ready &&
+  std::uint64_t kernel_clock_frequency{};
+  bool kernel_clock_verified{};
+  const char *kernel_clock_stage = "not_started";
+  try {
+    kernel_clock_verified =
+        VerifyKernelClockImports(kernel_clock_frequency, kernel_clock_stage);
+  } catch (...) {
+    kernel_clock_stage = "exception";
+    kernel_clock_verified = false;
+  }
+  const bool passed = kernel_clock_verified &&
+                      coordination_error == ERROR_SUCCESS && both_ready &&
                       worker_passed(state) && worker_passed(peer) &&
                       contexts_isolated && parent_isolated &&
                       missing_rejected && foreign_rejected && parent_cleared &&
@@ -697,6 +924,16 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
           << ";worker1_tls_value=" << peer.context.value
           << ";worker0_error=" << state.error << ";worker1_error=" << peer.error
           << ";allocations_released=" << (state.cleanup && peer.cleanup);
+  details << ";kernel_clock_scope=closed_authored_raw_self;kernel_clock_"
+             "backend=qpc_virtual"
+          << ";kernel_clock_services=3;kernel_clock_calls_verified="
+          << kernel_clock_verified
+          << ";kernel_clock_units_verified=" << kernel_clock_verified
+          << ";kernel_clock_unwind_cleanup_verified=" << kernel_clock_verified
+          << ";kernel_clock_frequency=" << kernel_clock_frequency
+          << ";kernel_clock_stage=" << kernel_clock_stage
+          << ";kernel_clock_direct_rdtsc_compatible=0;game_clock_exports_"
+             "registered=0";
   return {"guest-execution-fixture", passed,
           passed ? DWORD{ERROR_SUCCESS}
                  : (coordination_error ? coordination_error

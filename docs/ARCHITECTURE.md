@@ -517,6 +517,19 @@ execução. Isso substitui o patch manual, sem oferecer ABI geral ou HLE Orbis.
 `phase5-execution.jsonl` identifica `closed_authored_raw_self`; o scanner de
 jogos permanece só em dados, com registry vazio (ADR 0053).
 
+O primeiro subset de serviços Orbis pointer-free implementa
+`sceKernelGetProcessTime`, `sceKernelGetProcessTimeCounter` e
+`sceKernelGetProcessTimeCounterFrequency` com NIDs/assinaturas de
+`src/core/libraries/kernel/time.cpp`. `KernelClock` usa epoch/frequência imutáveis
+e aritmética inteira checked; o adapter nativo usa QPC. Fixtures ELF/SELF
+chamam os três serviços por thunks `u64(void)` com contexto oculto pertencente
+ao harness, nunca ponteiro vindo do guest. Gates com amostras host antes/depois
+verificam unidades, monotonicidade, frequência e unwind/cleanup.
+É um relógio virtual, não equivalência de QPC com RDTSC. Não registrar
+`sceKernelReadTsc`/`sceKernelGetTscFrequency`, nem esses três exports para jogos
+até existir runtime/lifetime e política de tempo compatível. O teste é serial
+e não certifica pause/resume temporal, TLS Orbis ou startup (ADR 0054).
+
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e
 resolvida novamente por objetos `StorageFolder` a cada ativação.

@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include "core/uwp/guest_hle_import_fixture.h"
 #include "core/uwp/guest_import_fixture.h"
+#include "core/uwp/kernel_clock_fixture.h"
 
 void Check(bool value, std::source_location location = std::source_location::current()) {
     if (!value)
@@ -25,6 +26,41 @@ int main() {
     try {
         using namespace Core::Uwp;
         Check(VerifyGuestImportFixtures());
+        const KernelClock clock{3, 100};
+        std::uint64_t time = 0;
+        Check(clock.Read(105, KernelClockService::Microseconds, time) && time == 1666666);
+        Check(clock.Read(105, KernelClockService::Counter, time) && time == 5);
+        Check(clock.Read(0, KernelClockService::Frequency, time) && time == 3);
+        Check(!clock.Read(99, KernelClockService::Counter, time));
+        Check(!clock.Read(100, static_cast<KernelClockService>(99), time));
+        Check(!KernelClock{0, 0}.Read(1, KernelClockService::Counter, time));
+        Check(!KernelClock{UINT64_MAX / 1000000 + 1, 0}.Valid());
+        Check(KernelClock{3200000000, 0}.Read(3200000000, KernelClockService::Microseconds, time) &&
+              time == 1000000);
+        Check(!KernelClock{1, 0}.Read(UINT64_MAX, KernelClockService::Microseconds, time));
+        Check(KernelClock{1000000000, 0}.Read(UINT64_MAX, KernelClockService::Microseconds, time));
+        for (const bool self : {false, true}) {
+            const auto file = MakeKernelClockFixture(self);
+            std::array<GuestDataExport, 3> registry;
+            for (unsigned i = 0; i < 3; ++i)
+                registry[i] = {KernelClockKey(i), 0x200000000ULL + i * 64};
+            const auto linked = StageGuestDataLink(file, GuestDiagnosticLoadBias, true, registry);
+            Check(linked.valid && linked.complete && linked.imports.matched == 3 &&
+                  linked.data_import_applied == 3 && linked.relative_applied == 1 &&
+                  linked.writes_verified && linked.untouched_verified);
+            for (unsigned i = 0; i < 3; ++i)
+                Check(Read(linked.payload.image.bytes, 0x4200 + i * 8) ==
+                      registry[i].numeric_address);
+            Check(Read(linked.payload.image.bytes, 0x4218) == GuestDiagnosticLoadBias + 0x400100);
+            Check(!StageGuestDataLink(file, GuestDiagnosticLoadBias, true).valid);
+            registry[1].key.module_minor = 0;
+            const auto rejected = StageGuestDataLink(file, GuestDiagnosticLoadBias, true, registry);
+            Check(!rejected.valid && !rejected.relative_applied && !rejected.data_import_applied &&
+                  rejected.payload.image.bytes == StageGuestPayload(file).image.bytes);
+            const auto thunk = MakeKernelClockThunk(123, 456);
+            Check(thunk.code.size() == 32 && thunk.epilogue_offset == 27 &&
+                  thunk.unwind == std::vector<std::uint8_t>({1, 4, 1, 0, 4, 0x42, 0, 0}));
+        }
         for (const bool self : {false, true}) {
             const auto file = MakeGuestHleImportFixture(self);
             const std::array registry{MakeFixtureHleImportExport(0x200001000ULL)};
