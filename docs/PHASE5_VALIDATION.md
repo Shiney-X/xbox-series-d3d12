@@ -116,6 +116,7 @@ Esperado no registro `guest-execution-fixture`:
 - `alignment_red_zone_verified=1`, `host_permissions_verified=1`.
 - `stack=windows_worker_thread`, `stack_verified=1`.
 - `fault_recovered=1`, `fault_code=3221225477` (access violation esperada).
+- `fault_filter_verified=1`: sete casos fora do escopo não são absorvidos.
 - `return_after_fault=42`, `allocations_released=1`.
 - `game_executed=0`, `game_frame=0`, `loader_linked=0`.
 

@@ -21,7 +21,8 @@ struct WorkerState {
   ULONG_PTR stack_low{}, stack_high{};
   std::uint64_t value{}, recovery_value{};
   DWORD error{}, fault_code{};
-  bool armed{}, recovered{}, protections{}, stack_verified{}, cleanup{};
+  bool armed{}, recovered{}, protections{}, stack_verified{}, cleanup{},
+      filter_verified{};
 };
 thread_local WorkerState *active_state{};
 
@@ -45,6 +46,51 @@ LONG CALLBACK FixtureException(EXCEPTION_POINTERS *exception) {
   exception->ContextRecord->Rsp = state->saved_rsp - FixtureBridgeFrame;
   exception->ContextRecord->Rax = 0;
   return EXCEPTION_CONTINUE_EXECUTION;
+}
+
+bool RejectOtherFaults(WorkerState &state) {
+  const auto saved_rsp = state.saved_rsp;
+  for (unsigned variant = 0; variant < 7; ++variant) {
+    EXCEPTION_RECORD record{};
+    CONTEXT context{};
+    EXCEPTION_POINTERS pointers{&record, &context};
+    record.ExceptionCode = EXCEPTION_ACCESS_VIOLATION;
+    record.NumberParameters = 2;
+    record.ExceptionInformation[1] = state.guard_address;
+    context.Rip = state.fault_ip;
+    state.armed = true;
+    switch (variant) {
+    case 0:
+      state.armed = false;
+      break;
+    case 1:
+      context.Rip++;
+      break;
+    case 2:
+      record.ExceptionInformation[1]++;
+      break;
+    case 3:
+      record.ExceptionInformation[0] = 1;
+      break;
+    case 4:
+      record.ExceptionCode = EXCEPTION_ILLEGAL_INSTRUCTION;
+      break;
+    case 5:
+      record.NumberParameters = 0;
+      break;
+    case 6:
+      state.saved_rsp = 0;
+      break;
+    }
+    const bool rejected =
+        FixtureException(&pointers) == EXCEPTION_CONTINUE_SEARCH &&
+        !state.recovered;
+    state.saved_rsp = saved_rsp;
+    state.armed = false;
+    if (!rejected)
+      return false;
+  }
+  return true;
 }
 
 struct Handler {
@@ -147,6 +193,12 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
     const auto invoke = reinterpret_cast<BridgeFunction>(thunk.base);
     state.value =
         invoke(19, 23, payload + staged.plan.entry_offset, &state.saved_rsp);
+    state.filter_verified = RejectOtherFaults(state);
+    if (!state.filter_verified) {
+      active_state = nullptr;
+      state.error = ERROR_INVALID_DATA;
+      return 0;
+    }
     state.armed = true;
     (void)invoke(state.guard_address, 0, payload + FixtureFaultOffset,
                  &state.saved_rsp);
@@ -201,10 +253,10 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
   // Only fixed, loop-free authored code. No arbitrary entry/file is accepted.
   const DWORD wait = WaitForSingleObject(thread, INFINITE);
   CloseHandle(thread);
-  const bool passed = wait == WAIT_OBJECT_0 && state.error == 0 &&
-                      state.value == 42 && state.recovery_value == 42 &&
-                      state.recovered && state.protections &&
-                      state.stack_verified && state.cleanup;
+  const bool passed =
+      wait == WAIT_OBJECT_0 && state.error == 0 && state.value == 42 &&
+      state.recovery_value == 42 && state.recovered && state.protections &&
+      state.stack_verified && state.cleanup && state.filter_verified;
   std::ostringstream details;
   details << "stage=fixture_execution;source=authored_elf;loader_linked=0;game_"
              "executed=0;game_frame=0"
@@ -216,6 +268,7 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
           << ";host_permissions_verified=" << state.protections
           << ";stack=windows_worker_thread;stack_verified="
           << state.stack_verified << ";fault_recovered=" << state.recovered
+          << ";fault_filter_verified=" << state.filter_verified
           << ";fault_code=" << state.fault_code
           << ";allocations_released=" << state.cleanup;
   return {"guest-execution-fixture", passed,
