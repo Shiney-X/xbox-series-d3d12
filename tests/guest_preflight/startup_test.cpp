@@ -37,7 +37,7 @@ int main() {
                   !tcb.tcb_canary && !tcb.tcb_fiber);
             Check(dtv[0].counter == 1 && dtv[1].counter == 1 &&
                   reinterpret_cast<std::uint64_t>(dtv[2].pointer) == (memory ? prepared.tls : 0));
-            Check(std::equal(source.begin(), source.end(), tls.begin()));
+            Check(source.empty() || std::equal(source.begin(), source.end(), tls.begin()));
             Check(std::all_of(tls.begin() + source.size(), tls.begin() + memory,
                               [](auto byte) { return byte == 0; }));
         }

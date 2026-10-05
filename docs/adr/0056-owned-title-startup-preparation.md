@@ -23,6 +23,9 @@ do desktop; não chamar essa extração de integração de Linker::Execute.
 
 `GuestStartupSession` reserva backing possuído com guards e relinka o snapshot
 com bias da alocação real. Verifica cópia completa antes das proteções. Páginas
+da imagem mantêm início alinhado a 16 KiB, com guards reservados de 16 KiB;
+proteções são aplicadas em unidades de 4 KiB do host. Esse alinhamento não é
+o modelo completo de reservas de endereço fixo do PS4. Páginas
 X guest tornam-se READONLY na preparação, não RX; outras são RW/RO/NOACCESS.
 Rejeitar W+X também após arredondamento a páginas host de 4 KiB. RELRO em
 página compartilhada RW ainda não é selado para entrada; só preparação.

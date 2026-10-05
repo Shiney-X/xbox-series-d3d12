@@ -71,12 +71,14 @@ bool GuestStartupSession::Prepare(std::span<const std::uint8_t> snapshot) {
       return fail("main_tls_alignment_or_budget_unsupported",
                   ERROR_NOT_SUPPORTED);
     constexpr std::size_t page = 4096;
-    image_ = VirtualAllocFromApp(nullptr,
-                                 static_cast<SIZE_T>(image_bytes_) + 2 * page,
-                                 MEM_RESERVE, PAGE_NOACCESS);
+    image_ = VirtualAllocFromApp(
+        nullptr, static_cast<SIZE_T>(image_bytes_) + 2 * GuestPageSize,
+        MEM_RESERVE, PAGE_NOACCESS);
     if (!image_)
       return fail("image_reservation_failed", GetLastError());
-    auto *mapped = static_cast<std::uint8_t *>(image_) + page;
+    auto *mapped = static_cast<std::uint8_t *>(image_) + GuestPageSize;
+    if (reinterpret_cast<std::uint64_t>(mapped) % GuestPageSize)
+      return fail("guest_image_alignment_failed", ERROR_INVALID_ADDRESS);
     if (VirtualAllocFromApp(mapped, static_cast<SIZE_T>(image_bytes_),
                             MEM_COMMIT, PAGE_READWRITE) != mapped ||
         reinterpret_cast<std::uint64_t>(mapped) < payload.image.plan.base)
@@ -160,8 +162,9 @@ bool GuestStartupSession::Prepare(std::span<const std::uint8_t> snapshot) {
             (tls_memory_ ? startup.tls : 0);
     startup_verified_ =
         startup_verified_ &&
-        std::equal(initial.begin(), initial.end(),
-                   static_cast<const std::uint8_t *>(tls_)) &&
+        (initial.empty() ||
+         std::equal(initial.begin(), initial.end(),
+                    static_cast<const std::uint8_t *>(tls_))) &&
         std::all_of(static_cast<const std::uint8_t *>(tls_) + tls_file_,
                     static_cast<const std::uint8_t *>(tls_) + tls_memory_,
                     [](auto byte) { return byte == 0; });
