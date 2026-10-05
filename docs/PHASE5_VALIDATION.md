@@ -357,6 +357,42 @@ tipo desconhecido) devem mostrar erro e zero patches aplicados. Tipos
 conhecidos pendentes e imports são explicitados, sem execução. ADR 0051;
 5D permanece aberta, aguardando resolver NID/módulos/HLE e runtime Orbis.
 
+### Evidência Xbox do link de dados anterior
+
+Sessão `134357105319283937-1800`: Sonic aplicou 1.150 relativas e deixou
+275 slots importados pendentes; Deltarune aplicou 10.125 e deixou 648.
+Ambos tiveram `writes_verified=1`, `untouched_bytes_verified=1`, zero local64
+e zero pendência de tipo/binding. FNV pós: Sonic `13228043239366263461`,
+Deltarune `13996771465480706034`. Os 25 probes e a retomada passaram.
+Isso valida o gate da ADR 0051, não boot ou resolução runtime.
+
+## Teste 5D — namespace e registry numérico de imports
+
+Instalar o novo pacote como Game, abrir Games e usar X RESCAN. Voltar ao
+Dev Home/reabrir e repetir a varredura. A interface permanece NOT BOOTED;
+não se espera uma nova imagem ou execução de Deltarune neste bloco.
+
+Enviar `phase5-imports.jsonl` (novo), `phase5-relocations.jsonl`,
+`phase5-link.jsonl`, `phase5-payload.jsonl`, `phase5-execution.jsonl`,
+`phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+Esperado: namespace válido nos dois títulos, registry de jogos vazio,
+`registered_data_exports=0`, `numeric_imports_matched=0`,
+`unresolved_imports=274` em Sonic e `578` em Deltarune. Versões/update podem
+alterar contagens. `binding_keys` lista as chaves normalizadas; unresolved
+é esperado e não é falha de namespace. Não equivale a imports resolvidos.
+
+O probe existente `guest-loader-fixture` deve mostrar
+`import_resolver_fixture_verified=1`, sem adicionar linha a Diagnostics.
+Somente essa fixture cadastra exports numéricos data-only. Relocations/FNV
+dos jogos devem continuar iguais à evidência anterior, com
+`data_import_relocations_applied=0`. Confirmar evento `guest-imports` com
+`report_error=0`, probes e apresentação após retomada.
+
+`imports_resolved=0`, `runtime_exports_callable=0`, `ready_for_boot=0`,
+`guest_executed=0` e `game_frame=0` são obrigatórios. ADR 0052;
+validação Xbox deste gate ainda pendente, 5D permanece aberta.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |

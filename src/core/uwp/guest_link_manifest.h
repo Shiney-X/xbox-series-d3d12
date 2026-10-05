@@ -15,6 +15,10 @@ struct GuestLinkRelocation {
     std::uint64_t address{}, addend_bits{};
     std::uint32_t type{}, symbol{};
 };
+struct GuestLinkDependency {
+    std::string name;
+    std::uint64_t packed{};
+};
 struct GuestLinkManifest {
     bool valid{};
     std::string error;
@@ -26,6 +30,8 @@ struct GuestLinkManifest {
     // Optional bounded records for the data linker, never executable pointers.
     std::vector<GuestLinkSymbol> symbol_records;
     std::vector<GuestLinkRelocation> relocation_records;
+    std::vector<GuestLinkDependency> module_records, library_records;
+    std::vector<std::uint32_t> import_symbol_indices;
 
     [[nodiscard]] std::string Details() const {
         const auto names = [](const std::vector<std::string>& list) {
@@ -199,6 +205,9 @@ struct GuestLinkManifest {
         std::string name;
         if (!string_at(tag == 1 ? value : value & 0xffffffffULL, name))
             return fail("invalid_dependency_name");
+        if (collect_records && tag != 1)
+            (tag == 0x6100000f ? result.module_records : result.library_records)
+                .push_back({name, value});
         (tag == 1            ? result.needed
          : tag == 0x6100000f ? result.modules
                              : result.libraries)
@@ -222,6 +231,8 @@ struct GuestLinkManifest {
         if (!string_at(read(symbols, offset, 4), name))
             return fail("invalid_import_name");
         result.imports.push_back(name);
+        if (collect_records)
+            result.import_symbol_indices.push_back(static_cast<std::uint32_t>(offset / 24));
         if (type == 2)
             ++result.undefined_functions;
         else if (type == 1)

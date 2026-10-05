@@ -15,6 +15,7 @@
 
 #include "core/uwp/core_bridge.h"
 #include "core/uwp/guest_data_link_fixture.h"
+#include "core/uwp/guest_import_fixture.h"
 #include "core/uwp/guest_link_fixture.h"
 #include "core/uwp/guest_loader_fixture.h"
 #include "core/uwp/guest_payload_fixture.h"
@@ -470,9 +471,12 @@ public:
               ::Core::Uwp::MakeGuestLinkFixture()));
       const bool relocation_fixture_verified =
           ::Core::Uwp::VerifyGuestDataLinkFixtures();
+      const bool import_fixture_verified =
+          ::Core::Uwp::VerifyGuestImportFixtures();
       loader_result.passed = loader_result.passed && self_fixture_verified &&
                              link_fixture_verified &&
-                             relocation_fixture_verified;
+                             relocation_fixture_verified &&
+                             import_fixture_verified;
       loader_result.error = static_cast<std::uint32_t>(
           loader_result.passed ? ERROR_SUCCESS : ERROR_INVALID_DATA);
       loader_result.details =
@@ -484,7 +488,9 @@ public:
           ";link_manifest_fixture_verified=" +
           std::to_string(link_fixture_verified) +
           ";data_relocation_fixture_verified=" +
-          std::to_string(relocation_fixture_verified);
+          std::to_string(relocation_fixture_verified) +
+          ";import_resolver_fixture_verified=" +
+          std::to_string(import_fixture_verified);
     } catch (const std::exception &) {
       loader_result.details += ";error=fixture_allocation_or_staging_failed";
     }
@@ -868,6 +874,7 @@ private:
     std::vector<ProbeResult> guest_payload_results;
     std::vector<ProbeResult> guest_link_results;
     std::vector<ProbeResult> guest_relocation_results;
+    std::vector<ProbeResult> guest_import_results;
     constexpr std::uint64_t maximum_payload_scan_bytes = 64ULL * 1024 * 1024;
     constexpr std::size_t maximum_payload_files = 8;
     std::uint64_t payload_bytes_requested = 0;
@@ -925,6 +932,8 @@ private:
                   const auto link_results_before = guest_link_results.size();
                   const auto relocation_results_before =
                       guest_relocation_results.size();
+                  const auto import_results_before =
+                      guest_import_results.size();
 
                   // First inspect a bounded 16 KiB prefix. The optional full
                   // snapshot below is data-only; never call the entry point.
@@ -1005,6 +1014,8 @@ private:
                                "payload_loaded=0;error=short_read_or_snapshot_"
                                "changed"});
                         } else {
+                          // Games have no runtime export registry yet. Numeric
+                          // fixture exports must never be registered here.
                           const auto data_link =
                               ::Core::Uwp::StageGuestDataLink(snapshot);
                           const auto &payload = data_link.payload;
@@ -1050,6 +1061,14 @@ private:
                                data_link.Details() +
                                    ";source=uwp_storage_snapshot;image_"
                                    "retained=0"});
+                          guest_import_results.push_back(
+                              {game.display.title_id, data_link.imports.valid,
+                               static_cast<std::uint32_t>(
+                                   data_link.imports.valid
+                                       ? ERROR_SUCCESS
+                                       : ERROR_BAD_EXE_FORMAT),
+                               data_link.imports.Details() +
+                                   ";source=uwp_storage_snapshot"});
                           // The staged image is deliberately discarded here;
                           // library scanning does not create an executable
                           // instance.
@@ -1102,6 +1121,14 @@ private:
                          "stage=data_relocation;guest_executed=0;ready_for_"
                          "boot=0;"
                          "relocations_applied=0;error=snapshot_or_data_link_"
+                         "unavailable"});
+                  }
+                  if (guest_import_results.size() == import_results_before) {
+                    guest_import_results.push_back(
+                        {game.display.title_id, false, ERROR_NOT_SUPPORTED,
+                         "stage=import_resolution;guest_executed=0;ready_for_"
+                         "boot=0;"
+                         "namespace_valid=0;error=snapshot_or_import_plan_"
                          "unavailable"});
                   }
                   try {
@@ -1295,6 +1322,31 @@ private:
           session_id_, "guest-link",
           ("guest_executed=0;valid=" + std::to_string(manifests_valid) +
            ";report_error=" + std::to_string(link_report_error))
+              .c_str());
+      const auto namespaces_valid = std::count_if(
+          guest_import_results.begin(), guest_import_results.end(),
+          [](const ProbeResult &result) { return result.passed; });
+      const bool imports_all_valid =
+          !guest_import_results.empty() &&
+          static_cast<std::size_t>(namespaces_valid) ==
+              guest_import_results.size();
+      const auto import_report_error = WriteReport(
+          ApplicationData::Current().LocalFolder(), L"phase5-imports.jsonl",
+          guest_import_results,
+          {"guest-import-scan", imports_all_valid,
+           static_cast<std::uint32_t>(imports_all_valid ? ERROR_SUCCESS
+                                                        : ERROR_NOT_SUPPORTED),
+           "stage=import_resolution;guest_executed=0;game_frame=0;imports_"
+           "resolved=0;"
+           "runtime_exports_callable=0;ready_for_boot=0;registered_data_"
+           "exports=0;"
+           "numeric_imports_matched=0;valid=" +
+               std::to_string(namespaces_valid) +
+               ";inspected=" + std::to_string(guest_import_results.size())});
+      AppendLifecycleEvent(
+          session_id_, "guest-imports",
+          ("guest_executed=0;valid=" + std::to_string(namespaces_valid) +
+           ";report_error=" + std::to_string(import_report_error))
               .c_str());
       const auto relocation_valid = std::count_if(
           guest_relocation_results.begin(), guest_relocation_results.end(),
