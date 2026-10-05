@@ -461,6 +461,13 @@ GS/TEB nem implementa TCB/DTV/pthreads Orbis (ADR 0048).
 
 ## Biblioteca USB no host UWP
 
+O gate inicial de payload usa `guest_payload.h`: snapshot StorageFile limitado,
+PT_LOAD/RELRO com índice original e adapter SELF direto não criptografado/comprimido.
+Valida ranges/blocos antes de copiar dados/BSS, sem permissões executáveis ou
+chamada de entry. Limites por arquivo/scan mantêm a leitura delimitada; imagem
+é descartada após `phase5-payload.jsonl`, não armazenada como instância guest.
+Esse caminho ainda não é o filesystem HLE ou o loader/linker upstream (ADR 0049).
+
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e
 resolvida novamente por objetos `StorageFolder` a cada ativação.

@@ -14,6 +14,8 @@ inline constexpr std::uint64_t GuestPageSize = 16384;
 struct GuestLoadSegment {
     std::uint64_t file_offset{}, address{}, file_size{}, memory_size{};
     std::uint32_t flags{};
+    std::uint32_t program_index{};
+    std::uint32_t type{1};
 };
 
 struct GuestLoadPlan {
@@ -37,7 +39,8 @@ struct GuestLoadPlan {
 // Deliberately restricted policy, not a replacement for the upstream loader.
 // SELF p_offset is an ELF logical offset, not a container file offset.
 [[nodiscard]] inline GuestLoadPlan PlanGuestLoads(std::span<const std::uint8_t> prefix,
-                                                  std::uint64_t file_size) {
+                                                  std::uint64_t file_size,
+                                                  bool include_sce_relro = false) {
     GuestLoadPlan plan;
     const auto fail = [&](const char* error) {
         plan.error = error;
@@ -64,11 +67,18 @@ struct GuestLoadPlan {
     bool executable_entry = false;
     for (std::size_t i = 0; i < header.program_headers; ++i) {
         const auto offset = static_cast<std::size_t>(header.elf_offset + phoff + i * 56);
-        if (read(offset, 4) != 1) // PT_LOAD only; no TLS/dynamic/relocations yet.
+        const auto type = static_cast<std::uint32_t>(read(offset, 4));
+        if (type != 1 && !(include_sce_relro && type == 0x61000010))
             continue;
-        const GuestLoadSegment segment{read(offset + 8, 8), read(offset + 16, 8),
-                                       read(offset + 32, 8), read(offset + 40, 8),
-                                       static_cast<std::uint32_t>(read(offset + 4, 4))};
+        const GuestLoadSegment segment{read(offset + 8, 8),
+                                       read(offset + 16, 8),
+                                       read(offset + 32, 8),
+                                       read(offset + 40, 8),
+                                       static_cast<std::uint32_t>(read(offset + 4, 4)),
+                                       static_cast<std::uint32_t>(i),
+                                       type};
+        if (type == 0x61000010 && (segment.flags & 1U))
+            return fail("unsupported_relro_permissions");
         const auto alignment = read(offset + 48, 8);
         if ((segment.flags & ~7U) != 0 || (segment.flags & 3U) == 3U)
             return fail("unsupported_segment_permissions"); // Never accept W+X.
@@ -94,7 +104,7 @@ struct GuestLoadPlan {
         }
         low = std::min(low, segment.address);
         high = std::max(high, end);
-        executable_entry |= (segment.flags & 1U) && header.entry >= segment.address &&
+        executable_entry |= type == 1 && (segment.flags & 1U) && header.entry >= segment.address &&
                             header.entry - segment.address < segment.file_size;
         plan.segments.push_back(segment);
     }
