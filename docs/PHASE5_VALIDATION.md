@@ -99,7 +99,7 @@ Windows, pacote UWP e qualidade/licenças/testes portáteis com sanitizers.
 Alterações no próprio workflow desktop ainda disparam os builds nesta PR.
 Não altera regras de proteção de branch ou transforma checks antigos em passes.
 
-## 5C: execução da fixture ELF autoral, não boot de jogo
+## 5C inicial (PR 45): execução da fixture ELF autoral, não boot de jogo
 
 Esperar os checks Windows/UWP/qualidade verdes, instalar o novo MSIX como
 Game e abrir. O probe roda automaticamente em uma thread de teste dedicada.
@@ -156,6 +156,41 @@ chamadas guest→host e tratamento geral de faults, além de comandos gráficos
 de jogo. Esse sucesso não certifica o ABI completo do PS4 ou um JIT do shadPS4.
 O teste Linux do mesmo thunk valida bytes/aritmética no host, não substitui
 o teste nativo Windows e AppContainer no Xbox.
+
+## Complemento 5C: fault SysV através da bridge registrada
+
+O perfil inicial acima foi validado no Xbox com 25 probes positivos,
+retorno 42 e apresentação após retomada. O novo MSIX adiciona um gate:
+unwind da bridge não leaf usando tabela dinâmica, sem VEH.
+
+Esperar os três checks Xbox verdes, instalar como Game e abrir. Repetir
+Dev Home/reabertura/navegação/X RESCAN. Enviar `phase5-execution.jsonl`,
+`phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+O relatório continua no mesmo arquivo, agora esperando:
+
+- `passed=true`, `return_value=42`, `return_after_fault=42`.
+- `fault_boundary=sysv_leaf_bridge_seh`.
+- `win64_fault_recovered=1`, `sysv_fault_recovered=1`.
+- `unwind_context_verified=1`: oracle de RSP/RIP, RSI/RDI e XMM6–15.
+- `function_table_registered=1`, `function_table_removed=1`.
+- `sysv_fault_unwind_supported=1` **somente para o perfil autoral testado**.
+- `unwind_scope=authored_leaf_and_fixed_bridge`.
+- Flags anteriores de proteções, filtros, stack e cleanup positivas.
+- `game_executed=0`, `game_frame=0`, `loader_linked=0`.
+
+`RtlAddFunctionTable` registra a tabela de uma única bridge. `RtlVirtualUnwind`
+é testado com contexto sintético e canários antes de entrar no guest. O fault
+SysV copia o guard para R10, clobbera RSI/RDI/XMM6 e lê o endereço reservado;
+a leaf não modifica RSP. O OS trata a leaf e usa UNWIND_INFO da bridge para
+chegar ao helper nativo SEH. A captura aborta essa chamada; não retoma a
+instrução inválida nem corrige page faults de jogos.
+
+O frame guest não leaf, a stack Orbis, unwind em prólogos/epílogos guest,
+guest→host, TLS e exceções arbitrárias continuam fora do gate. Tabela e
+metadados vivem na alocação própria até a remoção. Se remoção falhar, o probe
+falha e mantém essa alocação residente, em vez de deixar o OS apontando para
+memória liberada. Detalhes no ADR 0046.
 
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 

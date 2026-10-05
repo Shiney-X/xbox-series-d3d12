@@ -3,7 +3,9 @@
 #include "guest_execution_probe.h"
 #include "core/uwp/guest_execution_fixture.h"
 #include <Windows.h>
+#include <array>
 #include <cstring>
+#include <new>
 #include <sstream>
 
 namespace {
@@ -15,6 +17,22 @@ struct Allocation {
       VirtualFree(base, 0, MEM_RELEASE);
   }
 };
+struct FunctionTable {
+  RUNTIME_FUNCTION *entry{};
+  Allocation *allocation{};
+  bool registered{};
+  bool Remove() {
+    if (!registered)
+      return true;
+    registered = false;
+    if (RtlDeleteFunctionTable(entry))
+      return true;
+    // Never free code/table still referenced by the OS. Fail and keep it alive.
+    allocation->base = nullptr;
+    return false;
+  }
+  ~FunctionTable() { (void)Remove(); }
+};
 struct WorkerState {
   std::uint64_t saved_rsp{};
   std::uintptr_t fault_ip{}, guard_address{};
@@ -23,6 +41,8 @@ struct WorkerState {
   DWORD error{}, fault_code{};
   bool armed{}, recovered{}, protections{}, stack_verified{}, cleanup{},
       filter_verified{};
+  bool win64_recovered{}, sysv_recovered{}, unwind_verified{},
+      table_registered{}, table_removed{};
 };
 LONG FixtureException(EXCEPTION_POINTERS *exception, WorkerState *state) {
   if (!state->armed || state->recovered ||
@@ -94,6 +114,66 @@ void InvokeFaultLeaf(const void *entry, const void *guard, WorkerState *state) {
   }
 }
 
+using BridgeFunction = std::uint64_t (*)(std::uint64_t, std::uint64_t,
+                                         const void *, std::uint64_t *);
+void InvokeSysvFault(BridgeFunction bridge, const void *entry,
+                     const void *guard, WorkerState *state) {
+  __try {
+    (void)bridge(reinterpret_cast<std::uintptr_t>(guard), 0, entry,
+                 &state->saved_rsp);
+  } __except (FixtureException(GetExceptionInformation(), state)) {
+    // Dynamic metadata unwinds the bridge into this compiler-generated SEH
+    // frame.
+  }
+}
+
+bool VerifyUnwind(void *base, RUNTIME_FUNCTION *entry,
+                  const FixtureBridge &bridge) {
+  const auto address = reinterpret_cast<DWORD64>(base);
+  DWORD64 found_base{};
+  const auto *found = RtlLookupFunctionEntry(address + bridge.epilogue_offset,
+                                             &found_base, nullptr);
+  if (!found || found_base != address ||
+      found->BeginAddress != entry->BeginAddress ||
+      found->EndAddress != entry->EndAddress ||
+      found->UnwindData != entry->UnwindData)
+    return false;
+  alignas(16) std::array<std::uint64_t, 40> stack{};
+  for (unsigned reg = 6; reg < 16; ++reg) {
+    stack[16 + (reg - 6) * 2] = 1000 + reg;
+    stack[17 + (reg - 6) * 2] = 2000 + reg;
+  }
+  stack[37] = 0x11223344; // saved RSI
+  stack[38] = 0x55667788; // saved RDI
+  stack[39] =
+      0x12345678; // caller return address (only simulated, never jumped to)
+  CONTEXT context{};
+  context.ContextFlags = CONTEXT_FULL;
+  context.Rsp = reinterpret_cast<DWORD64>(stack.data());
+  context.Rip = address + bridge.epilogue_offset;
+  void *handler_data{};
+  DWORD64 establisher{};
+  (void)RtlVirtualUnwind(0, address, context.Rip, entry, &context,
+                         &handler_data, &establisher, nullptr);
+  if (context.Rsp != reinterpret_cast<DWORD64>(stack.data()) + sizeof(stack) ||
+      context.Rip != stack[39] || context.Rsi != stack[37] ||
+      context.Rdi != stack[38])
+    return false;
+  static_assert(offsetof(CONTEXT, Xmm15) ==
+                offsetof(CONTEXT, Xmm6) + 9 * sizeof(M128A));
+  for (unsigned reg = 6; reg < 16; ++reg) {
+    M128A value{};
+    std::memcpy(&value,
+                reinterpret_cast<const std::uint8_t *>(&context) +
+                    offsetof(CONTEXT, Xmm6) + (reg - 6) * sizeof(M128A),
+                sizeof(value));
+    if (value.Low != 1000 + reg ||
+        value.High != static_cast<std::int64_t>(2000 + reg))
+      return false;
+  }
+  return true;
+}
+
 bool Protect(void *address, SIZE_T bytes, ULONG flags) {
   ULONG old{};
   return VirtualProtectFromApp(address, bytes, flags, &old) != FALSE;
@@ -144,11 +224,21 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
     }
     std::memcpy(payload, staged.bytes.data(), staged.bytes.size());
     const auto bridge = MakeFixtureBridge();
-    if (bridge.code.size() > page) {
+    if (bridge.code.size() > FixtureRuntimeTableOffset ||
+        FixtureRuntimeTableOffset + sizeof(RUNTIME_FUNCTION) >
+            FixtureUnwindOffset ||
+        FixtureUnwindOffset + bridge.unwind.size() > page) {
       state.error = ERROR_INVALID_DATA;
       return 0;
     }
     std::memcpy(thunk.base, bridge.code.data(), bridge.code.size());
+    auto *function = new (static_cast<std::uint8_t *>(thunk.base) +
+                          FixtureRuntimeTableOffset) RUNTIME_FUNCTION{};
+    function->BeginAddress = 0;
+    function->EndAddress = static_cast<DWORD>(bridge.code.size());
+    function->UnwindData = FixtureUnwindOffset;
+    std::memcpy(static_cast<std::uint8_t *>(thunk.base) + FixtureUnwindOffset,
+                bridge.unwind.data(), bridge.unwind.size());
     if (!Protect(payload, staged.bytes.size(), PAGE_NOACCESS) ||
         !Protect(payload, page, PAGE_EXECUTE_READ) ||
         !Protect(payload + 0x4000, page, PAGE_READWRITE) ||
@@ -170,11 +260,22 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
       state.error = ERROR_INVALID_DATA;
       return 0;
     }
+    FunctionTable table{function, &thunk, false};
+    if (!RtlAddFunctionTable(function, 1,
+                             reinterpret_cast<DWORD64>(thunk.base))) {
+      state.error = ERROR_NOT_SUPPORTED;
+      return 0;
+    }
+    table.registered = true;
+    state.table_registered = true;
+    state.unwind_verified = VerifyUnwind(thunk.base, function, bridge);
+    if (!state.unwind_verified) {
+      state.error = ERROR_INVALID_DATA;
+      return 0;
+    }
     state.fault_ip =
         reinterpret_cast<std::uintptr_t>(payload + FixtureFaultOffset);
     state.guard_address = reinterpret_cast<std::uintptr_t>(image.base);
-    using BridgeFunction = std::uint64_t (*)(std::uint64_t, std::uint64_t,
-                                             const void *, std::uint64_t *);
     const auto invoke = reinterpret_cast<BridgeFunction>(thunk.base);
     state.value =
         invoke(19, 23, payload + staged.plan.entry_offset, &state.saved_rsp);
@@ -186,9 +287,28 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
     state.armed = true;
     InvokeFaultLeaf(payload + FixtureFaultOffset, image.base, &state);
     state.armed = false;
+    state.win64_recovered = state.recovered;
+    state.recovered = false;
+    state.fault_ip =
+        reinterpret_cast<std::uintptr_t>(payload + FixtureSysvFaultInstruction);
+    state.filter_verified = state.filter_verified && RejectOtherFaults(state);
+    if (!state.filter_verified) {
+      state.error = ERROR_INVALID_DATA;
+      return 0;
+    }
+    state.armed = true;
+    InvokeSysvFault(invoke, payload + FixtureSysvFaultOffset, image.base,
+                    &state);
+    state.armed = false;
+    state.sysv_recovered = state.recovered;
     // Prove the return boundary still works after handling the expected fault.
     state.recovery_value =
         invoke(19, 23, payload + staged.plan.entry_offset, &state.saved_rsp);
+    state.table_removed = table.Remove();
+    if (!state.table_removed) {
+      state.error = ERROR_FUNCTION_FAILED;
+      return 0;
+    }
     const bool image_freed = VirtualFree(image.base, 0, MEM_RELEASE) != FALSE;
     if (image_freed)
       image.base = nullptr;
@@ -232,7 +352,9 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
   const bool passed =
       wait == WAIT_OBJECT_0 && state.error == 0 && state.value == 42 &&
       state.recovery_value == 42 && state.recovered && state.protections &&
-      state.stack_verified && state.cleanup && state.filter_verified;
+      state.stack_verified && state.cleanup && state.filter_verified &&
+      state.win64_recovered && state.sysv_recovered && state.unwind_verified &&
+      state.table_registered && state.table_removed;
   std::ostringstream details;
   details << "stage=fixture_execution;source=authored_elf;loader_linked=0;game_"
              "executed=0;game_frame=0"
@@ -245,7 +367,14 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
           << ";stack=windows_worker_thread;stack_verified="
           << state.stack_verified << ";fault_recovered=" << state.recovered
           << ";fault_filter_verified=" << state.filter_verified
-          << ";fault_boundary=win64_leaf_seh;sysv_fault_unwind_supported=0"
+          << ";fault_boundary=sysv_leaf_bridge_seh;sysv_fault_unwind_supported="
+          << state.sysv_recovered
+          << ";win64_fault_recovered=" << state.win64_recovered
+          << ";sysv_fault_recovered=" << state.sysv_recovered
+          << ";unwind_context_verified=" << state.unwind_verified
+          << ";function_table_registered=" << state.table_registered
+          << ";function_table_removed=" << state.table_removed
+          << ";unwind_scope=authored_leaf_and_fixed_bridge"
           << ";fault_code=" << state.fault_code
           << ";allocations_released=" << state.cleanup;
   return {"guest-execution-fixture", passed,

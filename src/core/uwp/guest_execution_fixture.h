@@ -8,6 +8,10 @@
 namespace Core::Uwp {
 inline constexpr std::uint32_t FixtureBridgeFrame = 296;
 inline constexpr std::size_t FixtureFaultOffset = 0x180;
+inline constexpr std::size_t FixtureSysvFaultOffset = 0x1c0;
+inline constexpr std::size_t FixtureSysvFaultInstruction = FixtureSysvFaultOffset + 11;
+inline constexpr std::uint32_t FixtureRuntimeTableOffset = 512;
+inline constexpr std::uint32_t FixtureUnwindOffset = 528;
 
 [[nodiscard]] inline std::vector<std::uint8_t> MakeGuestExecutionFixture() {
     auto file = MakeGuestLoaderFixture();
@@ -22,6 +26,11 @@ inline constexpr std::size_t FixtureFaultOffset = 0x180;
     // the SysV bridge; compiler SEH can unwind this leaf without dynamic metadata.
     constexpr std::array<std::uint8_t, 4> fault{0x48, 0x8b, 0x01, 0xc3};
     std::copy(fault.begin(), fault.end(), file.begin() + FixtureFaultOffset);
+    // SysV fault leaf: preserve guard in R10, clobber Win64-only nonvolatiles,
+    // then read [r10]. RSP and SysV nonvolatile GPRs are unchanged.
+    constexpr std::array<std::uint8_t, 15> sysv_fault{
+        0x49, 0x89, 0xfa, 0x31, 0xff, 0x31, 0xf6, 0x66, 0x0f, 0xef, 0xf6, 0x49, 0x8b, 0x02, 0xc3};
+    std::copy(sysv_fault.begin(), sysv_fault.end(), file.begin() + FixtureSysvFaultOffset);
     for (unsigned i = 0; i < 8; ++i) {
         file[96 + i] = static_cast<std::uint8_t>(std::uint64_t{0x100} >> (8 * i));
         file[104 + i] = file[96 + i];
@@ -32,6 +41,7 @@ inline constexpr std::size_t FixtureFaultOffset = 0x180;
 struct FixtureBridge {
     std::vector<std::uint8_t> code;
     std::size_t epilogue_offset{};
+    std::vector<std::uint8_t> unwind;
 };
 
 // Win64 signature: uint64(a, b, entry, saved_rsp*).
@@ -58,6 +68,20 @@ struct FixtureBridge {
         }
     };
     xmm(false);
+    // Version-1 UNWIND_INFO for the exact emitted prologue. Codes are ordered
+    // by decreasing end-of-instruction offset; XMM/ALLOC use additional slots.
+    bridge.unwind = {1, static_cast<std::uint8_t>(code.size()), 24, 0};
+    for (unsigned reg = 16; reg-- > 6;) {
+        const unsigned instruction_end = reg == 6 ? 21 : reg == 7 ? 30 : 40 + (reg - 8) * 10;
+        const unsigned slot_offset = (128 + (reg - 6) * 16) / 16;
+        bridge.unwind.insert(bridge.unwind.end(),
+                             {static_cast<std::uint8_t>(instruction_end),
+                              static_cast<std::uint8_t>((reg << 4) | 8),
+                              static_cast<std::uint8_t>(slot_offset), 0}); // UWOP_SAVE_XMM128
+    }
+    bridge.unwind.insert(bridge.unwind.end(),
+                         {12, 1, static_cast<std::uint8_t>(FixtureBridgeFrame / 8), 0, 2, 0x60, 1,
+                          0x70});                // ALLOC_LARGE; PUSH RSI; PUSH RDI
     code.insert(code.end(), {0xfc,               // cld
                              0x48, 0x89, 0xcf,   // mov rdi,rcx
                              0x48, 0x89, 0xd6,   // mov rsi,rdx
