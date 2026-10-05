@@ -475,8 +475,8 @@ imagem. PT_DYNAMIC pode ser um subrange do bloco SELF de DYNLIBDATA.
 `phase5-link.jsonl` guarda requisitos por título e erros explícitos; somente
 targets de relocations com largura conhecida são conferidos contra LOAD/RELRO.
 Imports NID continuam strings, módulos/bibliotecas são nomes diagnósticos:
-IDs/versões packed, resolução, aplicação, inicializadores e TLS Orbis não são
-implementados. `ready_for_boot=0` permanece mesmo se `manifest_valid=1` (ADR 0050).
+O manifesto sozinho não resolve imports nem inicializadores/TLS Orbis.
+`ready_for_boot=0` permanece mesmo se `manifest_valid=1` (ADR 0050).
 
 `StageGuestDataLink` revalida o snapshot, stageia uma única imagem em vector
 e coleta registros limitados de símbolos/relocations. Usa bias **numérico**
@@ -492,6 +492,18 @@ ao backing do snapshot ou zero de BSS/gaps. `phase5-relocations.jsonl` distingue
 aplicação **em dados** de link completo/boot. Relatório payload registra BSS e
 FNV **antes** das relocations (`payload_phase=pre_relocation`), pois relocations
 podem preencher BSS. A imagem é descartada ao fim da inspeção por título.
+
+`ResolveGuestImports` associa `NID#library_id#module_id` às declarações packed
+do manifesto e gera uma chave estruturada NID/biblioteca/versão/módulo/versão/tipo.
+IDs seguem o alfabeto e representação canônica de `Module::EncodeId`.
+Registry data-only rejeita duplicatas e zeros; versões e tipo precisam coincidir
+exatamente, sem fallback de stubs. O matching de major/minor é deliberadamente
+mais estrito que a chave HLE upstream, não uma promessa de compatibilidade.
+Exports numéricos só são registrados na fixture autoral: seus slots externos
+64/GLOB_DAT/JUMP_SLOT usam o mesmo commit/readback transacional. Nos jogos,
+registry vazio deixa todos os imports pendentes e mantém os fingerprints da
+etapa anterior. Não há ponteiros host chamáveis, carregamento de dependências
+ou HLE real. `phase5-imports.jsonl` mede namespace, não boot (ADR 0052).
 
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e

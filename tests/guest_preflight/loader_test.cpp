@@ -35,6 +35,7 @@ int main(int argc, char** argv) {
             const auto result = StageGuestDataLink(bytes);
             std::cout << result.payload.Details() << ";payload_phase=pre_relocation\n";
             std::cout << result.manifest.Details() << '\n';
+            std::cout << result.imports.Details() << '\n';
             std::cout << result.Details() << '\n';
             return result.valid ? 0 : 1;
         }

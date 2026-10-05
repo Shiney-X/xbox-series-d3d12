@@ -525,8 +525,12 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
     Manifesto válido não resolve imports nem aplica relocations.
   - [x] Implementar relocations relativas e local64 em imagem de dados, com
     load bias numérico, preflight transacional, verificação exata e pendências.
-  - [ ] Validar `phase5-relocations.jsonl` no Xbox; endereços sintéticos não
+  - [x] Validar `phase5-relocations.jsonl` no Xbox; endereços sintéticos não
     são mapeamentos executáveis e imports externos continuam sem resolver.
+  - [x] Implementar normalização NID/ID/biblioteca/módulo/versão/tipo e registry
+    numérico data-only, com vinculação transacional de fixtures raw/SELF.
+  - [ ] Validar `phase5-imports.jsonl` e oracle de imports no Xbox. O registry
+    dos jogos continua vazio: isso não cadastra HLE nem executa o guest.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
 - [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
 - [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.
