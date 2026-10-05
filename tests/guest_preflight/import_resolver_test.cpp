@@ -3,6 +3,7 @@
 #include <iostream>
 #include <source_location>
 #include <stdexcept>
+#include "core/uwp/guest_hle_import_fixture.h"
 #include "core/uwp/guest_import_fixture.h"
 
 void Check(bool value, std::source_location location = std::source_location::current()) {
@@ -24,6 +25,25 @@ int main() {
     try {
         using namespace Core::Uwp;
         Check(VerifyGuestImportFixtures());
+        for (const bool self : {false, true}) {
+            const auto file = MakeGuestHleImportFixture(self);
+            const std::array registry{MakeFixtureHleImportExport(0x200001000ULL)};
+            const auto linked = StageGuestDataLink(file, GuestDiagnosticLoadBias, true, registry);
+            Check(VerifyFixtureHleImportLink(linked, GuestDiagnosticLoadBias, 0x200001000ULL));
+            const auto code = MakeGuestHleFixture();
+            Check(std::equal(code.begin() + 0x100, code.begin() + 0x200,
+                             linked.payload.image.bytes.begin() + 0x100));
+            const auto missing = StageGuestDataLink(file, GuestDiagnosticLoadBias, true);
+            Check(!missing.valid && missing.relative_applied == 0 &&
+                  missing.data_import_applied == 0 &&
+                  missing.payload.image.bytes == StageGuestPayload(file).image.bytes);
+            auto wrong = registry;
+            wrong[0].key.library_version = 1;
+            Check(!StageGuestDataLink(file, GuestDiagnosticLoadBias, true, wrong).valid);
+            wrong[0].key = registry[0].key;
+            wrong[0].key.type = 1;
+            Check(!StageGuestDataLink(file, GuestDiagnosticLoadBias, true, wrong).valid);
+        }
         std::uint16_t decoded = 0;
         for (std::uint32_t id = 0; id <= UINT16_MAX; ++id)
             Check(DecodeGuestId(EncodeGuestId(static_cast<std::uint16_t>(id)), decoded) &&

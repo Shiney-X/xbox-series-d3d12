@@ -1,6 +1,6 @@
 # ADR 0052 — Resolver tipado de imports em dados
 
-Status: implementado; validação Xbox pendente.
+Status: implementado e validado no Xbox (sessão `134357125360003938-3028`).
 
 ## Contexto e decisão
 
@@ -53,7 +53,9 @@ sem aumentar linhas de Diagnostics. `phase5-imports.jsonl` e evento
 
 O Deltarune local normaliza 578 imports com registry vazio e conserva 10.125
 relativas, 648 slots pendentes e FNV pós-relocation `13996771465480706034`.
-Validar novamente no Xbox antes de marcar esse novo gate.
+No Xbox, Sonic normalizou 274 imports e Deltarune 578, todos unresolved como
+esperado; fingerprints e relocations foram preservados. Oracle do resolver,
+25 probes, retomada e apresentação após resume passaram, sem erro de relatório.
 
 `imports_resolved=0`, `runtime_exports_callable=0`, `loader_linked=0`,
 `ready_for_boot=0`, `guest_executed=0` e `game_frame=0` permanecem, inclusive

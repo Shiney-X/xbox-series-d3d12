@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "guest_execution_probe.h"
 #include "core/uwp/guest_hle_fixture.h"
+#include "core/uwp/guest_hle_import_fixture.h"
 #include <Windows.h>
 #include <array>
 #include <cstring>
@@ -45,6 +46,9 @@ struct WorkerState {
   bool win64_recovered{}, sysv_recovered{}, unwind_verified{},
       table_registered{}, table_removed{};
   bool hle_verified{}, hle_unwind_verified{}, hle_table_removed{};
+  bool import_link_verified{}, import_slot_verified{},
+      import_relative_verified{}, import_missing_rejected{},
+      import_version_rejected{}, import_type_rejected{};
   std::uint64_t hle_value{}, hle_unknown{}, hle_overflow{};
   DWORD tls_index{TLS_OUT_OF_INDEXES};
   HANDLE ready{}, release{};
@@ -230,8 +234,10 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
     GetCurrentThreadStackLimits(&state.stack_low, &state.stack_high);
     const auto local = reinterpret_cast<std::uintptr_t>(&argument);
     state.stack_verified = local >= state.stack_low && local < state.stack_high;
-    const auto file = MakeGuestHleFixture();
-    const auto staged = StageRawGuest(file);
+    // Fixed generated corpus, one raw ELF worker and one SELF worker. No game
+    // file or caller-selected key/address reaches this execution harness.
+    const auto file = MakeGuestHleImportFixture(state.ordinal != 0);
+    const auto staged = StageGuestPayload(file).image;
     if (!staged.error.empty() || !state.stack_verified) {
       state.error = ERROR_INVALID_DATA;
       return 0;
@@ -262,7 +268,6 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
       state.error = GetLastError();
       return 0;
     }
-    std::memcpy(payload, staged.bytes.data(), staged.bytes.size());
     const auto bridge = MakeFixtureBridge();
     if (bridge.code.size() > FixtureRuntimeTableOffset ||
         FixtureRuntimeTableOffset + sizeof(RUNTIME_FUNCTION) >
@@ -290,8 +295,56 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
     std::memcpy(static_cast<std::uint8_t *>(hle.base) + FixtureUnwindOffset,
                 hle_thunk.unwind.data(), hle_thunk.unwind.size());
     const auto hle_address = reinterpret_cast<std::uint64_t>(hle.base);
-    std::memcpy(payload + FixtureHlePointerOffset, &hle_address,
-                sizeof(hle_address));
+    const auto payload_address = reinterpret_cast<std::uint64_t>(payload);
+    if (payload_address < staged.plan.base) {
+      state.error = ERROR_INVALID_ADDRESS;
+      return 0;
+    }
+    const auto bias = payload_address - staged.plan.base;
+    const std::array registry{MakeFixtureHleImportExport(hle_address)};
+    const auto rejected_without_write = [&](const GuestDataLink &rejected) {
+      return !rejected.valid &&
+             rejected.error == "pending_relocations_require_resolver" &&
+             !rejected.relative_applied && !rejected.data_import_applied &&
+             rejected.payload.image.bytes == staged.bytes;
+    };
+    state.import_missing_rejected =
+        rejected_without_write(StageGuestDataLink(file, bias, true));
+    auto wrong = registry;
+    wrong[0].key.library_version = 1;
+    state.import_version_rejected =
+        rejected_without_write(StageGuestDataLink(file, bias, true, wrong));
+    wrong[0] = registry[0];
+    wrong[0].key.type = 1;
+    state.import_type_rejected =
+        rejected_without_write(StageGuestDataLink(file, bias, true, wrong));
+    const auto linked = StageGuestDataLink(file, bias, true, registry);
+    state.import_link_verified =
+        VerifyFixtureHleImportLink(linked, bias, hle_address);
+    if (!state.import_link_verified || !state.import_missing_rejected ||
+        !state.import_version_rejected || !state.import_type_rejected) {
+      state.error = ERROR_INVALID_DATA;
+      return 0;
+    }
+    // Only a complete, verified authorial link is copied. No manual GOT patch.
+    std::memcpy(payload, linked.payload.image.bytes.data(),
+                staged.bytes.size());
+    std::uint64_t imported_address{};
+    std::uint64_t relocated_entry{};
+    std::memcpy(&imported_address, payload + FixtureHlePointerOffset,
+                sizeof(imported_address));
+    std::memcpy(&relocated_entry, payload + 0x4208, sizeof(relocated_entry));
+    state.import_slot_verified =
+        imported_address == hle_address &&
+        std::memcmp(payload, linked.payload.image.bytes.data(),
+                    staged.bytes.size()) == 0;
+    state.import_relative_verified =
+        relocated_entry ==
+        reinterpret_cast<std::uint64_t>(payload + staged.plan.entry_offset);
+    if (!state.import_slot_verified || !state.import_relative_verified) {
+      state.error = ERROR_INVALID_DATA;
+      return 0;
+    }
     if (!Protect(payload, staged.bytes.size(), PAGE_NOACCESS) ||
         !Protect(payload, page, PAGE_EXECUTE_READ) ||
         !Protect(payload + 0x4000, page, PAGE_READWRITE) ||
@@ -370,7 +423,8 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
     state.guard_address = reinterpret_cast<std::uintptr_t>(image.base);
     const auto invoke = reinterpret_cast<BridgeFunction>(thunk.base);
     state.value =
-        invoke(19, 23, payload + staged.plan.entry_offset, &state.saved_rsp);
+        invoke(19, 23, reinterpret_cast<const void *>(relocated_entry),
+               &state.saved_rsp);
     state.filter_verified = RejectOtherFaults(state);
     if (!state.filter_verified) {
       state.error = ERROR_INVALID_DATA;
@@ -395,7 +449,8 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
     state.sysv_recovered = state.recovered;
     // Prove the return boundary still works after handling the expected fault.
     state.recovery_value =
-        invoke(19, 23, payload + staged.plan.entry_offset, &state.saved_rsp);
+        invoke(19, 23, reinterpret_cast<const void *>(relocated_entry),
+               &state.saved_rsp);
     state.hle_value =
         invoke(1, 41, payload + FixtureHleEntryOffset, &state.saved_rsp);
     state.hle_unknown =
@@ -560,6 +615,9 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
            state.unwind_verified && state.table_registered &&
            state.table_removed && state.hle_verified &&
            state.hle_unwind_verified && state.hle_table_removed &&
+           state.import_link_verified && state.import_slot_verified &&
+           state.import_relative_verified && state.import_missing_rejected &&
+           state.import_version_rejected && state.import_type_rejected &&
            state.tls_bound && state.tls_cleared && state.context_verified &&
            state.rendezvous;
   };
@@ -603,6 +661,23 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
           << (state.hle_overflow == FixtureHleOverflow)
           << ";hle_unwind_verified=" << state.hle_unwind_verified
           << ";hle_table_removed=" << state.hle_table_removed
+          << ";import_execution_scope=closed_authored_raw_self"
+          << ";import_binding_source=typed_resolver_jump_slot"
+          << ";import_manual_patch=0;game_runtime_exports_callable=0"
+          << ";import_link_verified="
+          << (state.import_link_verified && peer.import_link_verified)
+          << ";import_slot_verified="
+          << (state.import_slot_verified && peer.import_slot_verified)
+          << ";import_relative_verified="
+          << (state.import_relative_verified && peer.import_relative_verified)
+          << ";import_call_verified="
+          << (state.hle_verified && peer.hle_verified)
+          << ";import_missing_rejected="
+          << (state.import_missing_rejected && peer.import_missing_rejected)
+          << ";import_version_rejected="
+          << (state.import_version_rejected && peer.import_version_rejected)
+          << ";import_type_rejected="
+          << (state.import_type_rejected && peer.import_type_rejected)
           << ";thread_scope=authored_workers;worker_threads=2"
           << ";workers_passed=" << (worker_passed(state) && worker_passed(peer))
           << ";thread_context_isolated=" << contexts_isolated
