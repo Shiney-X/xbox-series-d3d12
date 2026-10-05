@@ -441,7 +441,36 @@ scope `closed_authored_raw_self`. Os 25 probes anteriores continuam necessários
 `game_executed=0`, `game_frame=0`. Jogos mantêm registry vazio, mesmas relativas
 e fingerprints/imports pendentes. Serviço Orbis real não equivale a boot ou
 integração do runtime completo. Política temporal de suspensão não é validada
-pelo resume gráfico. ADR 0054; validação deste novo gate no Xbox pendente.
+pelo resume gráfico. ADR 0054; validado na sessão `134357143372603935-5336`:
+três serviços completos, 25 probes e apresentação após retomada passaram.
+Inspeção dos jogos manteve fingerprints/imports, sem regressão. A captura
+não inclui varredura após resume nem certifica política temporal de pause.
+
+## Teste 5D — ponteiros guest e serviços libc de memória
+
+Instalar o novo MSIX como Game. Abrir Diagnostics (teste automático), voltar
+ao Dev Home e reabrir. Conferir apresentação e, em Games, usar X RESCAN após
+a retomada. Não adicionar arquivos nem modificar o pendrive. A UI não ganha
+uma nova linha: o gate fica no probe de execução existente.
+
+Enviar `phase5-execution.jsonl`, `phase0-results.jsonl`,
+`phase0-lifecycle.jsonl`, `phase5-imports.jsonl`, `phase5-relocations.jsonl`,
+`phase5-link.jsonl` e `phase5-payload.jsonl`.
+
+Esperado: `guest_memory_scope=closed_authored_raw_self`, services=3,
+calls=34, rejected_calls=16, stage `complete` e todos os campos
+`guest_memory_calls_verified`, `guest_memory_ranges_verified`,
+`guest_memory_rejections_verified`, `guest_memory_unwind_cleanup_verified`
+em 1. As 16 rejeições são **intencionais**, não falhas de execução: ponteiro
+host, gap NOACCESS, limite lógico, RX, overflow, tamanho excessivo e overlap.
+Cada chamada verifica retorno e bytes exatos do LOAD de dados/código.
+
+Os 25 probes e o gate anterior de clock continuam necessários. Serviços reais
+de memcpy/memset/memcmp são chamados apenas pelas fixtures autorais raw/SELF;
+`game_memory_exports_registered=0`, `guest_memory_general_faults_supported=0`,
+`game_executed=0`, `game_frame=0` permanecem. Os jogos mantêm registry vazio,
+mesmas relativas/FNV e imports pendentes. Não é heap/MMU, startup Orbis,
+filesystem ou boot de Deltarune. ADR 0055; gate Xbox pendente.
 
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 

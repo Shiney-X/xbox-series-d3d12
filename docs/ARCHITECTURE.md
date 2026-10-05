@@ -530,6 +530,17 @@ verificam unidades, monotonicidade, frequência e unwind/cleanup.
 até existir runtime/lifetime e política de tempo compatível. O teste é serial
 e não certifica pause/resume temporal, TLS Orbis ou startup (ADR 0054).
 
+O subset libc de memória acrescenta fronteira de ponteiros para memcpy,
+memset e memcmp, com NIDs do upstream e três argumentos SysV convertidos
+para Win64. `GuestMemory` autoriza apenas spans confiáveis pertencentes ao
+host, valida tamanho/overflow/permissão antes do CRT e não junta ranges.
+Fixture serial permite leitura do LOAD RX e escrita do LOAD RW, não gaps,
+padding da página ou stack/contexto host. Contexto oculto chega em R9.
+Rejeições são sinalizadas ao oracle, não erros de jogo tratados com sucesso.
+Zero/overlap, bytes/retornos, resolver e unwind/cleanup têm gates próprios.
+Mapas fixos não certificam MMU concorrente; fault geral e registro para jogos
+permanecem bloqueados. Não é heap, filesystem ou boot (ADR 0055).
+
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e
 resolvida novamente por objetos `StorageFolder` a cada ativação.

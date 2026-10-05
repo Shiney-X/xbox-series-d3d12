@@ -537,8 +537,13 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
     não é registry runtime Orbis ou boot de jogo.
   - [x] Implementar subset pointer-free de tempo libkernel com NIDs upstream,
     contador/frequência QPC virtual e conversão checked de microssegundos.
-  - [ ] Validar chamadas aos três serviços Orbis de tempo via resolver em
+  - [x] Validar chamadas aos três serviços Orbis de tempo via resolver em
     ELF/SELF autoral no Xbox. Não registrar esses exports para jogos ainda.
+  - [x] Implementar fronteira de ponteiros guest com ranges autorizados,
+    permissões, tamanhos checked e memcpy/memset/memcmp por imports reais.
+  - [ ] Validar esses três serviços em ELF/SELF autoral no Xbox: bytes/retornos,
+    rejeição sem writes, ABI de três argumentos e unwind/cleanup. Não é MMU,
+    mapeamento dinâmico ou tratamento geral de faults do runtime.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
 - [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
 - [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.
