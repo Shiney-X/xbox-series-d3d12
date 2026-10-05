@@ -99,6 +99,64 @@ Windows, pacote UWP e qualidade/licenças/testes portáteis com sanitizers.
 Alterações no próprio workflow desktop ainda disparam os builds nesta PR.
 Não altera regras de proteção de branch ou transforma checks antigos em passes.
 
+## 5C: execução da fixture ELF autoral, não boot de jogo
+
+Esperar os checks Windows/UWP/qualidade verdes, instalar o novo MSIX como
+Game e abrir. O probe roda automaticamente em uma thread de teste dedicada.
+Não selecionar jogo para executar: Games continua só inspecionando SELF.
+
+Enviar `phase5-execution.jsonl`, `phase0-results.jsonl` e
+`phase0-lifecycle.jsonl`. Conferir UI e Diagnostics, sair para Dev Home e
+reabrir, depois fazer X RESCAN para regressão da biblioteca.
+
+Esperado no registro `guest-execution-fixture`:
+
+- `passed=true`, `win32_error=0`, `guest_executed=1` (somente a fixture).
+- `abi=sysv_integer_leaf`, `arguments=19,23`, `return_value=42`.
+- `alignment_red_zone_verified=1`, `host_permissions_verified=1`.
+- `stack=windows_worker_thread`, `stack_verified=1`.
+- `fault_recovered=1`, `fault_code=3221225477` (access violation esperada).
+- `fault_filter_verified=1`: sete casos fora do escopo não são absorvidos.
+- `fault_boundary=win64_leaf_seh`, `sysv_fault_unwind_supported=0`.
+- `return_after_fault=42`, `allocations_released=1`.
+- `game_executed=0`, `game_frame=0`, `loader_linked=0`.
+
+A fixture é ELF cru autoral com instruções x86-64 de um leaf SysV. Usa o
+staging 5B, depois copia a imagem para alocação virtual própria, sem fixar
+seus endereços guest. Páginas de código e bridge passam RW→RX; dados RW;
+gaps NOACCESS e extremos reservados/não comprometidos. Nunca usa RWX.
+O thunk preserva RSI/RDI e XMM6..15, adapta dois argumentos inteiros e
+verifica alinhamento de entrada e uso síncrono de 128 bytes de red zone.
+
+A stack é a de uma thread Windows com reserva solicitada de 256 KiB e
+limites verificados, não uma stack de processo Orbis montada pelo linker.
+Não há troca manual de RSP da UI nem alteração de TEB. A proteção/expansão
+da stack é gerenciada pelo Windows; o probe não simula stack overflow.
+
+A segunda entrada autoral é uma **leaf Win64 separada**, chamada diretamente
+por helper nativo com `__try/__except`. Lê um endereço reservado pertencente
+ao probe. O filtro SEH trata exclusivamente esse RIP/read/endereço enquanto
+armado no escopo da chamada. A leaf não altera RSP/não voláteis; não precisa
+de tabela de unwind própria. Não passa pela bridge SysV. O SDK AppContainer
+rejeitou Add/RemoveVectoredExceptionHandler no primeiro build; o caminho VEH
+foi removido, sem redeclarar/importar APIs desktop à força.
+
+Outras exceções continuam sua busca normal. **Recuperação de faults através
+da bridge SysV não está implementada**, e não há handler geral de jogos.
+O segundo retorno 42 comprova chamada SysV após recuperação da leaf Win64,
+não recuperação de fault ocorrido no corpo SysV.
+
+Não aceita paths, entrys ou instruções externas. A execução tem código fixo
+sem loops e espera a thread terminar; não é um executor com timeout/cancelamento
+para conteúdo não confiável. Mitigações proibitivas ou CFG ativo fazem o gate
+falhar, sem desligar políticas. API não suportada também deve falhar o gate.
+
+Ainda faltam Orbis main/startup, relocations/imports, adapter SELF, TLS/HLE,
+chamadas guest→host e tratamento geral de faults, além de comandos gráficos
+de jogo. Esse sucesso não certifica o ABI completo do PS4 ou um JIT do shadPS4.
+O teste Linux do mesmo thunk valida bytes/aritmética no host, não substitui
+o teste nativo Windows e AppContainer no Xbox.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |

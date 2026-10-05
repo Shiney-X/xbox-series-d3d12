@@ -52,6 +52,10 @@ gates; ainda não existe botão de boot. A 5B adiciona plano PT_LOAD e staging
 de uma fixture autoral em buffer de dados, sem executar código ou carregar
 payload dos jogos SELF. [Testes 5A/5B](docs/PHASE5_VALIDATION.md).
 
+A 5C adiciona execução de uma pequena fixture ELF autoral com bridge SysV
+em thread dedicada, proteções e fault controlado; **não executa jogos**.
+Validação AppContainer/hardware é separada dos testes host.
+
 ## Baseline upstream
 
 O primeiro baseline do core é o release `v.0.18.0`, commit
