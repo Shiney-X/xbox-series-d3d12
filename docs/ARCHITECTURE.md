@@ -541,6 +541,23 @@ Zero/overlap, bytes/retornos, resolver e unwind/cleanup têm gates próprios.
 Mapas fixos não certificam MMU concorrente; fault geral e registro para jogos
 permanecem bloqueados. Não é heap, filesystem ou boot (ADR 0055).
 
+`core/runtime_layout.h` agora fornece os mesmos tipos `EntryParams`, `Tcb`
+e `DtvEntry` ao linker/TLS upstream e ao pacote UWP, preservando seus layouts.
+Isso não compila `Linker::Execute` ou a CPU/MMU upstream no UWP. A sessão
+`GuestStartupSession` é o proprietário nativo da preparação do título:
+reabre a capability StorageFile selecionada, relinka relativas com bias da
+alocação real e mantém imagem não executável, stack com guards e TLS principal.
+O builder escreve argc/argv/entry, os dois qwords de entrada descritos pelo
+upstream e TCB/DTV de módulo único. Não muda RSP nem FS/GS, não cria pthread,
+não executa inicializadores ou entry. Não é o TLS completo do runtime.
+
+A ação A PREPARE produz `phase5-startup.jsonl` e informa `unresolved_imports`
+ou outro primeiro gate bloqueado. Registry runtime continua vazio; não usar
+os serviços autorais como exports de jogo. Código guest permanece READONLY,
+sem RX/RWX. Voltar, reescanear, preparar outro título ou suspender libera
+a sessão; geração cancela leituras assíncronas antigas antes de mapear.
+O autoteste usa essa mesma classe nativa, não uma versão mock. ADR 0056.
+
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e
 resolvida novamente por objetos `StorageFolder` a cada ativação.

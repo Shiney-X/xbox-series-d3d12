@@ -5,6 +5,7 @@
 #include "core/uwp/guest_hle_import_fixture.h"
 #include "core/uwp/guest_memory_fixture.h"
 #include "core/uwp/kernel_clock_fixture.h"
+#include "guest_startup_session.h"
 #include <Windows.h>
 #include <array>
 #include <cstring>
@@ -1105,7 +1106,9 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
     memory_probe.stage = "exception";
     memory_probe.passed = false;
   }
-  const bool passed = kernel_clock_verified && memory_probe.passed &&
+  const auto startup_probe = ProbeGuestStartup();
+  const bool passed = startup_probe.passed && kernel_clock_verified &&
+                      memory_probe.passed &&
                       coordination_error == ERROR_SUCCESS && both_ready &&
                       worker_passed(state) && worker_passed(peer) &&
                       contexts_isolated && parent_isolated &&
@@ -1197,6 +1200,8 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
       << ";guest_memory_stage=" << memory_probe.stage
       << ";game_memory_exports_registered=0;guest_memory_general_faults_"
          "supported=0";
+  details << ";startup_preparation_fixture_verified=" << startup_probe.passed
+          << ";startup_preparation_scope=owned_mapping_not_entry_execution";
   return {"guest-execution-fixture", passed,
           passed ? DWORD{ERROR_SUCCESS}
                  : (coordination_error ? coordination_error

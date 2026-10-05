@@ -8,6 +8,7 @@
 #include <vector>
 #include "core/libraries/kernel/threads.h"
 #include "core/module.h"
+#include "core/runtime_layout.h"
 
 namespace Core {
 
@@ -45,13 +46,6 @@ struct OrbisProcParam {
 using ExitFunc = PS4_SYSV_ABI void (*)();
 
 class Linker;
-
-struct EntryParams {
-    int argc;
-    u32 padding;
-    const char* argv[33];
-    VAddr entry_addr;
-};
 
 struct HeapAPI {
     PS4_SYSV_ABI void* (*heap_malloc)(u64);

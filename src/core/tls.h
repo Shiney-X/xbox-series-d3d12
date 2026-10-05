@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include "common/types.h"
+#include "core/runtime_layout.h"
 #ifdef _WIN32
 #include <malloc.h>
 #endif
@@ -18,20 +19,6 @@ struct OrbisFiberContext;
 }
 
 namespace Core {
-
-union DtvEntry {
-    std::size_t counter;
-    u8* pointer;
-};
-
-struct Tcb {
-    Tcb* tcb_self;
-    DtvEntry* tcb_dtv;
-    void* tcb_thread;
-    void* tcb_spare[2];
-    u64 tcb_canary;
-    ::Libraries::Fiber::OrbisFiberContext* tcb_fiber;
-};
 
 #ifdef _WIN32
 /// Gets the thread local storage key for the TCB block.

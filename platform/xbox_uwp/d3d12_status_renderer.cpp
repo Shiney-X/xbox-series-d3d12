@@ -667,7 +667,7 @@ void D3D12StatusRenderer::DrawPage(const XboxShellState &state) {
   DrawText(state.page == XboxShellPage::Games
                ? (state.library_folder_state == LibraryFolderState::Ready
                       ? (state.library_scan_state != LibraryScanState::Inactive
-                             ? "DPAD MOVE   B FOLDERS   X RESCAN"
+                             ? "A PREPARE   B FOLDERS   X RESCAN"
                              : (state.library_at_device_root
                                     ? "DPAD MOVE   A OPEN   B HOME   X SELECT"
                                     : "DPAD MOVE   A OPEN   B UP   X SELECT"))

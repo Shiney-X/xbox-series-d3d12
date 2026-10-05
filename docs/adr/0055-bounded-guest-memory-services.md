@@ -1,6 +1,6 @@
 # ADR 0055 — Fronteira de ponteiros e subset libc de memória
 
-Status: implementado; gate de execução no Xbox pendente.
+Status: implementado e validado no Series S no corpus autoral fechado.
 
 ## Viabilidade, dependências e decisão
 
@@ -91,3 +91,11 @@ Telemetria `guest_memory_*` em `phase5-execution.jsonl`; 25 probes preservados.
 Manter `game_memory_exports_registered=0`,
 `guest_memory_general_faults_supported=0`, `game_executed=0`, `game_frame=0`.
 Gate de hardware e integração runtime são verificações separadas; 5D aberta.
+
+## Evidência de hardware
+
+Sessão `134357153616663927-6448`: 34 chamadas, 16 rejeições intencionais,
+stage `complete`, calls/ranges/rejections/unwind_cleanup em 1. Os 25 probes
+passaram, incluindo clock anterior, retomada e apresentação. Nova varredura
+após resume aprovou os dois títulos sem mudança de imports/relativas/FNV.
+Isso não valida faults gerais ou registra serviços para jogos.

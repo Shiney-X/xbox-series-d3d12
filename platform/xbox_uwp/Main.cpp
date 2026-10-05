@@ -22,6 +22,7 @@
 #include "core/uwp/guest_preflight.h"
 #include "d3d12_status_renderer.h"
 #include "guest_execution_probe.h"
+#include "guest_startup_session.h"
 #include "library_folder_access.h"
 #include "memory_pressure_probe.h"
 #include "probes.h"
@@ -303,6 +304,7 @@ std::uint32_t WriteLibraryReport(bool passed, std::string_view state,
 struct DiscoveredGame {
   XboxGameListEntry display;
   std::string folder_name;
+  StorageFile executable{nullptr};
 };
 
 std::string_view IconStateName(GameIconState state) noexcept {
@@ -940,6 +942,7 @@ private:
                   // Inspection failure must not hide a game.
                   try {
                     const StorageFile executable = eboot_item.as<StorageFile>();
+                    game.executable = executable;
                     const IRandomAccessStream stream =
                         co_await executable.OpenReadAsync();
                     const auto size = stream.Size();
@@ -1252,9 +1255,11 @@ private:
       }
 
       shell_state_.games.clear();
+      game_executables_.clear();
       shell_state_.games.reserve(discovered.size());
       for (const DiscoveredGame &game : discovered) {
         shell_state_.games.push_back(game.display);
+        game_executables_.push_back(game.executable);
       }
       shell_state_.library_scan_state = discovered.empty()
                                             ? LibraryScanState::Empty
@@ -1476,6 +1481,18 @@ private:
         }
       } else if (shell_state_.page == XboxShellPage::Games) {
         if (library_operation_active_) {
+          if (startup_operation_active_ &&
+              (key == VirtualKey::GamepadB || key == VirtualKey::Escape)) {
+            args.Handled(true);
+            ++startup_generation_;
+            library_operation_active_ = startup_operation_active_ = false;
+            shell_state_.library_scan_state = LibraryScanState::Inactive;
+            shell_state_.games.clear();
+            ReleaseStartup("back_cancelled");
+            if (renderer_)
+              renderer_->Render(shell_state_);
+            return;
+          }
           if (key == VirtualKey::GamepadA || key == VirtualKey::GamepadB ||
               key == VirtualKey::Enter || key == VirtualKey::Escape) {
             args.Handled(true);
@@ -1499,8 +1516,14 @@ private:
                   (shell_state_.selected_game + 1U) %
                   static_cast<std::uint32_t>(shell_state_.games.size());
               changed = true;
+            } else if (key == VirtualKey::GamepadA ||
+                       key == VirtualKey::Enter) {
+              args.Handled(true);
+              PrepareSelectedStartup();
+              return;
             } else if (key == VirtualKey::GamepadX) {
               args.Handled(true);
+              ReleaseStartup("rescan");
               ScanSelectedLibrary();
               return;
             } else if (key == VirtualKey::GamepadB ||
@@ -1508,6 +1531,7 @@ private:
               shell_state_.library_scan_state = LibraryScanState::Inactive;
               shell_state_.games.clear();
               shell_state_.selected_game = 0U;
+              ReleaseStartup("back");
               changed = true;
             }
           } else if ((key == VirtualKey::GamepadDPadUp ||
@@ -1650,6 +1674,113 @@ private:
     results_.push_back(SaveReport(results_));
   }
 
+  void SaveStartupReport(ProbeResult result) {
+    result.details += ";session=" + session_id_;
+    if (startup_reports_.size() >= 16)
+      startup_reports_.erase(startup_reports_.begin());
+    startup_reports_.push_back(std::move(result));
+    const auto error =
+        WriteReport(ApplicationData::Current().LocalFolder(),
+                    L"phase5-startup.jsonl", startup_reports_,
+                    {"startup-report-storage", true, ERROR_SUCCESS,
+                     "guest_entry_called=0;game_frame=0"});
+    const auto details = "report_error=" + std::to_string(error) +
+                         ";guest_entry_called=0;game_frame=0";
+    AppendLifecycleEvent(session_id_, "guest-startup", details.c_str());
+  }
+  void ReleaseStartup(const char *reason) {
+    if (!startup_session_)
+      return;
+    const bool released = startup_session_->Release();
+    SaveStartupReport(
+        {startup_title_ + "-release", released,
+         released ? DWORD{ERROR_SUCCESS} : DWORD{ERROR_INVALID_DATA},
+         startup_session_->Details() + ";release_reason=" + reason});
+    if (released)
+      startup_session_.reset();
+  }
+  fire_and_forget PrepareSelectedStartup() {
+    [[maybe_unused]] const auto lifetime = get_strong();
+    const auto selected = shell_state_.selected_game;
+    if (library_operation_active_ || selected >= game_executables_.size() ||
+        selected >= shell_state_.games.size() || !game_executables_[selected])
+      co_return;
+    const StorageFile file = game_executables_[selected];
+    const auto title = shell_state_.games[selected].title_id;
+    const auto generation = ++startup_generation_;
+    library_operation_active_ = startup_operation_active_ = true;
+    shell_state_.games[selected].guest_header_status =
+        "PREPARING STARTUP  NOT BOOTED";
+    try {
+      ReleaseStartup("next_attempt");
+      if (startup_session_)
+        throw hresult_error(E_FAIL, L"startup cleanup failed");
+      if (renderer_)
+        renderer_->Render(shell_state_);
+      const auto stream = co_await file.OpenReadAsync();
+      const auto size = stream.Size();
+      if (!size || size > ::Core::Uwp::GuestPayloadFileLimit)
+        throw hresult_error(E_INVALIDARG, L"startup file budget exceeded");
+      const auto requested = static_cast<std::uint32_t>(
+          std::min<std::uint64_t>(size, ::Core::Uwp::GuestPrefixLimit));
+      const DataReader prefix_reader(stream.GetInputStreamAt(0));
+      const auto prefix_size = co_await prefix_reader.LoadAsync(requested);
+      if (generation != startup_generation_)
+        co_return;
+      std::vector<std::uint8_t> prefix(prefix_size);
+      prefix_reader.ReadBytes(prefix);
+      prefix_reader.DetachStream();
+      if (prefix_size != requested)
+        throw hresult_error(E_FAIL, L"startup prefix short read");
+      const DataReader reader(stream.GetInputStreamAt(0));
+      const auto loaded =
+          co_await reader.LoadAsync(static_cast<std::uint32_t>(size));
+      if (generation != startup_generation_)
+        co_return; // Suspension/back cancels before any native mapping is
+                   // created.
+      if (loaded != size || stream.Size() != size)
+        throw hresult_error(E_FAIL, L"startup snapshot changed or short read");
+      std::vector<std::uint8_t> snapshot(loaded);
+      reader.ReadBytes(snapshot);
+      reader.DetachStream();
+      if (!std::equal(prefix.begin(), prefix.end(), snapshot.begin()))
+        throw hresult_error(E_FAIL, L"startup snapshot prefix changed");
+      startup_session_ = std::make_unique<GuestStartupSession>();
+      startup_title_ = title;
+      const bool prepared = startup_session_->Prepare(snapshot);
+      SaveStartupReport(
+          {title, prepared,
+           prepared ? DWORD{ERROR_SUCCESS} : DWORD{ERROR_INVALID_DATA},
+           startup_session_->Details() + ";source=uwp_storage_snapshot"});
+      shell_state_.games[selected].guest_header_status =
+          prepared ? "STARTUP BLOCKED  SEE LOG" : "STARTUP PREPARATION FAILED";
+    } catch (const hresult_error &error) {
+      if (generation != startup_generation_)
+        co_return;
+      shell_state_.games[selected].guest_header_status =
+          "STARTUP READ OR PREP FAILED";
+      SaveStartupReport(
+          {title, false, static_cast<DWORD>(error.code().value),
+           "stage=startup_preparation;blocker=storage_or_preparation_error;"
+           "guest_entry_called=0;game_executed=0;game_frame=0"});
+    } catch (...) {
+      if (generation != startup_generation_)
+        co_return;
+      shell_state_.games[selected].guest_header_status =
+          "STARTUP PREPARATION FAILED";
+      AppendLifecycleEvent(session_id_, "guest-startup",
+                           "unexpected preparation or report failure");
+    }
+    library_operation_active_ = startup_operation_active_ = false;
+    try {
+      if (renderer_)
+        renderer_->Render(shell_state_);
+    } catch (...) {
+      AppendLifecycleEvent(session_id_, "guest-startup",
+                           "presentation failed after preparation");
+    }
+  }
+
   void OnActivated(const CoreApplicationView &, const IActivatedEventArgs &) {
     CoreWindow::GetForCurrentThread().Activate();
   }
@@ -1660,6 +1791,10 @@ private:
     const std::uint32_t journal_error = AppendLifecycleEvent(
         session_id_, "suspend", "suspending event observed;report flushed");
     try {
+      ++startup_generation_;
+      if (startup_operation_active_)
+        library_operation_active_ = startup_operation_active_ = false;
+      ReleaseStartup("suspend");
       bool trim_supported = false;
       if (renderer_) {
         trim_supported = renderer_->TryTrim();
@@ -1737,6 +1872,12 @@ private:
   std::vector<StorageFolder> child_folders_;
   std::vector<StorageFolder> folder_stack_;
   bool library_operation_active_{};
+  std::vector<StorageFile> game_executables_;
+  std::unique_ptr<GuestStartupSession> startup_session_;
+  std::string startup_title_;
+  std::vector<ProbeResult> startup_reports_;
+  std::uint64_t startup_generation_{};
+  bool startup_operation_active_{};
   std::unique_ptr<D3D12StatusRenderer> renderer_;
 };
 
