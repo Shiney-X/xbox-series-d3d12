@@ -16,11 +16,15 @@ struct GuestPayload {
         return image.plan.valid && image.error.empty() && !image.bytes.empty() && bss_verified;
     }
     [[nodiscard]] std::string Details() const {
+        const auto relro = std::count_if(
+            image.plan.segments.begin(), image.plan.segments.end(),
+            [](const GuestLoadSegment& segment) { return segment.type == 0x61000010; });
         return "stage=payload_data_staging;loader_linked=0;guest_executed=0;game_frame=0;"
                "host_permissions_applied=0;data_staged=" +
                std::to_string(Ready()) + ";payload_loaded=" + std::to_string(Ready()) +
-               ";container=" + (image.plan.raw_elf ? "ELF" : "SELF") +
-               ";load_segments=" + std::to_string(image.plan.segments.size()) +
+               ";container=" + (image.plan.raw_elf ? "ELF" : "SELF") + ";load_segments=" +
+               std::to_string(image.plan.segments.size() - static_cast<std::size_t>(relro)) +
+               ";relro_segments=" + std::to_string(relro) +
                ";image_bytes=" + std::to_string(image.bytes.size()) +
                ";copied_bytes=" + std::to_string(copied_bytes) +
                ";bss_bytes=" + std::to_string(bss_bytes) +
@@ -42,7 +46,7 @@ struct GuestPayload {
     if (file.size() > GuestPayloadFileLimit)
         return fail("payload_file_budget_exceeded");
     const auto prefix = file.first(std::min<std::size_t>(file.size(), GuestPrefixLimit));
-    payload.image.plan = PlanGuestLoads(prefix, file.size());
+    payload.image.plan = PlanGuestLoads(prefix, file.size(), true);
     if (!payload.image.plan.valid)
         return fail(payload.image.plan.error.c_str());
     const auto read = [&](std::size_t offset, unsigned count) {

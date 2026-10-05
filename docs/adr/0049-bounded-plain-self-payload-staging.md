@@ -13,13 +13,15 @@ segmentos reais, não apenas os cabeçalhos inspecionados na biblioteca.
 O loader desktop `Core::Loader::Elf::LoadSegment` resolve SELF usando
 IsBlocked (`0x800`) e GetId (bits 20–31), relacionando o bloco ao **índice
 original do program header**, não à posição filtrada na lista PT_LOAD.
-Usar diretamente p_offset como offset do SELF é incorreto.
+Usar diretamente p_offset como offset do SELF é incorreto. `Module` carrega
+PT_LOAD e PT_SCE_RELRO; ambos são incluídos no novo staging. O planner antigo
+mantém seu padrão PT_LOAD-only; a opção RELRO é ativada pelo adapter de payload.
 
 ## Decisão
 
 `StageGuestPayload` recebe snapshot imutável limitado a 32 MiB e revalida
 internamente cabeçalhos/plano. PT_LOAD recebe program_index explícito.
-ELF raw mantém os offsets normais. SELF suporta somente blocos diretos
+ELF raw mantém os offsets normais. RELRO executável é rejeitado. SELF suporta somente blocos diretos
 não criptografados e não comprimidos, um bloco por program header carregado.
 Não fornece decriptação, chaves ou extração de conteúdo protegido.
 
@@ -72,8 +74,8 @@ metadados, tamanhos, encryption/compression, BSS-only e PH não LOAD intermediá
 Probe de startup UWP também testa a fixture SELF em dados.
 
 Diagnóstico local read-only no eboot Deltarune fornecido pelo usuário:
-arquivo 6.709.849 bytes, imagem 12.222.464, cópia 6.030.144, BSS 3.214.776;
-dois PT_LOAD e BSS positivo. Nenhum código do jogo foi executado.
+arquivo 6.709.849 bytes, imagem 12.222.464, cópia 6.402.592, BSS 3.214.776;
+dois PT_LOAD, um PT_SCE_RELRO e BSS positivo. Nenhum código do jogo foi executado.
 Isso não substitui o teste USB no Series S.
 
 ## Limites e próximos requisitos

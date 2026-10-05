@@ -258,13 +258,14 @@ Enviar `phase5-payload.jsonl`, `phase5-execution.jsonl`,
 Esperado por jogo compatível:
 
 - `passed=true`, `stage=payload_data_staging`, `container=SELF`.
-- `data_staged=1`, `payload_loaded=1`, `load_segments=2`.
+- `data_staged=1`, `payload_loaded=1`, `load_segments=2`; RELRO é contado
+  separadamente em `relro_segments` (1 no Deltarune local).
 - `image_bytes` e `copied_bytes` positivos; `bss_verified=1`.
 - `source=uwp_storage_snapshot`, `image_retained=0`.
 - `host_permissions_applied=0`, `guest_executed=0`, `game_frame=0`, `loader_linked=0`.
 
 Para o eboot Deltarune testado localmente: imagem 12.222.464 bytes,
-cópia 6.030.144 e BSS 3.214.776. Versão/update/dump diferente pode mudar esses
+cópia 6.402.592 e BSS 3.214.776, incluindo PT_SCE_RELRO. Versão/update/dump diferente pode mudar esses
 valores; não usar o fingerprint FNV como certificado de autenticidade.
 Summary deve indicar ready=2 se apenas os dois jogos compatíveis estiverem lá.
 

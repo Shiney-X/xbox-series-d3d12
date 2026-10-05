@@ -515,7 +515,7 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
     chave oculta no thunk HLE, rendezvous e limpeza após join.
   - [x] Validar isolamento/cleanup de threads e contexto host TLS no Xbox:
     valores 100/101, IDs distintos, rejeições e 25 probes com retomada.
-  - [x] Implementar leitura USB limitada e staging de dados PT_LOAD via
+  - [x] Implementar leitura USB limitada e staging de dados PT_LOAD/RELRO via
     adapter SELF direto não criptografado/comprimido, com BSS e diagnóstico.
   - [ ] Validar payloads reais Sonic/Deltarune no Xbox; staging não é boot,
     filesystem HLE ou integração do loader/runtime upstream.

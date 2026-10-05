@@ -77,6 +77,15 @@ int main(int argc, char** argv) {
         Check(std::all_of(bss_payload.image.bytes.begin() + 0x4200,
                           bss_payload.image.bytes.begin() + 0x4210,
                           [](std::uint8_t value) { return value == 0; }));
+        auto relro = payload_file;
+        Put(relro, 96 + 120, 0x61000010, 4);
+        const auto relro_payload = StageGuestPayload(relro);
+        Check(relro_payload.Ready() && relro_payload.image.plan.segments.size() == 2 &&
+              relro_payload.image.plan.segments[1].type == 0x61000010 &&
+              VerifyGuestLoaderFixture(relro_payload.image));
+        Check(PlanGuestLoads(relro, relro.size()).segments.size() == 1);
+        Put(relro, 96 + 124, 5, 4);
+        Check(StageGuestPayload(relro).image.error == "unsupported_relro_permissions");
         // A non-LOAD header between LOADs must not turn ordinal 1 into ID 1.
         auto sparse = payload_file;
         std::copy_n(payload_file.begin() + 96 + 120, 56, sparse.begin() + 96 + 176);
