@@ -6,6 +6,15 @@
 #include "core/uwp/guest_payload.h"
 
 namespace Core::Uwp {
+struct GuestLinkSymbol {
+    std::uint64_t address{}, size{};
+    std::uint16_t section{};
+    std::uint8_t binding{}, type{};
+};
+struct GuestLinkRelocation {
+    std::uint64_t address{}, addend_bits{};
+    std::uint32_t type{}, symbol{};
+};
 struct GuestLinkManifest {
     bool valid{};
     std::string error;
@@ -14,6 +23,9 @@ struct GuestLinkManifest {
         undefined_functions{}, undefined_objects{}, undefined_other{}, tls_segments{},
         tls_address{}, tls_file_bytes{}, tls_memory_bytes{}, tls_alignment{};
     std::vector<std::string> needed, modules, libraries, imports;
+    // Optional bounded records for the data linker, never executable pointers.
+    std::vector<GuestLinkSymbol> symbol_records;
+    std::vector<GuestLinkRelocation> relocation_records;
 
     [[nodiscard]] std::string Details() const {
         const auto names = [](const std::vector<std::string>& list) {
@@ -52,8 +64,8 @@ struct GuestLinkManifest {
 // Orbis SCE dynamic-table profile only, based on Module::LoadDynamicInfo.
 // Resolve offsets in the ELF logical file domain before reading SELF bytes.
 // This inventories link requirements; it neither links nor executes anything.
-[[nodiscard]] inline GuestLinkManifest InspectGuestLinkManifest(
-    std::span<const std::uint8_t> file) {
+[[nodiscard]] inline GuestLinkManifest InspectGuestLinkManifest(std::span<const std::uint8_t> file,
+                                                                bool collect_records = false) {
     GuestLinkManifest result;
     const auto fail = [&](const char* error) {
         result.error = error;
@@ -193,8 +205,15 @@ struct GuestLinkManifest {
             .push_back(name);
     }
     result.symbols = symbols.size() / 24;
+    if (collect_records)
+        result.symbol_records.reserve(static_cast<std::size_t>(result.symbols));
     for (std::size_t offset = 0; offset < symbols.size(); offset += 24) {
         const auto bind = symbols[offset + 4] >> 4, type = symbols[offset + 4] & 15;
+        if (collect_records)
+            result.symbol_records.push_back(
+                {read(symbols, offset + 8, 8), read(symbols, offset + 16, 8),
+                 static_cast<std::uint16_t>(read(symbols, offset + 6, 2)),
+                 static_cast<std::uint8_t>(bind), static_cast<std::uint8_t>(type)});
         if (read(symbols, offset + 6, 2) != 0 || (bind != 1 && bind != 2))
             continue;
         if (result.imports.size() >= 8192)
@@ -229,6 +248,9 @@ struct GuestLinkManifest {
             const auto symbol = info >> 32;
             if (symbol >= result.symbols || (type == 8 && symbol != 0))
                 return fail("invalid_relocation_symbol");
+            if (collect_records)
+                result.relocation_records.push_back({address, read(bytes, offset + 16, 8), type,
+                                                     static_cast<std::uint32_t>(symbol)});
             ++result.relocations;
             std::uint64_t width = 0;
             if (type == 8) {

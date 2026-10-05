@@ -4,7 +4,7 @@
 #include <iostream>
 #include <source_location>
 #include <stdexcept>
-#include "core/uwp/guest_link_manifest.h"
+#include "core/uwp/guest_data_link.h"
 #include "core/uwp/guest_payload_fixture.h"
 
 void Check(bool value, std::source_location location = std::source_location::current()) {
@@ -32,11 +32,11 @@ int main(int argc, char** argv) {
             input.read(reinterpret_cast<char*>(bytes.data()),
                        static_cast<std::streamsize>(bytes.size()));
             Check(input.good());
-            const auto result = StageGuestPayload(bytes);
+            const auto result = StageGuestDataLink(bytes);
+            std::cout << result.payload.Details() << ";payload_phase=pre_relocation\n";
+            std::cout << result.manifest.Details() << '\n';
             std::cout << result.Details() << '\n';
-            const auto manifest = InspectGuestLinkManifest(bytes);
-            std::cout << manifest.Details() << '\n';
-            return result.Ready() && manifest.valid ? 0 : 1;
+            return result.valid ? 0 : 1;
         }
         Check(argc == 1);
         const auto fixture = MakeGuestLoaderFixture();

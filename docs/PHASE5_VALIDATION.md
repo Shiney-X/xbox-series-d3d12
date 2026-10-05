@@ -312,6 +312,51 @@ executa inicializadores e não implementa TCB/DTV/FS/GS Orbis. Tipos desconhecid
 são contados, mas seus targets não são validados. ADR 0050 delimita o gate;
 5D continua aberta e o pacote ainda não tenta boot de Deltarune.
 
+## 5D: relocations transacionais em dados
+
+O manifesto da PR 50 passou no Xbox: dois títulos válidos, 25 probes com
+retomada/apresentação sem alertas na sessão `134357092219333946-5156`.
+
+O novo pacote aplica RELATIVE e local64 suportadas em uma imagem de dados
+com bias numérico de 4 GiB. Não é reserva de endereço guest/host nem boot.
+Imports externos não são substituídos por stubs ou zero.
+
+Instalar como Game; em Games usar X RESCAN na mesma pasta USB. Esperar a
+varredura, voltar ao Dev Home/reabrir e confirmar títulos/ícones e Diagnostics.
+Não é necessário modificar o pendrive ou adicionar sysmodules para esse gate.
+
+Enviar `phase5-relocations.jsonl` (novo), `phase5-link.jsonl`,
+`phase5-payload.jsonl`, `phase5-execution.jsonl`, `phase0-results.jsonl` e
+`phase0-lifecycle.jsonl`.
+
+Esperado no Deltarune CUSA15250 testado localmente:
+
+- `passed=true`, `data_link_valid=1`, `relative_applied=10125`.
+- `local_symbol_applied=0`, `pending_import_relocations=648`.
+- `pending_symbol_bindings=0`, `pending_type_relocations=0`.
+- `writes_verified=1`, `untouched_bytes_verified=1`.
+- `all_relocations_applied=0`, `imports_resolved=0`, `ready_for_boot=0`.
+- `address_scope=synthetic_load_bias`, `load_bias=4294967296`.
+- FNV diagnóstico antes `5509961483789055787`, depois `13996771465480706034`.
+- `guest_executed=0`, `game_frame=0`, `host_permissions_applied=0`,
+  `runtime_instance_created=0`, `image_retained=0`.
+
+Contagens podem mudar com versão/update. Sonic tem 1.150 relativas no
+manifesto validado; confirmar aplicação no Xbox, sem presumir sucesso só
+pela contagem. Summary valid=2 significa **estágio parcial de dados** passou
+nos dois títulos, não que os jogos estejam linkados ou prontos para boot.
+
+`guest-loader-fixture` exige `data_relocation_fixture_verified=1`, sem nova
+linha em Diagnostics. `phase5-payload.jsonl` continua diagnosticando o estado
+**anterior** às escritas (`payload_phase=pre_relocation`); BSS pode receber
+ponteiros depois. O manifesto continua read-only, então seu campo
+`relocations_applied=0` não contradiz o novo relatório em dados.
+
+Gates inválidos (overflow, target RX/read-only não RELRO, sobreposição,
+tipo desconhecido) devem mostrar erro e zero patches aplicados. Tipos
+conhecidos pendentes e imports são explicitados, sem execução. ADR 0051;
+5D permanece aberta, aguardando resolver NID/módulos/HLE e runtime Orbis.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |
