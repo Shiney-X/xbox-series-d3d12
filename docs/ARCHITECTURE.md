@@ -61,6 +61,12 @@ SysV. VEH não é exposto pelo SDK UWP e foi removido; não é um handler de jog
 e `loader_linked=0` permanecem. Startup Orbis e runtime completo continuam
 pendentes. Ver ADR 0045 e o relatório `phase5-execution.jsonl`.
 
+O complemento 5C registra UNWIND_INFO da bridge com RtlAddFunctionTable,
+valida RSP/RIP e não voláteis em contexto sintético e testa SEH de uma leaf
+SysV através da bridge. Essa captura aborta somente a chamada da fixture.
+Não certifica funções guest com frames próprios ou page faults recuperáveis.
+Remover tabela antes de liberar a alocação; ver ADR 0046.
+
 ### Compilador isolado da 4C (validado no Xbox)
 
 O UWP linka a IR e `EmitSPIRV` reais como biblioteca AppContainer. A entrada
