@@ -1,6 +1,6 @@
 # ADR 0054 — Subset Orbis de tempo sem ponteiros guest
 
-Status: implementado; validação Xbox pendente.
+Status: implementado e validado no Series S no corpus autoral fechado.
 
 ## Escopo e referências
 
@@ -69,3 +69,11 @@ Telemetria `kernel_clock_*` fica em `phase5-execution.jsonl`; exigir serviço=3,
 chamadas/unidades/unwind/cleanup positivos e frequency > 0.
 `game_clock_exports_registered=0`, `kernel_clock_direct_rdtsc_compatible=0`,
 `game_executed=0`, `game_frame=0` permanecem. A 5D continua aberta.
+
+## Evidência no console
+
+Sessão `134357143372603935-5336`: três serviços, calls/units/unwind/cleanup em
+1, stage `complete` e frequência QPC de 1745500000 counts/s (não frequência
+física da CPU nem certificação de TSC PS4). Os 25 probes passaram; apresentação
+após retomada e inspeção dos dois títulos sem regressão. Não houve varredura
+após resume nesta captura, nem teste da política temporal de suspensão.

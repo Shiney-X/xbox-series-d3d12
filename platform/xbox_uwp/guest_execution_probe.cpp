@@ -3,6 +3,7 @@
 #include "guest_execution_probe.h"
 #include "core/uwp/guest_hle_fixture.h"
 #include "core/uwp/guest_hle_import_fixture.h"
+#include "core/uwp/guest_memory_fixture.h"
 #include "core/uwp/kernel_clock_fixture.h"
 #include <Windows.h>
 #include <array>
@@ -436,6 +437,250 @@ bool VerifyKernelClockImports(std::uint64_t &frequency, const char *&stage) {
   return passed;
 }
 
+struct MemoryContext {
+  GuestMemory memory;
+  DWORD owner{};
+  std::uint64_t calls{}, rejected{};
+};
+std::uint64_t InvokeMemory(GuestMemoryService service, std::uint64_t first,
+                           std::uint64_t second, std::uint64_t count,
+                           MemoryContext *context) noexcept {
+  if (!context || context->owner != GetCurrentThreadId())
+    return 0;
+  ++context->calls;
+  const auto result = context->memory.Invoke(service, first, second, count);
+  if (!result.valid)
+    ++context->rejected;
+  // Invalid pointers are a harness rejection, not a successful libc result or
+  // emulated errno. This boundary must become a runtime guest fault before
+  // boot.
+  return result.valid ? result.value : 0;
+}
+std::uint64_t MemoryCopy(std::uint64_t dest, std::uint64_t source,
+                         std::uint64_t count, MemoryContext *context) noexcept {
+  return InvokeMemory(GuestMemoryService::Copy, dest, source, count, context);
+}
+std::uint64_t MemorySet(std::uint64_t dest, std::uint64_t value,
+                        std::uint64_t count, MemoryContext *context) noexcept {
+  return InvokeMemory(GuestMemoryService::Set, dest, value, count, context);
+}
+std::uint64_t MemoryCompare(std::uint64_t first, std::uint64_t second,
+                            std::uint64_t count,
+                            MemoryContext *context) noexcept {
+  return InvokeMemory(GuestMemoryService::Compare, first, second, count,
+                      context);
+}
+struct MemoryProbe {
+  bool passed{};
+  std::uint64_t calls{}, rejected{};
+  const char *stage = "not_started";
+};
+bool VerifyGuestMemoryImports(MemoryProbe &result) {
+  const std::array callbacks{&MemoryCopy, &MemorySet, &MemoryCompare};
+  SYSTEM_INFO info{};
+  GetSystemInfo(&info);
+  if (info.dwPageSize != 4096)
+    return false;
+  constexpr SIZE_T page = 4096;
+  for (const bool self : {false, true}) {
+    result.stage = "fixture_staging";
+    const auto file = MakeGuestMemoryFixture(self);
+    const auto staged = StageGuestPayload(file);
+    if (!staged.Ready() || staged.image.bytes.size() != 32768)
+      return false;
+    Allocation image, bridge_memory, services;
+    result.stage = "owned_allocations";
+    image.base = VirtualAllocFromApp(nullptr, 32768 + 2 * page, MEM_RESERVE,
+                                     PAGE_NOACCESS);
+    bridge_memory.base = VirtualAllocFromApp(
+        nullptr, page, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    services.base = VirtualAllocFromApp(nullptr, page, MEM_RESERVE | MEM_COMMIT,
+                                        PAGE_READWRITE);
+    if (!image.base || !bridge_memory.base || !services.base)
+      return false;
+    auto *payload = static_cast<std::uint8_t *>(image.base) + page;
+    if (VirtualAllocFromApp(payload, 32768, MEM_COMMIT, PAGE_READWRITE) !=
+            payload ||
+        reinterpret_cast<std::uint64_t>(payload) < staged.image.plan.base)
+      return false;
+    // Authorize logical LOAD ranges, not rounded pages, padding, stack,
+    // imports' native callbacks or arbitrary host memory. Backing cannot change
+    // in this serial closed test; no check/use race with mprotect/munmap.
+    const std::array ranges{GuestMemoryRange{{payload + 0x100, 0x100}, false},
+                            GuestMemoryRange{{payload + 0x4200, 0x400}, true}};
+    MemoryContext context{GuestMemory(ranges), GetCurrentThreadId(), 0, 0};
+    if (!context.memory.Valid())
+      return false;
+    const auto bridge = MakeFixtureBridge();
+    if (bridge.code.size() > FixtureRuntimeTableOffset ||
+        FixtureRuntimeTableOffset + sizeof(RUNTIME_FUNCTION) >
+            FixtureUnwindOffset ||
+        FixtureUnwindOffset + bridge.unwind.size() > page)
+      return false;
+    std::memcpy(bridge_memory.base, bridge.code.data(), bridge.code.size());
+    auto *bridge_function =
+        new (static_cast<std::uint8_t *>(bridge_memory.base) +
+             FixtureRuntimeTableOffset) RUNTIME_FUNCTION{};
+    bridge_function->EndAddress = static_cast<DWORD>(bridge.code.size());
+    bridge_function->UnwindData = FixtureUnwindOffset;
+    std::memcpy(static_cast<std::uint8_t *>(bridge_memory.base) +
+                    FixtureUnwindOffset,
+                bridge.unwind.data(), bridge.unwind.size());
+    auto *functions = reinterpret_cast<RUNTIME_FUNCTION *>(
+        static_cast<std::uint8_t *>(services.base) + 512);
+    std::array<GuestDataExport, 3> registry;
+    std::array<FixtureBridge, 3> thunks;
+    for (unsigned i = 0; i < 3; ++i) {
+      thunks[i] =
+          MakeGuestMemoryThunk(reinterpret_cast<std::uint64_t>(callbacks[i]),
+                               reinterpret_cast<std::uint64_t>(&context));
+      if (thunks[i].code.size() > 64 || thunks[i].unwind.size() != 8)
+        return false;
+      auto *code = static_cast<std::uint8_t *>(services.base) + i * 64;
+      std::memcpy(code, thunks[i].code.data(), thunks[i].code.size());
+      new (&functions[i]) RUNTIME_FUNCTION{
+          i * 64, i * 64 + static_cast<DWORD>(thunks[i].code.size()),
+          560 + i * 8};
+      std::memcpy(static_cast<std::uint8_t *>(services.base) +
+                      functions[i].UnwindData,
+                  thunks[i].unwind.data(), 8);
+      registry[i] = {GuestMemoryKey(i), reinterpret_cast<std::uint64_t>(code)};
+    }
+    result.stage = "strict_import_link";
+    const auto bias =
+        reinterpret_cast<std::uint64_t>(payload) - staged.image.plan.base;
+    const auto linked = StageGuestDataLink(file, bias, true, registry);
+    if (!linked.valid || !linked.complete || linked.imports.matched != 3 ||
+        linked.relative_applied != 1 || linked.data_import_applied != 3 ||
+        !linked.writes_verified || !linked.untouched_verified)
+      return false;
+    result.stage = "mapped_readback_and_protections";
+    std::memcpy(payload, linked.payload.image.bytes.data(), 32768);
+    if (std::memcmp(payload, linked.payload.image.bytes.data(), 32768) != 0 ||
+        !Protect(payload, 32768, PAGE_NOACCESS) ||
+        !Protect(payload, page, PAGE_EXECUTE_READ) ||
+        !Protect(payload + 0x4000, page, PAGE_READWRITE) ||
+        !Protect(bridge_memory.base, page, PAGE_EXECUTE_READ) ||
+        !Protect(services.base, page, PAGE_EXECUTE_READ) ||
+        !IsProtection(payload, PAGE_EXECUTE_READ) ||
+        !IsProtection(payload + 0x4000, PAGE_READWRITE) ||
+        !IsProtection(payload + page, PAGE_NOACCESS) ||
+        !IsProtection(bridge_memory.base, PAGE_EXECUTE_READ) ||
+        !IsProtection(services.base, PAGE_EXECUTE_READ) ||
+        !IsProtection(image.base, 0, MEM_RESERVE) ||
+        !IsProtection(payload + 32768, 0, MEM_RESERVE) ||
+        !FlushInstructionCache(GetCurrentProcess(), payload, page) ||
+        !FlushInstructionCache(GetCurrentProcess(), bridge_memory.base,
+                               bridge.code.size()) ||
+        !FlushInstructionCache(GetCurrentProcess(), services.base, page))
+      return false;
+    FunctionTable bridge_table{bridge_function, &bridge_memory, false};
+    FunctionTable services_table{functions, &services, false};
+    result.stage = "unwind_registration_and_verification";
+    const auto service_base = reinterpret_cast<DWORD64>(services.base);
+    if (!RtlAddFunctionTable(bridge_function, 1,
+                             reinterpret_cast<DWORD64>(bridge_memory.base)))
+      return false;
+    bridge_table.registered = true;
+    if (!RtlAddFunctionTable(functions, 3, service_base))
+      return false;
+    services_table.registered = true;
+    if (!VerifyUnwind(bridge_memory.base, bridge_function, bridge))
+      return false;
+    for (unsigned i = 0; i < 3; ++i) {
+      std::array<std::uint64_t, 6> stack{};
+      stack[5] = 0x12345678;
+      CONTEXT unwind{};
+      unwind.ContextFlags = CONTEXT_FULL;
+      unwind.Rsp = reinterpret_cast<DWORD64>(stack.data());
+      unwind.Rip = service_base + functions[i].BeginAddress +
+                   thunks[i].epilogue_offset - 2;
+      DWORD64 found_base{};
+      const auto *found =
+          RtlLookupFunctionEntry(unwind.Rip, &found_base, nullptr);
+      if (!found || found_base != service_base ||
+          found->BeginAddress != functions[i].BeginAddress ||
+          found->UnwindData != functions[i].UnwindData)
+        return false;
+      void *handler{};
+      DWORD64 establisher{};
+      (void)RtlVirtualUnwind(0, service_base, unwind.Rip, &functions[i],
+                             &unwind, &handler, &establisher, nullptr);
+      if (unwind.Rip != stack[5] ||
+          unwind.Rsp != reinterpret_cast<DWORD64>(stack.data()) + sizeof(stack))
+        return false;
+    }
+    result.stage = "bounded_memory_calls";
+    const auto address = [](const void *pointer) {
+      return static_cast<std::uint64_t>(
+          reinterpret_cast<std::uintptr_t>(pointer));
+    };
+    const auto invoke = reinterpret_cast<BridgeFunction>(bridge_memory.base);
+    std::uint64_t saved_rsp{};
+    std::array<std::uint8_t, 0x400> expected;
+    std::memcpy(expected.data(), payload + 0x4200, expected.size());
+    for (unsigned i = 0; i < 16; ++i) {
+      payload[0x4340 + i] = static_cast<std::uint8_t>(0x20 + i);
+      expected[0x140 + i] = static_cast<std::uint8_t>(0x20 + i);
+    }
+    const auto call = [&](unsigned entry, std::uint64_t first,
+                          std::uint64_t second, std::uint64_t value,
+                          bool reject = false) {
+      const auto calls = context.calls, rejected = context.rejected;
+      const auto actual = invoke(first, second, payload + entry, &saved_rsp);
+      return actual == value && context.calls == calls + 1 &&
+             context.rejected == rejected + (reject ? 1 : 0) &&
+             std::memcmp(payload + 0x4200, expected.data(), expected.size()) ==
+                 0 &&
+             std::memcmp(payload + 0x100,
+                         linked.payload.image.bytes.data() + 0x100, 0x100) == 0;
+    };
+    const auto dest = address(payload + 0x4300);
+    const auto source = address(payload + 0x4340);
+    std::fill_n(expected.begin() + 0x100, 16, std::uint8_t{0xa5});
+    if (!call(0x150, dest, 0x12345678a5ULL, dest))
+      return false;
+    std::copy_n(expected.begin() + 0x140, 16, expected.begin() + 0x100);
+    if (!call(0x140, dest, source, dest) || !call(0x160, dest, source, 0))
+      return false;
+    --payload[0x4300];
+    --expected[0x100];
+    if (!call(0x160, dest, source, UINT64_MAX) || !call(0x160, source, dest, 1))
+      return false;
+    std::copy_n(payload + 0x100, 16, expected.begin() + 0x100);
+    if (!call(0x140, dest, address(payload + 0x100), dest))
+      return false;
+    result.stage = "invalid_pointers_rejected_without_writes";
+    if (!call(0x140, address(payload + 0x100), source, 0, true) ||
+        !call(0x140, dest, address(payload + page), 0, true) ||
+        !call(0x150, address(payload + page), 0xa5, 0, true) ||
+        !call(0x140, address(payload + 0x45f8), source, 0, true) ||
+        !call(0x140, dest, UINT64_MAX, 0, true) ||
+        !call(0x140, dest + 1, dest, 0, true) ||
+        !call(0x170, dest, source, 0, true) ||
+        !call(0x140, address(&context), source, 0, true))
+      return false;
+    result.stage = "zero_length_calls";
+    const auto end = address(payload + 0x4600);
+    if (!call(0x180, end, end, end) || !call(0x190, end, 0, end) ||
+        !call(0x1a0, end, end, 0) || context.calls != 17 ||
+        context.rejected != 8)
+      return false;
+    result.calls += context.calls;
+    result.rejected += context.rejected;
+    result.stage = "unwind_and_allocation_cleanup";
+    if (!services_table.Remove() || !bridge_table.Remove())
+      return false;
+    for (auto *allocation : {&image, &bridge_memory, &services}) {
+      if (!VirtualFree(allocation->base, 0, MEM_RELEASE))
+        return false;
+      allocation->base = nullptr;
+    }
+  }
+  result.stage = "complete";
+  return result.calls == 34 && result.rejected == 16;
+}
+
 DWORD WINAPI ExecuteFixture(void *argument) noexcept {
   auto &state = *static_cast<WorkerState *>(argument);
   ThreadBinding binding{state};
@@ -853,7 +1098,14 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
     kernel_clock_stage = "exception";
     kernel_clock_verified = false;
   }
-  const bool passed = kernel_clock_verified &&
+  MemoryProbe memory_probe;
+  try {
+    memory_probe.passed = VerifyGuestMemoryImports(memory_probe);
+  } catch (...) {
+    memory_probe.stage = "exception";
+    memory_probe.passed = false;
+  }
+  const bool passed = kernel_clock_verified && memory_probe.passed &&
                       coordination_error == ERROR_SUCCESS && both_ready &&
                       worker_passed(state) && worker_passed(peer) &&
                       contexts_isolated && parent_isolated &&
@@ -934,6 +1186,17 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
           << ";kernel_clock_stage=" << kernel_clock_stage
           << ";kernel_clock_direct_rdtsc_compatible=0;game_clock_exports_"
              "registered=0";
+  details
+      << ";guest_memory_scope=closed_authored_raw_self;guest_memory_services=3"
+      << ";guest_memory_calls_verified=" << memory_probe.passed
+      << ";guest_memory_ranges_verified=" << memory_probe.passed
+      << ";guest_memory_rejections_verified=" << memory_probe.passed
+      << ";guest_memory_unwind_cleanup_verified=" << memory_probe.passed
+      << ";guest_memory_calls=" << memory_probe.calls
+      << ";guest_memory_rejected_calls=" << memory_probe.rejected
+      << ";guest_memory_stage=" << memory_probe.stage
+      << ";game_memory_exports_registered=0;guest_memory_general_faults_"
+         "supported=0";
   return {"guest-execution-fixture", passed,
           passed ? DWORD{ERROR_SUCCESS}
                  : (coordination_error ? coordination_error
