@@ -443,7 +443,7 @@ O handle opaco retornado por `GetFrontendHandle()` é uma ponte transitória par
 os adaptadores SDL de ImGui e mouse. Código novo de core ou renderer não deve
 depender desse handle.
 
-## Biblioteca USB no host UWP
+## Boundary HLE autoral no host UWP
 
 O gate inicial 5D usa `guest_hle_fixture.h` para uma chamada autoral
 guest→host→guest: tail-jump a thunk SysV/Win64 de dois argumentos inteiros,
@@ -451,6 +451,15 @@ shadow space próprio e tabela dinâmica de unwind. O callback C++ nativo
 implementa apenas um serviço aritmético limitado, sem ponteiros guest ou IO.
 Não é resolver de imports/HLE Orbis; threads, TLS, filesystem e scePad seguem
 pendentes. O relatório reutiliza `phase5-execution.jsonl` (ADR 0047).
+
+O complemento de threads/contexto executa a fixture em duas workers Windows,
+cada uma com imagem, stack, bridges e tabelas próprias. Uma chave TLS host
+compartilhada guarda contextos distintos por thread, acessados pela HLE via
+argumento oculto emitido pelo harness. Rendezvous confirma que ambos escreveram
+antes da leitura. Bindings são limpos e a chave liberada após join. Não altera
+GS/TEB nem implementa TCB/DTV/pthreads Orbis (ADR 0048).
+
+## Biblioteca USB no host UWP
 
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e

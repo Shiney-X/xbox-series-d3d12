@@ -509,7 +509,11 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
 - [ ] 5D: HLE/threads/TLS/filesystem e gamepad guest básico.
   - [x] Implementar chamada autoral guest→host→guest com thunk SysV/Win64,
     serviço inteiro limitado, rejeição de operação/overflow e unwind registrado.
-  - [ ] Validar esse round-trip HLE no Xbox; não equivale a imports/HLE Orbis.
+  - [x] Validar esse round-trip HLE no Xbox: retorno 42, rejeições,
+    unwind/cleanup e 25 probes com retomada; não equivale a imports/HLE Orbis.
+  - [x] Implementar duas workers autorais concorrentes com contexto host TLS,
+    chave oculta no thunk HLE, rendezvous e limpeza após join.
+  - [ ] Validar isolamento/cleanup de threads e contexto host TLS no Xbox.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
 - [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
 - [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.

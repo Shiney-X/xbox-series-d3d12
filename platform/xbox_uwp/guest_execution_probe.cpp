@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include <array>
 #include <cstring>
+#include <memory>
 #include <new>
 #include <sstream>
 
@@ -45,10 +46,33 @@ struct WorkerState {
       table_registered{}, table_removed{};
   bool hle_verified{}, hle_unwind_verified{}, hle_table_removed{};
   std::uint64_t hle_value{}, hle_unknown{}, hle_overflow{};
+  DWORD tls_index{TLS_OUT_OF_INDEXES};
+  HANDLE ready{}, release{};
+  unsigned ordinal{};
+  FixtureThreadContext context{};
+  bool tls_bound{}, tls_cleared{}, context_verified{}, rendezvous{};
+};
+struct ThreadBinding {
+  WorkerState &state;
+  ~ThreadBinding() {
+    if (state.tls_bound)
+      state.tls_cleared = TlsSetValue(state.tls_index, nullptr) != FALSE &&
+                          TlsGetValue(state.tls_index) == nullptr;
+    // Wake the coordinator on early failure so it can release/join peers.
+    if (state.ready)
+      SetEvent(state.ready);
+  }
 };
 std::uint64_t FixtureHleCallback(std::uint64_t operation,
-                                 std::uint64_t argument) noexcept {
-  return DispatchFixtureHle(operation, argument);
+                                 std::uint64_t argument,
+                                 std::uint64_t key) noexcept {
+  if (key >= TLS_OUT_OF_INDEXES)
+    return FixtureHleMissingContext;
+  auto *context =
+      static_cast<FixtureThreadContext *>(TlsGetValue(static_cast<DWORD>(key)));
+  if (!context || context->owner != GetCurrentThreadId())
+    return FixtureHleMissingContext;
+  return DispatchFixtureContext(*context, operation, argument);
 }
 LONG FixtureException(EXCEPTION_POINTERS *exception, WorkerState *state) {
   if (!state->armed || state->recovered ||
@@ -194,7 +218,15 @@ bool IsProtection(const void *address, DWORD protection,
 
 DWORD WINAPI ExecuteFixture(void *argument) noexcept {
   auto &state = *static_cast<WorkerState *>(argument);
+  ThreadBinding binding{state};
   try {
+    state.context.owner = GetCurrentThreadId();
+    if (TlsGetValue(state.tls_index) != nullptr ||
+        !TlsSetValue(state.tls_index, &state.context)) {
+      state.error = ERROR_INVALID_DATA;
+      return 0;
+    }
+    state.tls_bound = true;
     GetCurrentThreadStackLimits(&state.stack_low, &state.stack_high);
     const auto local = reinterpret_cast<std::uintptr_t>(&argument);
     state.stack_verified = local >= state.stack_low && local < state.stack_high;
@@ -248,7 +280,7 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
     std::memcpy(static_cast<std::uint8_t *>(thunk.base) + FixtureUnwindOffset,
                 bridge.unwind.data(), bridge.unwind.size());
     const auto hle_thunk = MakeFixtureHleThunk(
-        reinterpret_cast<std::uint64_t>(&FixtureHleCallback));
+        reinterpret_cast<std::uint64_t>(&FixtureHleCallback), state.tls_index);
     std::memcpy(hle.base, hle_thunk.code.data(), hle_thunk.code.size());
     auto *hle_function =
         new (static_cast<std::uint8_t *>(hle.base) + FixtureRuntimeTableOffset)
@@ -374,6 +406,32 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
         state.hle_value == 42 && state.hle_unknown == FixtureHleUnsupported &&
         state.hle_overflow == FixtureHleOverflow &&
         invoke(1, 0, payload + FixtureHleEntryOffset, &state.saved_rsp) == 1;
+    const auto local_value = std::uint64_t{100} + state.ordinal;
+    const auto written = invoke(2, local_value, payload + FixtureHleEntryOffset,
+                                &state.saved_rsp);
+    if (!SetEvent(state.ready)) {
+      state.error = GetLastError();
+      return 0;
+    }
+    state.rendezvous =
+        WaitForSingleObject(state.release, 10000) == WAIT_OBJECT_0;
+    if (!state.rendezvous) {
+      state.error = ERROR_TIMEOUT;
+      return 0;
+    }
+    // Both threads have written distinct values before either reads back.
+    const auto read =
+        invoke(3, 0, payload + FixtureHleEntryOffset, &state.saved_rsp);
+    const auto owner =
+        invoke(4, 0, payload + FixtureHleEntryOffset, &state.saved_rsp);
+    const auto invalid =
+        invoke(3, 1, payload + FixtureHleEntryOffset, &state.saved_rsp);
+    const auto unchanged =
+        invoke(3, 0, payload + FixtureHleEntryOffset, &state.saved_rsp);
+    state.context_verified =
+        written == local_value && read == local_value &&
+        unchanged == local_value && owner == state.context.owner &&
+        invalid == FixtureHleUnsupported && state.context.calls == 9;
     state.hle_table_removed = hle_table.Remove();
     state.table_removed = table.Remove();
     if (!state.table_removed || !state.hle_table_removed) {
@@ -398,7 +456,6 @@ DWORD WINAPI ExecuteFixture(void *argument) noexcept {
 } // namespace
 
 XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
-  WorkerState state;
   PROCESS_MITIGATION_DYNAMIC_CODE_POLICY dynamic{};
   PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY cfg{};
   if (!GetProcessMitigationPolicy(GetCurrentProcess(), ProcessDynamicCodePolicy,
@@ -413,23 +470,110 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
     return {"guest-execution-fixture", false, ERROR_NOT_SUPPORTED,
             "stage=fixture_execution;guest_executed=0;game_executed=0;error="
             "unsupported_mitigation"};
-  const HANDLE thread =
-      CreateThread(nullptr, 256 * 1024, ExecuteFixture, &state,
-                   STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
-  if (!thread)
-    return {"guest-execution-fixture", false, GetLastError(),
-            "stage=fixture_execution;guest_executed=0;game_executed=0;error="
-            "thread_creation_failed"};
-  // Only fixed, loop-free authored code. No arbitrary entry/file is accepted.
-  const DWORD wait = WaitForSingleObject(thread, INFINITE);
-  CloseHandle(thread);
-  const bool passed =
-      wait == WAIT_OBJECT_0 && state.error == 0 && state.value == 42 &&
-      state.recovery_value == 42 && state.recovered && state.protections &&
-      state.stack_verified && state.cleanup && state.filter_verified &&
-      state.win64_recovered && state.sysv_recovered && state.unwind_verified &&
-      state.table_registered && state.table_removed && state.hle_verified &&
-      state.hle_unwind_verified && state.hle_table_removed;
+  const DWORD key = TlsAlloc();
+  if (key == TLS_OUT_OF_INDEXES)
+    return {
+        "guest-execution-fixture", false, GetLastError(),
+        "stage=fixture_execution;game_executed=0;error=tls_allocation_failed"};
+  std::unique_ptr<std::array<WorkerState, 2>> states(
+      new (std::nothrow) std::array<WorkerState, 2>{});
+  if (!states) {
+    TlsFree(key);
+    return {"guest-execution-fixture", false, ERROR_NOT_ENOUGH_MEMORY,
+            "stage=fixture_execution;game_executed=0;error=worker_state_"
+            "allocation"};
+  }
+  std::array<HANDLE, 2> ready{}, threads{};
+  HANDLE release = CreateEventExW(nullptr, nullptr, CREATE_EVENT_MANUAL_RESET,
+                                  EVENT_ALL_ACCESS);
+  DWORD coordination_error = release ? ERROR_SUCCESS : GetLastError();
+  for (unsigned i = 0; release && i < 2; ++i) {
+    ready[i] = CreateEventExW(nullptr, nullptr, CREATE_EVENT_MANUAL_RESET,
+                              EVENT_ALL_ACCESS);
+    if (!ready[i]) {
+      coordination_error = GetLastError();
+      break;
+    }
+    auto &worker = (*states)[i];
+    worker.tls_index = key;
+    worker.ordinal = i;
+    worker.ready = ready[i];
+    worker.release = release;
+  }
+  const bool missing_rejected =
+      FixtureHleCallback(3, 0, key) == FixtureHleMissingContext;
+  FixtureThreadContext foreign_context{UINT64_MAX, 0, 0};
+  const bool foreign_rejected =
+      TlsSetValue(key, &foreign_context) != FALSE &&
+      FixtureHleCallback(3, 0, key) == FixtureHleMissingContext;
+  const bool parent_cleared = TlsSetValue(key, nullptr) != FALSE;
+  const bool invalid_key_rejected =
+      FixtureHleCallback(3, 0, TLS_OUT_OF_INDEXES) == FixtureHleMissingContext;
+  if (coordination_error == ERROR_SUCCESS) {
+    for (unsigned i = 0; i < 2; ++i) {
+      threads[i] =
+          CreateThread(nullptr, 256 * 1024, ExecuteFixture, &(*states)[i],
+                       STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
+      if (!threads[i]) {
+        coordination_error = GetLastError();
+        break;
+      }
+    }
+  }
+  bool both_ready = false;
+  if (threads[0] && threads[1]) {
+    const auto wait = WaitForMultipleObjects(2, ready.data(), TRUE, 10000);
+    both_ready = wait == WAIT_OBJECT_0;
+    if (!both_ready)
+      coordination_error = wait == WAIT_FAILED ? GetLastError() : ERROR_TIMEOUT;
+  }
+  if (release && !SetEvent(release))
+    coordination_error = GetLastError();
+  // Only fixed authored code. Release/timeout prevents a stranded rendezvous;
+  // never terminate a thread or free state/code while it might still execute.
+  for (const auto thread : threads) {
+    if (thread && WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0) {
+      const auto error = GetLastError();
+      (void)states
+          .release(); // Keep state, events and TLS key alive on join failure.
+      return {"guest-execution-fixture", false, error,
+              "stage=fixture_execution;game_executed=0;error=join_failed_"
+              "resources_retained"};
+    }
+  }
+  const bool parent_isolated = TlsGetValue(key) == nullptr;
+  bool handles_released = true;
+  for (const auto thread : threads)
+    if (thread)
+      handles_released = CloseHandle(thread) != FALSE && handles_released;
+  for (const auto event : ready)
+    if (event)
+      handles_released = CloseHandle(event) != FALSE && handles_released;
+  if (release)
+    handles_released = CloseHandle(release) != FALSE && handles_released;
+  const bool tls_released = TlsFree(key) != FALSE;
+  const auto worker_passed = [](const WorkerState &state) {
+    return state.error == 0 && state.value == 42 &&
+           state.recovery_value == 42 && state.recovered && state.protections &&
+           state.stack_verified && state.cleanup && state.filter_verified &&
+           state.win64_recovered && state.sysv_recovered &&
+           state.unwind_verified && state.table_registered &&
+           state.table_removed && state.hle_verified &&
+           state.hle_unwind_verified && state.hle_table_removed &&
+           state.tls_bound && state.tls_cleared && state.context_verified &&
+           state.rendezvous;
+  };
+  const auto &state = (*states)[0];
+  const auto &peer = (*states)[1];
+  const bool contexts_isolated =
+      state.context_verified && peer.context_verified &&
+      state.context.owner != peer.context.owner && state.context.value == 100 &&
+      peer.context.value == 101;
+  const bool passed = coordination_error == ERROR_SUCCESS && both_ready &&
+                      worker_passed(state) && worker_passed(peer) &&
+                      contexts_isolated && parent_isolated &&
+                      missing_rejected && foreign_rejected && parent_cleared &&
+                      invalid_key_rejected && handles_released && tls_released;
   std::ostringstream details;
   details << "stage=fixture_execution;source=authored_elf;loader_linked=0;game_"
              "executed=0;game_frame=0"
@@ -459,9 +603,30 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
           << (state.hle_overflow == FixtureHleOverflow)
           << ";hle_unwind_verified=" << state.hle_unwind_verified
           << ";hle_table_removed=" << state.hle_table_removed
-          << ";allocations_released=" << state.cleanup;
+          << ";thread_scope=authored_workers;worker_threads=2"
+          << ";workers_passed=" << (worker_passed(state) && worker_passed(peer))
+          << ";thread_context_isolated=" << contexts_isolated
+          << ";tls_scope=host_slot_not_orbis;tls_parent_isolated="
+          << parent_isolated
+          << ";tls_missing_context_rejected=" << missing_rejected
+          << ";tls_foreign_context_rejected=" << foreign_rejected
+          << ";tls_invalid_key_rejected=" << invalid_key_rejected
+          << ";tls_bindings_cleared=" << (state.tls_cleared && peer.tls_cleared)
+          << ";tls_slot_released=" << tls_released
+          << ";thread_handles_released=" << handles_released
+          << ";thread_rendezvous_verified="
+          << (both_ready && state.rendezvous && peer.rendezvous)
+          << ";worker0_id=" << state.context.owner
+          << ";worker1_id=" << peer.context.owner
+          << ";worker0_tls_value=" << state.context.value
+          << ";worker1_tls_value=" << peer.context.value
+          << ";worker0_error=" << state.error << ";worker1_error=" << peer.error
+          << ";allocations_released=" << (state.cleanup && peer.cleanup);
   return {"guest-execution-fixture", passed,
           passed ? DWORD{ERROR_SUCCESS}
-                 : (state.error ? state.error : DWORD{ERROR_INVALID_DATA}),
+                 : (coordination_error ? coordination_error
+                    : state.error      ? state.error
+                    : peer.error       ? peer.error
+                                       : DWORD{ERROR_INVALID_DATA}),
           details.str()};
 }

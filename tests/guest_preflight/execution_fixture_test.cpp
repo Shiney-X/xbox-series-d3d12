@@ -6,8 +6,10 @@
 #if defined(__linux__) && defined(__x86_64__)
 #include <cstring>
 #include <sys/mman.h>
-std::uint64_t __attribute__((ms_abi)) HostCallback(std::uint64_t operation,
-                                                   std::uint64_t argument) noexcept {
+std::uint64_t __attribute__((ms_abi)) HostCallback(std::uint64_t operation, std::uint64_t argument,
+                                                   std::uint64_t key) noexcept {
+    if (key != 0x1122)
+        return Core::Uwp::FixtureHleMissingContext;
     return Core::Uwp::DispatchFixtureHle(operation, argument);
 }
 #endif
@@ -34,13 +36,24 @@ int main() {
     }
     const auto hle = MakeFixtureHleThunk(0x1122334455667788ULL);
     constexpr std::array<std::uint8_t, 8> hle_unwind{1, 4, 1, 0, 4, 0x42, 0, 0};
-    if (hle.code.size() != 28 || hle.epilogue_offset != 23 ||
+    if (hle.code.size() != 38 || hle.epilogue_offset != 33 ||
         !std::equal(hle.unwind.begin(), hle.unwind.end(), hle_unwind.begin(), hle_unwind.end()) ||
         hle.code[13] != 0x88 || hle.code[20] != 0x11 || DispatchFixtureHle(1, 41) != 42 ||
         DispatchFixtureHle(1, 0) != 1 || DispatchFixtureHle(0, 41) != FixtureHleUnsupported ||
         DispatchFixtureHle(99, 41) != FixtureHleUnsupported ||
         DispatchFixtureHle(1, UINT64_MAX) != FixtureHleOverflow) {
         std::cerr << "HLE thunk/dispatch contract failed\n";
+        return 1;
+    }
+    FixtureThreadContext left{11, 0, 0}, right{22, 0, 0};
+    if (DispatchFixtureContext(left, 2, 100) != 100 ||
+        DispatchFixtureContext(right, 2, 101) != 101 || DispatchFixtureContext(left, 3, 0) != 100 ||
+        DispatchFixtureContext(right, 3, 0) != 101 || DispatchFixtureContext(left, 4, 0) != 11 ||
+        DispatchFixtureContext(right, 4, 0) != 22 ||
+        DispatchFixtureContext(left, 3, 1) != FixtureHleUnsupported ||
+        DispatchFixtureContext(left, 99, 0) != FixtureHleUnsupported || left.value != 100 ||
+        right.value != 101 || left.calls != 5 || right.calls != 3) {
+        std::cerr << "thread context contract failed\n";
         return 1;
     }
 #if defined(__linux__) && defined(__x86_64__)
@@ -52,7 +65,8 @@ int main() {
     auto* bytes = static_cast<std::uint8_t*>(code);
     std::memcpy(bytes, staged.bytes.data(), staged.bytes.size());
     std::memcpy(bytes + 512, bridge.code.data(), bridge.code.size());
-    const auto native_hle = MakeFixtureHleThunk(reinterpret_cast<std::uint64_t>(&HostCallback));
+    const auto native_hle =
+        MakeFixtureHleThunk(reinterpret_cast<std::uint64_t>(&HostCallback), 0x1122);
     std::memcpy(bytes + 1024, native_hle.code.data(), native_hle.code.size());
     const auto target = reinterpret_cast<std::uint64_t>(bytes + 1024);
     std::memcpy(bytes + FixtureHlePointerOffset, &target, sizeof(target));
