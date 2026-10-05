@@ -99,6 +99,55 @@ Windows, pacote UWP e qualidade/licenças/testes portáteis com sanitizers.
 Alterações no próprio workflow desktop ainda disparam os builds nesta PR.
 Não altera regras de proteção de branch ou transforma checks antigos em passes.
 
+## 5C: execução da fixture ELF autoral, não boot de jogo
+
+Esperar os checks Windows/UWP/qualidade verdes, instalar o novo MSIX como
+Game e abrir. O probe roda automaticamente em uma thread de teste dedicada.
+Não selecionar jogo para executar: Games continua só inspecionando SELF.
+
+Enviar `phase5-execution.jsonl`, `phase0-results.jsonl` e
+`phase0-lifecycle.jsonl`. Conferir UI e Diagnostics, sair para Dev Home e
+reabrir, depois fazer X RESCAN para regressão da biblioteca.
+
+Esperado no registro `guest-execution-fixture`:
+
+- `passed=true`, `win32_error=0`, `guest_executed=1` (somente a fixture).
+- `abi=sysv_integer_leaf`, `arguments=19,23`, `return_value=42`.
+- `alignment_red_zone_verified=1`, `host_permissions_verified=1`.
+- `stack=windows_worker_thread`, `stack_verified=1`.
+- `fault_recovered=1`, `fault_code=3221225477` (access violation esperada).
+- `return_after_fault=42`, `allocations_released=1`.
+- `game_executed=0`, `game_frame=0`, `loader_linked=0`.
+
+A fixture é ELF cru autoral com instruções x86-64 de um leaf SysV. Usa o
+staging 5B, depois copia a imagem para alocação virtual própria, sem fixar
+seus endereços guest. Páginas de código e bridge passam RW→RX; dados RW;
+gaps NOACCESS e extremos reservados/não comprometidos. Nunca usa RWX.
+O thunk preserva RSI/RDI e XMM6..15, adapta dois argumentos inteiros e
+verifica alinhamento de entrada e uso síncrono de 128 bytes de red zone.
+
+A stack é a de uma thread Windows com reserva solicitada de 256 KiB e
+limites verificados, não uma stack de processo Orbis montada pelo linker.
+Não há troca manual de RSP da UI nem alteração de TEB. A proteção/expansão
+da stack é gerenciada pelo Windows; o probe não simula stack overflow.
+
+A segunda entrada autoral lê um endereço reservado pertencente ao probe.
+O VEH trata exclusivamente esse RIP/read/endereço/thread enquanto armado,
+redireciona para o epílogo da bridge e restaura o estado salvo. Não faz
+unwind SEH genérico de código emitido. Outras exceções seguem seus handlers
+normais; não existe recuperação geral de crashes de jogos.
+
+Não aceita paths, entrys ou instruções externas. A execução tem código fixo
+sem loops e espera a thread terminar; não é um executor com timeout/cancelamento
+para conteúdo não confiável. Mitigações proibitivas ou CFG ativo fazem o gate
+falhar, sem desligar políticas. API não suportada também deve falhar o gate.
+
+Ainda faltam Orbis main/startup, relocations/imports, adapter SELF, TLS/HLE,
+chamadas guest→host e tratamento geral de faults, além de comandos gráficos
+de jogo. Esse sucesso não certifica o ABI completo do PS4 ou um JIT do shadPS4.
+O teste Linux do mesmo thunk valida bytes/aritmética no host, não substitui
+o teste nativo Windows e AppContainer no Xbox.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |

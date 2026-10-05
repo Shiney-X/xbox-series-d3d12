@@ -53,6 +53,13 @@ SELF real recebe somente plano de metadados: falta adapter para seus blocos.
 Não há reserva de endereço guest, aplicação de permissões host, relocations
 ou salto ao entry; o loader upstream continua não ligado. Ver ADR 0044.
 
+5C executa apenas o leaf SysV do ELF autoral: imagem RX/RW/NOACCESS,
+bridge Win64→SysV e stack de thread Windows dedicada. Um VEH restrito
+recupera a leitura inválida esperada da fixture; não é um handler de jogos.
+`guest_executed=1` nesta etapa significa fixture, enquanto `game_executed=0`
+e `loader_linked=0` permanecem. Startup Orbis e runtime completo continuam
+pendentes. Ver ADR 0045 e o relatório `phase5-execution.jsonl`.
+
 ### Compilador isolado da 4C (validado no Xbox)
 
 O UWP linka a IR e `EmitSPIRV` reais como biblioteca AppContainer. A entrada

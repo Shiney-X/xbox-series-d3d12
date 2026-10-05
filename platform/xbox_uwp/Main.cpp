@@ -17,6 +17,7 @@
 #include "core/uwp/guest_loader_fixture.h"
 #include "core/uwp/guest_preflight.h"
 #include "d3d12_status_renderer.h"
+#include "guest_execution_probe.h"
 #include "library_folder_access.h"
 #include "memory_pressure_probe.h"
 #include "probes.h"
@@ -475,6 +476,16 @@ public:
     results_.push_back(
         {"guest-loader-storage", loader_report_error == ERROR_SUCCESS,
          loader_report_error, "report=LocalState/phase5-loader.jsonl"});
+    const auto execution_result = ProbeGuestExecution();
+    const auto execution_report_error =
+        WriteReport(ApplicationData::Current().LocalFolder(),
+                    L"phase5-execution.jsonl", {execution_result},
+                    {"guest-execution-report", true, ERROR_SUCCESS,
+                     "game_executed=0;game_frame=0"});
+    results_.push_back(execution_result);
+    results_.push_back(
+        {"guest-execution-storage", execution_report_error == ERROR_SUCCESS,
+         execution_report_error, "report=LocalState/phase5-execution.jsonl"});
     const std::uint32_t bridge_report_error =
         WriteCoreBridgeReport(bridge_status_);
     results_.push_back(

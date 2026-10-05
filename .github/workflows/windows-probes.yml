@@ -26,7 +26,7 @@ jobs:
       - name: License compliance
         run: reuse lint
       - name: Guest parser and staging formatting
-        run: clang-format --dry-run --Werror src/core/uwp/guest_preflight.h src/core/uwp/guest_load_plan.h src/core/uwp/guest_loader_fixture.h tests/guest_preflight/*.cpp platform/xbox_uwp/Main.cpp
+        run: clang-format --dry-run --Werror src/core/uwp/guest_preflight.h src/core/uwp/guest_load_plan.h src/core/uwp/guest_loader_fixture.h src/core/uwp/guest_execution_fixture.h tests/guest_preflight/*.cpp tests/probes/guest_execution_test.cpp platform/xbox_uwp/guest_execution_probe.* platform/xbox_uwp/Main.cpp
       - name: Portable guest tests with sanitizers
         run: |
           cmake -S tests/guest_preflight -B out/guest-sanitizers -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
