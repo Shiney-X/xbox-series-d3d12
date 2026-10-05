@@ -8,7 +8,31 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: xbox-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  portable-quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install quality tools
+        run: python -m pip install clang-format==19.1.7 reuse==5.1.1
+      - name: License compliance
+        run: reuse lint
+      - name: Guest parser and staging formatting
+        run: clang-format --dry-run --Werror src/core/uwp/guest_preflight.h src/core/uwp/guest_load_plan.h src/core/uwp/guest_loader_fixture.h tests/guest_preflight/*.cpp platform/xbox_uwp/Main.cpp
+      - name: Portable guest tests with sanitizers
+        run: |
+          cmake -S tests/guest_preflight -B out/guest-sanitizers -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          cmake --build out/guest-sanitizers -j 2
+          ctest --test-dir out/guest-sanitizers --output-on-failure
+
   build-and-test:
     runs-on: windows-2022
     timeout-minutes: 15

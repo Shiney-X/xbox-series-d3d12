@@ -5,7 +5,8 @@ name: Build and Release
 
 on:
   push:
-    branches-ignore: [Pre-release-shadPS4-*]
+    # Feature branches are tested by pull_request, avoiding duplicate SDL builds.
+    branches: [main]
     paths-ignore:
       - "documents/**"
       - "**/*.md"
@@ -14,6 +15,7 @@ on:
       - "src/core/uwp/**"
       - "src/phase0/**"
       - "tests/probes/**"
+      - "tests/guest_preflight/**"
 
   pull_request:
     paths-ignore:
@@ -24,6 +26,7 @@ on:
       - "src/core/uwp/**"
       - "src/phase0/**"
       - "tests/probes/**"
+      - "tests/guest_preflight/**"
 
   workflow_dispatch:
 
