@@ -419,7 +419,29 @@ Exigir `import_execution_scope=closed_authored_raw_self`,
 A fixture executa o destino autoral via resolver/relocation; jogos continuam
 com registry vazio, mesmas relativas/fingerprints e imports unresolved.
 ABI/serviço/corpus fechados não certificam runtime geral ou HLE Orbis.
-ADR 0053; validação deste novo gate no console ainda pendente.
+ADR 0053: validado na sessão `134357133173433935-3916`, sete novos gates em 1,
+retorno 42, workers 100/101, cleanup/unwind, 25 probes e apresentação após
+retomada. Inspeção dos jogos permaneceu idêntica e sem erro de relatório.
+
+## Teste 5D — três serviços Orbis de tempo
+
+Instalar como Game, abrir Diagnostics, voltar ao Dev Home/reabrir e confirmar
+apresentação. Em Games usar X RESCAN para checar regressões. Enviar os mesmos
+sete logs, especialmente `phase5-execution.jsonl`, resultados e lifecycle.
+Não é necessário adicionar conteúdo no USB; as fixtures são internas.
+
+O novo gate executa NIDs reais de `sceKernelGetProcessTime`,
+`sceKernelGetProcessTimeCounter` e `sceKernelGetProcessTimeCounterFrequency`
+em código autoral ELF/SELF. Exigir `kernel_clock_services=3`, frequency > 0 e
+`kernel_clock_calls_verified=1`, `kernel_clock_units_verified=1`,
+`kernel_clock_unwind_cleanup_verified=1`. O backend é `qpc_virtual`;
+scope `closed_authored_raw_self`. Os 25 probes anteriores continuam necessários.
+
+`kernel_clock_direct_rdtsc_compatible=0`, `game_clock_exports_registered=0`,
+`game_executed=0`, `game_frame=0`. Jogos mantêm registry vazio, mesmas relativas
+e fingerprints/imports pendentes. Serviço Orbis real não equivale a boot ou
+integração do runtime completo. Política temporal de suspensão não é validada
+pelo resume gráfico. ADR 0054; validação deste novo gate no Xbox pendente.
 
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 

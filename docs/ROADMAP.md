@@ -533,8 +533,12 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
     dos jogos continua vazio: isso não cadastra HLE nem executa o guest.
   - [x] Integrar resolver/JUMP_SLOT a chamada HLE autoral raw/SELF, com bias
     da alocação real, gates de RX/unwind/TLS e rejeições antes de executar.
-  - [ ] Validar execução via import resolvido nas duas workers no Xbox;
+  - [x] Validar execução via import resolvido nas duas workers no Xbox;
     não é registry runtime Orbis ou boot de jogo.
+  - [x] Implementar subset pointer-free de tempo libkernel com NIDs upstream,
+    contador/frequência QPC virtual e conversão checked de microssegundos.
+  - [ ] Validar chamadas aos três serviços Orbis de tempo via resolver em
+    ELF/SELF autoral no Xbox. Não registrar esses exports para jogos ainda.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
 - [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
 - [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.
