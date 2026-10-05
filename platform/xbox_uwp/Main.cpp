@@ -14,6 +14,7 @@
 #include <winrt/Windows.UI.Core.h>
 
 #include "core/uwp/core_bridge.h"
+#include "core/uwp/guest_link_fixture.h"
 #include "core/uwp/guest_loader_fixture.h"
 #include "core/uwp/guest_payload_fixture.h"
 #include "core/uwp/guest_preflight.h"
@@ -463,7 +464,11 @@ public:
       const bool self_fixture_verified =
           self_image.Ready() &&
           ::Core::Uwp::VerifyGuestLoaderFixture(self_image.image);
-      loader_result.passed = loader_result.passed && self_fixture_verified;
+      const bool link_fixture_verified = ::Core::Uwp::VerifyGuestLinkFixture(
+          ::Core::Uwp::InspectGuestLinkManifest(
+              ::Core::Uwp::MakeGuestLinkFixture()));
+      loader_result.passed = loader_result.passed && self_fixture_verified &&
+                             link_fixture_verified;
       loader_result.error = static_cast<std::uint32_t>(
           loader_result.passed ? ERROR_SUCCESS : ERROR_INVALID_DATA);
       loader_result.details =
@@ -471,7 +476,9 @@ public:
           std::to_string(image.bytes.size()) +
           ";copy_bss_verified=" + std::to_string(loader_result.passed) +
           ";stage_error=" + image.error + ";self_data_fixture_verified=" +
-          std::to_string(self_fixture_verified);
+          std::to_string(self_fixture_verified) +
+          ";link_manifest_fixture_verified=" +
+          std::to_string(link_fixture_verified);
     } catch (const std::exception &) {
       loader_result.details += ";error=fixture_allocation_or_staging_failed";
     }
@@ -853,6 +860,7 @@ private:
     std::vector<ProbeResult> guest_preflight_results;
     std::vector<ProbeResult> guest_segment_results;
     std::vector<ProbeResult> guest_payload_results;
+    std::vector<ProbeResult> guest_link_results;
     constexpr std::uint64_t maximum_payload_scan_bytes = 64ULL * 1024 * 1024;
     constexpr std::size_t maximum_payload_files = 8;
     std::uint64_t payload_bytes_requested = 0;
@@ -907,6 +915,7 @@ private:
                   game.display.app_version =
                       CreateFolderLabel(metadata.app_version);
                   game.folder_name = to_string(candidate.folder.Name());
+                  const auto link_results_before = guest_link_results.size();
 
                   // First inspect a bounded 16 KiB prefix. The optional full
                   // snapshot below is data-only; never call the entry point.
@@ -1003,6 +1012,27 @@ private:
                                 inspection.self_container
                                     ? "SELF DATA OK  NOT BOOTED"
                                     : "ELF DATA OK  NOT BOOTED";
+                          if (payload.Ready()) {
+                            try {
+                              const auto manifest =
+                                  ::Core::Uwp::InspectGuestLinkManifest(
+                                      snapshot);
+                              guest_link_results.push_back(
+                                  {game.display.title_id, manifest.valid,
+                                   static_cast<std::uint32_t>(
+                                       manifest.valid ? ERROR_SUCCESS
+                                                      : ERROR_BAD_EXE_FORMAT),
+                                   manifest.Details() +
+                                       ";source=uwp_storage_snapshot"});
+                            } catch (...) {
+                              guest_link_results.push_back(
+                                  {game.display.title_id, false,
+                                   ERROR_GEN_FAILURE,
+                                   "stage=link_manifest;guest_executed=0;"
+                                   "ready_for_boot=0;error=manifest_inspection_"
+                                   "failed"});
+                            }
+                          }
                           // The staged image is deliberately discarded here;
                           // library scanning does not create an executable
                           // instance.
@@ -1041,6 +1071,13 @@ private:
                          "storage_read_failed"});
                   }
 
+                  if (guest_link_results.size() == link_results_before) {
+                    guest_link_results.push_back({game.display.title_id, false,
+                                                  ERROR_NOT_SUPPORTED,
+                                                  "stage=link_manifest;guest_"
+                                                  "executed=0;ready_for_boot=0;"
+                                                  "error=payload_not_ready"});
+                  }
                   try {
                     const IStorageItem icon_item =
                         co_await sce_system.TryGetItemAsync(L"icon0.png");
@@ -1211,6 +1248,28 @@ private:
                            ("guest_executed=0;payload_loaded=0;report_error=" +
                             std::to_string(segment_report_error))
                                .c_str());
+      const auto manifests_valid = std::count_if(
+          guest_link_results.begin(), guest_link_results.end(),
+          [](const ProbeResult &result) { return result.passed; });
+      const bool links_all_valid = !guest_link_results.empty() &&
+                                   static_cast<std::size_t>(manifests_valid) ==
+                                       guest_link_results.size();
+      const auto link_report_error = WriteReport(
+          ApplicationData::Current().LocalFolder(), L"phase5-link.jsonl",
+          guest_link_results,
+          {"guest-link-scan", links_all_valid,
+           static_cast<std::uint32_t>(links_all_valid ? ERROR_SUCCESS
+                                                      : ERROR_NOT_SUPPORTED),
+           "stage=link_manifest;guest_executed=0;game_frame=0;imports_resolved="
+           "0;"
+           "relocations_applied=0;ready_for_boot=0;valid=" +
+               std::to_string(manifests_valid) +
+               ";inspected=" + std::to_string(guest_link_results.size())});
+      AppendLifecycleEvent(
+          session_id_, "guest-link",
+          ("guest_executed=0;valid=" + std::to_string(manifests_valid) +
+           ";report_error=" + std::to_string(link_report_error))
+              .c_str());
       AppendLifecycleEvent(
           session_id_, "guest-preflight",
           ("stage=header_inspection;guest_executed=0;inspected=" +

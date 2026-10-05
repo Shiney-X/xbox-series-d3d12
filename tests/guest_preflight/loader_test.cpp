@@ -4,6 +4,7 @@
 #include <iostream>
 #include <source_location>
 #include <stdexcept>
+#include "core/uwp/guest_link_manifest.h"
 #include "core/uwp/guest_payload_fixture.h"
 
 void Check(bool value, std::source_location location = std::source_location::current()) {
@@ -33,7 +34,9 @@ int main(int argc, char** argv) {
             Check(input.good());
             const auto result = StageGuestPayload(bytes);
             std::cout << result.Details() << '\n';
-            return result.Ready() ? 0 : 1;
+            const auto manifest = InspectGuestLinkManifest(bytes);
+            std::cout << manifest.Details() << '\n';
+            return result.Ready() && manifest.valid ? 0 : 1;
         }
         Check(argc == 1);
         const auto fixture = MakeGuestLoaderFixture();
@@ -69,9 +72,10 @@ int main(int argc, char** argv) {
         auto mismatch = payload_file;
         Put(mismatch, 48, 3);
         Put(mismatch, 56, 3);
-        Check(StageGuestPayload(mismatch).image.error == "self_load_size_mismatch");
+        Check(StageGuestPayload(mismatch).image.error == "self_logical_range_or_size_invalid");
         auto bss_only = payload_file;
         Put(bss_only, 96 + 120 + 32, 0);
+        Put(bss_only, 32, (1ULL << 20)); // No blocked file payload for BSS-only LOAD.
         const auto bss_payload = StageGuestPayload(bss_only);
         Check(bss_payload.Ready() && bss_payload.copied_bytes == 4 && bss_payload.bss_bytes == 16);
         Check(std::all_of(bss_payload.image.bytes.begin() + 0x4200,

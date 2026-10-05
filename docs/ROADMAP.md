@@ -517,8 +517,12 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
     valores 100/101, IDs distintos, rejeições e 25 probes com retomada.
   - [x] Implementar leitura USB limitada e staging de dados PT_LOAD/RELRO via
     adapter SELF direto não criptografado/comprimido, com BSS e diagnóstico.
-  - [ ] Validar payloads reais Sonic/Deltarune no Xbox; staging não é boot,
+  - [x] Validar payloads reais Sonic/Deltarune no Xbox; staging não é boot,
     filesystem HLE ou integração do loader/runtime upstream.
+  - [x] Implementar inventário limitado de dependências/imports, RELA/JMPREL
+    e PT_TLS a partir do snapshot ELF/SELF, com fixture e gates negativos.
+  - [ ] Validar `phase5-link.jsonl` dos dois títulos no Xbox, incluindo retomada.
+    Manifesto válido não resolve imports nem aplica relocations.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
 - [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
 - [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.

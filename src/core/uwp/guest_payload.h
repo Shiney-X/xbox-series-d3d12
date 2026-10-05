@@ -7,10 +7,16 @@
 namespace Core::Uwp {
 inline constexpr std::uint64_t GuestPayloadFileLimit = 32 * 1024 * 1024;
 
+struct GuestFileRange {
+    std::uint64_t logical_offset{}, physical_offset{}, size{};
+};
+
 struct GuestPayload {
     GuestStagedImage image;
     std::uint64_t copied_bytes{}, bss_bytes{}, checksum{};
     bool bss_verified{};
+    std::vector<GuestFileRange> file_ranges;
+    std::vector<std::uint64_t> load_offsets;
 
     [[nodiscard]] bool Ready() const {
         return image.plan.valid && image.error.empty() && !image.bytes.empty() && bss_verified;
@@ -36,7 +42,7 @@ struct GuestPayload {
 // Immutable bounded snapshot only. SELF offsets are resolved through blocked
 // segment IDs (program header indices), never used as raw ELF file offsets.
 // No decryption, decompression, relocation, import resolution or execution.
-[[nodiscard]] inline GuestPayload StageGuestPayload(std::span<const std::uint8_t> file) {
+[[nodiscard]] inline GuestPayload PlanGuestPayloadFile(std::span<const std::uint8_t> file) {
     GuestPayload payload;
     const auto fail = [&](const char* error) {
         payload.image.error = error;
@@ -56,9 +62,10 @@ struct GuestPayload {
         return value;
     };
     const auto header = InspectGuestPrefix(prefix, file.size());
-    std::vector<std::uint64_t> offsets;
+    auto& offsets = payload.load_offsets;
     offsets.reserve(payload.image.plan.segments.size());
     if (payload.image.plan.raw_elf) {
+        payload.file_ranges.push_back({0, 0, file.size()});
         for (const auto& segment : payload.image.plan.segments)
             offsets.push_back(segment.file_offset);
     } else {
@@ -99,6 +106,21 @@ struct GuestPayload {
                 return fail("unsupported_self_block_size");
             blocks[index] = {offset, size, true};
         }
+        for (std::size_t i = 0; i < blocks.size(); ++i) {
+            const auto& block = blocks[i];
+            if (!block.present)
+                continue;
+            const auto ph = static_cast<std::size_t>(header.elf_offset + phoff + i * 56);
+            const auto logical = read(ph + 8, 8);
+            const auto size = read(ph + 32, 8);
+            if (logical > UINT64_MAX - size || size != block.size)
+                return fail("self_logical_range_or_size_invalid");
+            for (const auto& range : payload.file_ranges)
+                if (size && range.size && logical < range.logical_offset + range.size &&
+                    range.logical_offset < logical + size)
+                    return fail("overlapping_self_logical_ranges");
+            payload.file_ranges.push_back({logical, block.offset, size});
+        }
         for (const auto& segment : payload.image.plan.segments) {
             if (segment.file_size == 0) {
                 offsets.push_back(0); // BSS-only PT_LOAD requires no file payload.
@@ -112,6 +134,14 @@ struct GuestPayload {
             offsets.push_back(block.offset);
         }
     }
+    return payload;
+}
+
+[[nodiscard]] inline GuestPayload StageGuestPayload(std::span<const std::uint8_t> file) {
+    auto payload = PlanGuestPayloadFile(file);
+    if (!payload.image.plan.valid || !payload.image.error.empty())
+        return payload;
+    const auto& offsets = payload.load_offsets;
     // All payload mappings validated before allocating/copying the image.
     payload.image.bytes.resize(static_cast<std::size_t>(payload.image.plan.image_size), 0);
     for (std::size_t i = 0; i < offsets.size(); ++i) {
