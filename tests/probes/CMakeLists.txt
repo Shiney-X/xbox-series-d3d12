@@ -38,6 +38,7 @@ endif()
 if(BUILD_TESTING)
     add_subdirectory(../guest_preflight guest_preflight)
     add_executable(xbox_guest_execution_test
+        ../../platform/xbox_uwp/guest_startup_session.cpp
         guest_execution_test.cpp ../../platform/xbox_uwp/guest_execution_probe.cpp)
     target_include_directories(xbox_guest_execution_test PRIVATE
         ../../platform/xbox_uwp ../../src ../../src/phase0)

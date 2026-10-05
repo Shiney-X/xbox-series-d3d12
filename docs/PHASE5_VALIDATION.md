@@ -470,7 +470,45 @@ de memcpy/memset/memcmp são chamados apenas pelas fixtures autorais raw/SELF;
 `game_memory_exports_registered=0`, `guest_memory_general_faults_supported=0`,
 `game_executed=0`, `game_frame=0` permanecem. Os jogos mantêm registry vazio,
 mesmas relativas/FNV e imports pendentes. Não é heap/MMU, startup Orbis,
-filesystem ou boot de Deltarune. ADR 0055; gate Xbox pendente.
+filesystem ou boot de Deltarune. ADR 0055; validado na sessão
+`134357153616663927-6448`: 34 chamadas/16 rejeições, 25 probes e varredura
+após retomada sem regressão. Esse gate fechado não certifica runtime geral.
+
+## Teste 5D — sessão de preparação do executável selecionado
+
+Instalar como Game. Abrir Diagnostics e conferir o probe de execução existente:
+`startup_preparation_fixture_verified=1`; sem nova linha no painel.
+
+1. Em Games selecionar **Deltarune** e pressionar **A PREPARE**. Esperar
+   `STARTUP BLOCKED SEE LOG`; não esperar tela de jogo.
+2. Pressionar B para voltar às pastas, reentrar/selecionar a biblioteca,
+   selecionar Sonic Mania e repetir A PREPARE.
+3. Com uma sessão preparada, voltar ao Dev Home e reabrir. Confirmar shell,
+   reescanear e preparar Deltarune novamente. Não precisa reinstalar.
+4. Opcional: B durante a leitura deve cancelar sem fechar o aplicativo.
+
+Enviar **`phase5-startup.jsonl` (novo)** e os sete logs anteriores.
+
+Nas linhas dos títulos: preparation_passed, mapped_readback_verified,
+entry_stack_tcb_dtv_prepared e data_only_protections_verified em 1;
+address_scope `actual_owned_mapping`, bias não sintético, image_retained=1,
+blocker `unresolved_imports`. Os dumps recebidos têm 274/578 imports e
+1150/10125 relativas (Sonic/Deltarune); update pode alterar contagens.
+O checksum do relatório antigo continua usando bias sintético, portanto não
+comparar bytes de relativas da nova sessão com os fingerprints antigos.
+
+Nas linhas `-release`: cleanup_verified=1, image_retained=0,
+release_reason `back`, `next_attempt`, `rescan` ou `suspend`. O journal deve
+registrar guest-startup sem erro de relatório, além de retomada/apresentação.
+O relatório mantém até 16 eventos desta execução, não um histórico ilimitado.
+
+Obrigatórios: upstream_startup_layout_shared=1,
+upstream_linker_execute_integrated=0, tls_main_module_only=1, tls_bound=0,
+entry_boundary_ready=0, ready_for_entry=0, game_code_executable=0,
+guest_entry_called=0, game_executed=0, game_frame=0. Preparação válida com
+imports ausentes **não é boot bem-sucedido**. Este bloco ainda é 5D, não 5E.
+Falha de leitura/mapeamento deve aparecer separada do blocker de imports.
+ADR 0056; validação física pendente.
 
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 

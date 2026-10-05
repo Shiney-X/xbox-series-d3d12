@@ -541,9 +541,14 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
     ELF/SELF autoral no Xbox. Não registrar esses exports para jogos ainda.
   - [x] Implementar fronteira de ponteiros guest com ranges autorizados,
     permissões, tamanhos checked e memcpy/memset/memcmp por imports reais.
-  - [ ] Validar esses três serviços em ELF/SELF autoral no Xbox: bytes/retornos,
+  - [x] Validar esses três serviços em ELF/SELF autoral no Xbox: bytes/retornos,
     rejeição sem writes, ABI de três argumentos e unwind/cleanup. Não é MMU,
     mapeamento dinâmico ou tratamento geral de faults do runtime.
+  - [x] Integrar sessão de preparação por título: bias da alocação real,
+    imagem data-only possuída pelo host, stack, TCB/DTV do módulo principal,
+    layouts compartilhados com upstream e bloqueio explícito antes do entry.
+  - [ ] Validar preparação selecionada e liberação/retomada no Xbox; ação
+    A PREPARE não chama o entry e não conclui 5D/5E. ADR 0056.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
 - [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
 - [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.
