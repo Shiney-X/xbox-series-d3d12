@@ -21,6 +21,15 @@ int main() {
             const auto file = MakeGuestLinkFixture(self);
             const auto manifest = InspectGuestLinkManifest(file);
             Check(VerifyGuestLinkFixture(manifest));
+            Check(manifest.symbol_records.empty() && manifest.relocation_records.empty());
+            const auto records = InspectGuestLinkManifest(file, true);
+            Check(records.valid && records.symbol_records.size() == 3 &&
+                  records.relocation_records.size() == 2 &&
+                  records.symbol_records[1].binding == 1 &&
+                  records.symbol_records[1].section == 0 &&
+                  records.relocation_records[0].address == 0x404208 &&
+                  records.relocation_records[0].type == 8 &&
+                  records.relocation_records[0].addend_bits == 0x400100);
             Check(manifest.valid && manifest.dynamic_entries == 14 && manifest.symbols == 3 &&
                   manifest.undefined_functions == 1 && manifest.undefined_objects == 1 &&
                   manifest.relocations == 2 && manifest.relative == 1 && manifest.jump_slots == 1 &&

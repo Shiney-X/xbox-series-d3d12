@@ -14,6 +14,7 @@
 #include <winrt/Windows.UI.Core.h>
 
 #include "core/uwp/core_bridge.h"
+#include "core/uwp/guest_data_link_fixture.h"
 #include "core/uwp/guest_link_fixture.h"
 #include "core/uwp/guest_loader_fixture.h"
 #include "core/uwp/guest_payload_fixture.h"
@@ -467,8 +468,11 @@ public:
       const bool link_fixture_verified = ::Core::Uwp::VerifyGuestLinkFixture(
           ::Core::Uwp::InspectGuestLinkManifest(
               ::Core::Uwp::MakeGuestLinkFixture()));
+      const bool relocation_fixture_verified =
+          ::Core::Uwp::VerifyGuestDataLinkFixtures();
       loader_result.passed = loader_result.passed && self_fixture_verified &&
-                             link_fixture_verified;
+                             link_fixture_verified &&
+                             relocation_fixture_verified;
       loader_result.error = static_cast<std::uint32_t>(
           loader_result.passed ? ERROR_SUCCESS : ERROR_INVALID_DATA);
       loader_result.details =
@@ -478,7 +482,9 @@ public:
           ";stage_error=" + image.error + ";self_data_fixture_verified=" +
           std::to_string(self_fixture_verified) +
           ";link_manifest_fixture_verified=" +
-          std::to_string(link_fixture_verified);
+          std::to_string(link_fixture_verified) +
+          ";data_relocation_fixture_verified=" +
+          std::to_string(relocation_fixture_verified);
     } catch (const std::exception &) {
       loader_result.details += ";error=fixture_allocation_or_staging_failed";
     }
@@ -861,6 +867,7 @@ private:
     std::vector<ProbeResult> guest_segment_results;
     std::vector<ProbeResult> guest_payload_results;
     std::vector<ProbeResult> guest_link_results;
+    std::vector<ProbeResult> guest_relocation_results;
     constexpr std::uint64_t maximum_payload_scan_bytes = 64ULL * 1024 * 1024;
     constexpr std::size_t maximum_payload_files = 8;
     std::uint64_t payload_bytes_requested = 0;
@@ -916,6 +923,8 @@ private:
                       CreateFolderLabel(metadata.app_version);
                   game.folder_name = to_string(candidate.folder.Name());
                   const auto link_results_before = guest_link_results.size();
+                  const auto relocation_results_before =
+                      guest_relocation_results.size();
 
                   // First inspect a bounded 16 KiB prefix. The optional full
                   // snapshot below is data-only; never call the entry point.
@@ -996,14 +1005,16 @@ private:
                                "payload_loaded=0;error=short_read_or_snapshot_"
                                "changed"});
                         } else {
-                          const auto payload =
-                              ::Core::Uwp::StageGuestPayload(snapshot);
+                          const auto data_link =
+                              ::Core::Uwp::StageGuestDataLink(snapshot);
+                          const auto &payload = data_link.payload;
                           guest_payload_results.push_back(
                               {game.display.title_id, payload.Ready(),
                                static_cast<std::uint32_t>(
                                    payload.Ready() ? ERROR_SUCCESS
                                                    : ERROR_BAD_EXE_FORMAT),
                                payload.Details() +
+                                   ";payload_phase=pre_relocation" +
                                    ";file_bytes=" + std::to_string(size) +
                                    ";source=uwp_storage_snapshot;image_"
                                    "retained=0"});
@@ -1014,9 +1025,7 @@ private:
                                     : "ELF DATA OK  NOT BOOTED";
                           if (payload.Ready()) {
                             try {
-                              const auto manifest =
-                                  ::Core::Uwp::InspectGuestLinkManifest(
-                                      snapshot);
+                              const auto &manifest = data_link.manifest;
                               guest_link_results.push_back(
                                   {game.display.title_id, manifest.valid,
                                    static_cast<std::uint32_t>(
@@ -1033,6 +1042,14 @@ private:
                                    "failed"});
                             }
                           }
+                          guest_relocation_results.push_back(
+                              {game.display.title_id, data_link.valid,
+                               static_cast<std::uint32_t>(
+                                   data_link.valid ? ERROR_SUCCESS
+                                                   : ERROR_BAD_EXE_FORMAT),
+                               data_link.Details() +
+                                   ";source=uwp_storage_snapshot;image_"
+                                   "retained=0"});
                           // The staged image is deliberately discarded here;
                           // library scanning does not create an executable
                           // instance.
@@ -1077,6 +1094,15 @@ private:
                                                   "stage=link_manifest;guest_"
                                                   "executed=0;ready_for_boot=0;"
                                                   "error=payload_not_ready"});
+                  }
+                  if (guest_relocation_results.size() ==
+                      relocation_results_before) {
+                    guest_relocation_results.push_back(
+                        {game.display.title_id, false, ERROR_NOT_SUPPORTED,
+                         "stage=data_relocation;guest_executed=0;ready_for_"
+                         "boot=0;"
+                         "relocations_applied=0;error=snapshot_or_data_link_"
+                         "unavailable"});
                   }
                   try {
                     const IStorageItem icon_item =
@@ -1269,6 +1295,29 @@ private:
           session_id_, "guest-link",
           ("guest_executed=0;valid=" + std::to_string(manifests_valid) +
            ";report_error=" + std::to_string(link_report_error))
+              .c_str());
+      const auto relocation_valid = std::count_if(
+          guest_relocation_results.begin(), guest_relocation_results.end(),
+          [](const ProbeResult &result) { return result.passed; });
+      const bool relocations_all_valid =
+          !guest_relocation_results.empty() &&
+          static_cast<std::size_t>(relocation_valid) ==
+              guest_relocation_results.size();
+      const auto relocation_report_error = WriteReport(
+          ApplicationData::Current().LocalFolder(), L"phase5-relocations.jsonl",
+          guest_relocation_results,
+          {"guest-relocation-scan", relocations_all_valid,
+           static_cast<std::uint32_t>(
+               relocations_all_valid ? ERROR_SUCCESS : ERROR_NOT_SUPPORTED),
+           "stage=data_relocation;guest_executed=0;game_frame=0;ready_for_boot="
+           "0;"
+           "address_scope=synthetic_load_bias;valid=" +
+               std::to_string(relocation_valid) + ";inspected=" +
+               std::to_string(guest_relocation_results.size())});
+      AppendLifecycleEvent(
+          session_id_, "guest-relocations",
+          ("guest_executed=0;valid=" + std::to_string(relocation_valid) +
+           ";report_error=" + std::to_string(relocation_report_error))
               .c_str());
       AppendLifecycleEvent(
           session_id_, "guest-preflight",

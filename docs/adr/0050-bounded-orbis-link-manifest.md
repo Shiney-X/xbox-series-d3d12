@@ -1,6 +1,12 @@
 # ADR 0050 — Inventário Orbis de linkedição no snapshot USB
 
-Status: implementado; validação do manifesto no Xbox pendente.
+Status: implementado e validado no Series S; não certifica link/boot.
+
+Evidência da PR 50: sessão `134357092219333946-5156`, 25 probes positivos,
+retomada/apresentação sem alertas. Dois manifestos válidos: Sonic com 267
+funções e 7 objetos indefinidos, 1.425 relocations; Deltarune com 571 funções,
+7 objetos e 10.773 relocations, coincidindo com o oracle local. Staging,
+contexto TLS/threads e cleanup também positivos; nenhum jogo executado.
 
 ## Viabilidade e dependências
 

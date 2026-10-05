@@ -478,6 +478,21 @@ Imports NID continuam strings, módulos/bibliotecas são nomes diagnósticos:
 IDs/versões packed, resolução, aplicação, inicializadores e TLS Orbis não são
 implementados. `ready_for_boot=0` permanece mesmo se `manifest_valid=1` (ADR 0050).
 
+`StageGuestDataLink` revalida o snapshot, stageia uma única imagem em vector
+e coleta registros limitados de símbolos/relocations. Usa bias **numérico**
+de diagnóstico, não um ponteiro host. Planeja RELATIVE e local64
+(64/GLOB_DAT/JUMP_SLOT com STB_LOCAL definido), valida overflow, targets,
+permissões lógicas e overlaps incluindo escritas pendentes antes de alterar
+bytes. Imports externos, global/weak e tipos ainda não suportados não recebem
+stubs/zero. Modo parcial explicita as pendências; modo estrito não escreve
+se houver pendência. Nada reserva VA, aplica RX ou executa entry (ADR 0051).
+
+Readback confere patches, e todos os demais bytes são comparados exatamente
+ao backing do snapshot ou zero de BSS/gaps. `phase5-relocations.jsonl` distingue
+aplicação **em dados** de link completo/boot. Relatório payload registra BSS e
+FNV **antes** das relocations (`payload_phase=pre_relocation`), pois relocations
+podem preencher BSS. A imagem é descartada ao fim da inspeção por título.
+
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e
 resolvida novamente por objetos `StorageFolder` a cada ativação.
