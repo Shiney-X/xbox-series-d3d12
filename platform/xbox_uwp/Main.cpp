@@ -15,6 +15,7 @@
 
 #include "core/uwp/core_bridge.h"
 #include "core/uwp/guest_loader_fixture.h"
+#include "core/uwp/guest_payload_fixture.h"
 #include "core/uwp/guest_preflight.h"
 #include "d3d12_status_renderer.h"
 #include "guest_execution_probe.h"
@@ -457,13 +458,20 @@ public:
       const auto fixture = ::Core::Uwp::MakeGuestLoaderFixture();
       const auto image = ::Core::Uwp::StageRawGuest(fixture);
       loader_result.passed = ::Core::Uwp::VerifyGuestLoaderFixture(image);
+      const auto self_image = ::Core::Uwp::StageGuestPayload(
+          ::Core::Uwp::MakeGuestPayloadFixture());
+      const bool self_fixture_verified =
+          self_image.Ready() &&
+          ::Core::Uwp::VerifyGuestLoaderFixture(self_image.image);
+      loader_result.passed = loader_result.passed && self_fixture_verified;
       loader_result.error = static_cast<std::uint32_t>(
           loader_result.passed ? ERROR_SUCCESS : ERROR_INVALID_DATA);
       loader_result.details =
           image.plan.Details() + ";fixture=authored;staged_bytes=" +
           std::to_string(image.bytes.size()) +
           ";copy_bss_verified=" + std::to_string(loader_result.passed) +
-          ";stage_error=" + image.error;
+          ";stage_error=" + image.error + ";self_data_fixture_verified=" +
+          std::to_string(self_fixture_verified);
     } catch (const std::exception &) {
       loader_result.details += ";error=fixture_allocation_or_staging_failed";
     }
@@ -844,6 +852,11 @@ private:
     std::vector<DiscoveredGame> discovered;
     std::vector<ProbeResult> guest_preflight_results;
     std::vector<ProbeResult> guest_segment_results;
+    std::vector<ProbeResult> guest_payload_results;
+    constexpr std::uint64_t maximum_payload_scan_bytes = 64ULL * 1024 * 1024;
+    constexpr std::size_t maximum_payload_files = 8;
+    std::uint64_t payload_bytes_requested = 0;
+    std::size_t payload_files_attempted = 0;
     std::size_t next_folder = 0U;
     std::size_t directories_scanned = 0U;
     std::size_t invalid_metadata = 0U;
@@ -895,8 +908,9 @@ private:
                       CreateFolderLabel(metadata.app_version);
                   game.folder_name = to_string(candidate.folder.Name());
 
-                  // Read at most 16 KiB, never load executable segments or call
-                  // the entry point. Inspection failure must not hide a game.
+                  // First inspect a bounded 16 KiB prefix. The optional full
+                  // snapshot below is data-only; never call the entry point.
+                  // Inspection failure must not hide a game.
                   try {
                     const StorageFile executable = eboot_item.as<StorageFile>();
                     const IRandomAccessStream stream =
@@ -911,7 +925,6 @@ private:
                     std::vector<std::uint8_t> prefix(loaded);
                     header_reader.ReadBytes(prefix);
                     header_reader.DetachStream();
-                    stream.Close();
                     const auto inspection =
                         ::Core::Uwp::InspectGuestPrefix(prefix, size);
                     const auto plan = ::Core::Uwp::PlanGuestLoads(prefix, size);
@@ -935,7 +948,86 @@ private:
                          inspection.Details() +
                              ";file_bytes=" + std::to_string(size) +
                              ";prefix_bytes=" + std::to_string(loaded)});
+                    // Read-only data snapshot, never executable memory. SELF
+                    // logical offsets are mapped only by the bounded adapter.
+                    try {
+                      if (!plan.valid ||
+                          size > ::Core::Uwp::GuestPayloadFileLimit ||
+                          payload_files_attempted >= maximum_payload_files ||
+                          size > maximum_payload_scan_bytes -
+                                     payload_bytes_requested) {
+                        guest_payload_results.push_back(
+                            {game.display.title_id, false, ERROR_NOT_SUPPORTED,
+                             "stage=payload_data_staging;guest_executed=0;game_"
+                             "frame=0;"
+                             "payload_loaded=0;error=plan_or_scan_budget_"
+                             "unsupported"});
+                      } else {
+                        ++payload_files_attempted;
+                        payload_bytes_requested += size;
+                        std::vector<std::uint8_t> snapshot(
+                            static_cast<std::size_t>(size));
+                        std::uint32_t payload_loaded = 0;
+                        {
+                          const DataReader payload_reader(
+                              stream.GetInputStreamAt(0));
+                          payload_loaded = co_await payload_reader.LoadAsync(
+                              static_cast<std::uint32_t>(size));
+                          if (payload_loaded == size)
+                            payload_reader.ReadBytes(snapshot);
+                          payload_reader.DetachStream();
+                        }
+                        if (payload_loaded != size || stream.Size() != size ||
+                            !std::equal(prefix.begin(), prefix.end(),
+                                        snapshot.begin())) {
+                          guest_payload_results.push_back(
+                              {game.display.title_id, false, ERROR_READ_FAULT,
+                               "stage=payload_data_staging;guest_executed=0;"
+                               "game_frame=0;"
+                               "payload_loaded=0;error=short_read_or_snapshot_"
+                               "changed"});
+                        } else {
+                          const auto payload =
+                              ::Core::Uwp::StageGuestPayload(snapshot);
+                          guest_payload_results.push_back(
+                              {game.display.title_id, payload.Ready(),
+                               static_cast<std::uint32_t>(
+                                   payload.Ready() ? ERROR_SUCCESS
+                                                   : ERROR_BAD_EXE_FORMAT),
+                               payload.Details() +
+                                   ";file_bytes=" + std::to_string(size) +
+                                   ";source=uwp_storage_snapshot;image_"
+                                   "retained=0"});
+                          if (payload.Ready())
+                            game.display.guest_header_status =
+                                inspection.self_container
+                                    ? "SELF DATA OK  NOT BOOTED"
+                                    : "ELF DATA OK  NOT BOOTED";
+                          // The staged image is deliberately discarded here;
+                          // library scanning does not create an executable
+                          // instance.
+                        }
+                      }
+                    } catch (const hresult_error &error) {
+                      guest_payload_results.push_back(
+                          {game.display.title_id, false,
+                           static_cast<std::uint32_t>(error.code().value),
+                           "stage=payload_data_staging;guest_executed=0;"
+                           "payload_loaded=0;error=storage_read_failed"});
+                    } catch (...) {
+                      guest_payload_results.push_back(
+                          {game.display.title_id, false, ERROR_GEN_FAILURE,
+                           "stage=payload_data_staging;guest_executed=0;"
+                           "payload_loaded=0;error=allocation_or_staging_"
+                           "failed"});
+                    }
+                    stream.Close();
                   } catch (const hresult_error &error) {
+                    guest_payload_results.push_back(
+                        {game.display.title_id, false,
+                         static_cast<std::uint32_t>(error.code().value),
+                         "stage=payload_data_staging;guest_executed=0;payload_"
+                         "loaded=0;error=header_storage_read_failed"});
                     guest_segment_results.push_back(
                         {game.display.title_id, false,
                          static_cast<std::uint32_t>(error.code().value),
@@ -1093,6 +1185,28 @@ private:
           {"guest-segment-scan", true, ERROR_SUCCESS,
            "stage=segment_plan;guest_executed=0;payload_loaded=0;inspected=" +
                std::to_string(guest_segment_results.size())});
+      const auto payload_ready = std::count_if(
+          guest_payload_results.begin(), guest_payload_results.end(),
+          [](const ProbeResult &result) { return result.passed; });
+      const bool payload_all_ready = !guest_payload_results.empty() &&
+                                     static_cast<std::size_t>(payload_ready) ==
+                                         guest_payload_results.size();
+      const auto payload_report_error = WriteReport(
+          ApplicationData::Current().LocalFolder(), L"phase5-payload.jsonl",
+          guest_payload_results,
+          {"guest-payload-scan", payload_all_ready,
+           static_cast<std::uint32_t>(payload_all_ready ? ERROR_SUCCESS
+                                                        : ERROR_NOT_SUPPORTED),
+           "stage=payload_data_staging;guest_executed=0;game_frame=0;ready=" +
+               std::to_string(payload_ready) +
+               ";inspected=" + std::to_string(guest_payload_results.size()) +
+               ";files_attempted=" + std::to_string(payload_files_attempted) +
+               ";bytes_requested=" + std::to_string(payload_bytes_requested)});
+      AppendLifecycleEvent(
+          session_id_, "guest-payload",
+          ("guest_executed=0;ready=" + std::to_string(payload_ready) +
+           ";report_error=" + std::to_string(payload_report_error))
+              .c_str());
       AppendLifecycleEvent(session_id_, "guest-segments",
                            ("guest_executed=0;payload_loaded=0;report_error=" +
                             std::to_string(segment_report_error))

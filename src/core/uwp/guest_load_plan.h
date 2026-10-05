@@ -14,6 +14,7 @@ inline constexpr std::uint64_t GuestPageSize = 16384;
 struct GuestLoadSegment {
     std::uint64_t file_offset{}, address{}, file_size{}, memory_size{};
     std::uint32_t flags{};
+    std::uint32_t program_index{};
 };
 
 struct GuestLoadPlan {
@@ -66,9 +67,12 @@ struct GuestLoadPlan {
         const auto offset = static_cast<std::size_t>(header.elf_offset + phoff + i * 56);
         if (read(offset, 4) != 1) // PT_LOAD only; no TLS/dynamic/relocations yet.
             continue;
-        const GuestLoadSegment segment{read(offset + 8, 8), read(offset + 16, 8),
-                                       read(offset + 32, 8), read(offset + 40, 8),
-                                       static_cast<std::uint32_t>(read(offset + 4, 4))};
+        const GuestLoadSegment segment{read(offset + 8, 8),
+                                       read(offset + 16, 8),
+                                       read(offset + 32, 8),
+                                       read(offset + 40, 8),
+                                       static_cast<std::uint32_t>(read(offset + 4, 4)),
+                                       static_cast<std::uint32_t>(i)};
         const auto alignment = read(offset + 48, 8);
         if ((segment.flags & ~7U) != 0 || (segment.flags & 3U) == 3U)
             return fail("unsupported_segment_permissions"); // Never accept W+X.

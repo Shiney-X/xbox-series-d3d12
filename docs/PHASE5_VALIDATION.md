@@ -242,6 +242,39 @@ rendezvous pelo coordenador. Contextos não usam GS/TEB guest e não são TCB/DT
 Orbis. Não há pthreads guest, filesystem ou scePad nesse gate (ADR 0048).
 A 5D permanece aberta; não confundir contexto host com TLS de um jogo.
 
+## 5D: payloads reais em dados via USB
+
+O gate threads/contexto da PR 48 passou no Xbox: duas workers, 100/101,
+cleanup e 25 probes com retomada. Agora o pacote adiciona leitura/staging de
+PT_LOAD reais por StorageFile; não executa entry nem retém a imagem para boot.
+
+Instalar como Game e abrir. Entrar em Games com a pasta que já contém Sonic
+Mania e Deltarune; usar X RESCAN e esperar terminar. Se necessário selecionar
+a pasta novamente. Voltar ao Dev Home/reabrir e confirmar biblioteca/ícones.
+
+Enviar `phase5-payload.jsonl`, `phase5-execution.jsonl`,
+`phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+Esperado por jogo compatível:
+
+- `passed=true`, `stage=payload_data_staging`, `container=SELF`.
+- `data_staged=1`, `payload_loaded=1`, `load_segments=2`.
+- `image_bytes` e `copied_bytes` positivos; `bss_verified=1`.
+- `source=uwp_storage_snapshot`, `image_retained=0`.
+- `host_permissions_applied=0`, `guest_executed=0`, `game_frame=0`, `loader_linked=0`.
+
+Para o eboot Deltarune testado localmente: imagem 12.222.464 bytes,
+cópia 6.030.144 e BSS 3.214.776. Versão/update/dump diferente pode mudar esses
+valores; não usar o fingerprint FNV como certificado de autenticidade.
+Summary deve indicar ready=2 se apenas os dois jogos compatíveis estiverem lá.
+
+UI pode mostrar SELF DATA OK NOT BOOTED. Erros ficam no relatório e não devem
+ocultar títulos/ícones. Encryption/compression e perfis não suportados são
+rejeitados, sem decriptação. Limites: 32 MiB/arquivo, 64 MiB/oito arquivos por
+varredura e 16 MiB/imagem; bibliotecas maiores podem ter resultados skipped.
+O relatório de segments/preflight continua metadata-only. ADR 0049 descreve
+os limites e os módulos ainda pendentes para runtime/boot.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |
