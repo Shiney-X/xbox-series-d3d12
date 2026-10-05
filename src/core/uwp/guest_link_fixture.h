@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
+#include <array>
+#include <string_view>
+#include <utility>
 #include "core/uwp/guest_link_manifest.h"
 #include "core/uwp/guest_loader_fixture.h"
 
