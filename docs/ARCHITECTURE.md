@@ -45,6 +45,14 @@ Loader/memória, boundary SysV, TLS/exceções, HLE e input guest exigem gates
 separados. A auditoria do código atual e alternativas estão no ADR 0043;
 procedimento/testes em PHASE5_VALIDATION.
 
+5B adiciona `PlanGuestLoads`: tabela limitada ao prefixo, validação de ranges,
+alinhamento, flags e entry com orçamento explícito. `StageRawGuest` recalcula
+o plano, aceita somente ELF cru e copia/zera segmentos em buffer host de dados.
+Uma fixture autoral usa esse caminho no UWP e confere os 32 KiB byte a byte.
+SELF real recebe somente plano de metadados: falta adapter para seus blocos.
+Não há reserva de endereço guest, aplicação de permissões host, relocations
+ou salto ao entry; o loader upstream continua não ligado. Ver ADR 0044.
+
 ### Compilador isolado da 4C (validado no Xbox)
 
 O UWP linka a IR e `EmitSPIRV` reais como biblioteca AppContainer. A entrada

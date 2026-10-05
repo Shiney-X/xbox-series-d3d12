@@ -46,6 +46,59 @@ Fixtures de cabeçalho ELF/SELF são autorais, não programas executáveis.
 Testam leituras desalinhadas, limites, truncamentos e offsets extremos;
 nunca são executadas como código. CI Windows também roda o teste.
 
+## 5B: plano PT_LOAD e staging de dados (não é boot)
+
+Instalar o novo MSIX como Game, depois dos três checks do workflow
+`Xbox UWP shell` verdes: `portable-quality`, `build-and-test` e
+`build-uwp-package`. Não é necessário recompilar manualmente no console.
+
+1. Abrir o app: a fixture ELF autoral é carregada automaticamente em um buffer
+   de dados de 32 KiB e liberada após a verificação. Não é código do PS4.
+2. Em Games, usar X RESCAN com Sonic Mania e Deltarune na pasta.
+3. Voltar ao Dev Home, reabrir e conferir navegação/ícones/Diagnostics.
+4. Enviar `phase5-loader.jsonl`, `phase5-segments.jsonl`,
+   `phase5-preflight.jsonl`, `phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+No `phase5-loader.jsonl`, esperar `guest-loader-fixture` com `passed=true`,
+`staged_bytes=32768`, `copy_bss_verified=1`, `host_permissions_applied=0`
+e `guest_executed=0`. A verificação compara todos os bytes do buffer,
+incluindo payloads, BSS e intervalos zerados. Uma falha aparece também nos
+system probes. Não foi adicionada outra linha à tela Diagnostics.
+
+`phase5-segments.jsonl` inspeciona a tabela de program headers dentro do mesmo
+prefixo de 16 KiB. Relata ranges e flags PT_LOAD, entry file-backed executável,
+overflow, alinhamento, sobreposição e orçamento de imagem de 16 MiB.
+Esses limites são política restrita do protótipo, não limites do hardware
+nem uma medida da memória necessária para rodar esses jogos.
+
+Um `plan_valid=1` em SELF **não valida os blocos do container**: `p_offset`
+é lógico ao ELF, não um offset diretamente copiável de `eboot.bin`.
+`self_adapter_ready=0` e `payload_loaded=0` continuam explícitos.
+Uma rejeição do plano não remove o título e não prova incompatibilidade.
+O resumo `guest-segment-scan` só confirma que o scan terminou.
+
+`StageRawGuest` só aceita payload ELF cru, recalcula o plano antes de alocar,
+copia bytes e zera BSS. Valida flags guest e rejeita W+X, mas **não aplica
+permissões de página, endereço virtual fixo ou relocations**. O buffer host
+não é um address space guest e seu endereço não é o entry. Aplicação real
+de permissões, guard pages, stack e boundary de execução permanece gate da 5C.
+Não há carregamento/boot dos jogos, áudio nem entrada guest nesta build.
+
+O teste portátil agora inclui `phase5.guest-loader`. Exercita truncamentos,
+ranges extremos, W+X, alinhamento, entry inválido, BSS, limite de imagem,
+rejeição de staging SELF e corrupção detectada pelo oracle de bytes.
+
+## CI proporcional ao escopo
+
+Mudanças exclusivamente nos caminhos Xbox já filtrados, incluindo
+`tests/guest_preflight/**`, não disparam builds SDL desktop. Alterações em
+código compartilhado continuam disparando-os. Branches de trabalho disparam
+o workflow desktop via PR, não também via push; `main` continua coberta por
+push e execução manual permanece disponível. O workflow Xbox mantém testes
+Windows, pacote UWP e qualidade/licenças/testes portáteis com sanitizers.
+Alterações no próprio workflow desktop ainda disparam os builds nesta PR.
+Não altera regras de proteção de branch ou transforma checks antigos em passes.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |

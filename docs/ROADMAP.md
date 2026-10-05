@@ -488,8 +488,12 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
 
 - [x] 5A: auditar dependências do runtime e implementar inspeção read-only
   ELF/SELF de eboot no UWP, com relatório; não carrega nem executa guest.
-- [ ] Validar 5A no Xbox com eboot real e regressão de UI/lifecycle.
-- [ ] 5B: carregar fixture guest controlada, validar ranges e permissões.
+- [x] Validar cabeçalhos 5A no Xbox: Sonic Mania CUSA07023 e Deltarune
+  CUSA15250; SELF/Orbis, 11 program headers por arquivo, sem execução.
+- [ ] Completar evidência de regressão de lifecycle da build 5A/5B.
+- [x] 5B: implementar plano PT_LOAD e staging de fixture em buffer de dados,
+  ranges, flags guest e limites; sem endereço/permissões host executáveis.
+- [ ] Validar 5B no Xbox: cópia/BSS e relatórios de segmentos dos dois jogos.
 - [ ] 5C: executar fixture guest com boundary SysV e diagnóstico de faults.
 - [ ] 5D: HLE/threads/TLS/filesystem e gamepad guest básico.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.

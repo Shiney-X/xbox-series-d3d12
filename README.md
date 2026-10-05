@@ -48,7 +48,9 @@ Procedimento: [validação da Fase 4](docs/PHASE4_VALIDATION.md).
 A Fase 5 iniciou com auditoria e preflight limitado de `eboot.bin` no Xbox.
 Games mostra o formato ELF/SELF e registra os cabeçalhos, **sem carregar ou
 executar o guest**. Testes pequenos e Deltarune serão combinados nos próximos
-gates; ainda não existe botão de boot. [Teste 5A](docs/PHASE5_VALIDATION.md).
+gates; ainda não existe botão de boot. A 5B adiciona plano PT_LOAD e staging
+de uma fixture autoral em buffer de dados, sem executar código ou carregar
+payload dos jogos SELF. [Testes 5A/5B](docs/PHASE5_VALIDATION.md).
 
 ## Baseline upstream
 

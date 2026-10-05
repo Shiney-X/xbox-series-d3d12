@@ -14,6 +14,7 @@
 #include <winrt/Windows.UI.Core.h>
 
 #include "core/uwp/core_bridge.h"
+#include "core/uwp/guest_loader_fixture.h"
 #include "core/uwp/guest_preflight.h"
 #include "d3d12_status_renderer.h"
 #include "library_folder_access.h"
@@ -448,6 +449,32 @@ public:
     session_id_ = CreateSessionId();
     bridge_status_ = ::Core::Uwp::InitializeBridge();
     results_ = XboxSeriesD3D12::Phase0::RunAllProbes();
+    ProbeResult loader_result{
+        "guest-loader-fixture", false, ERROR_INVALID_DATA,
+        "stage=data_staging;guest_executed=0;game_frame=0"};
+    try {
+      const auto fixture = ::Core::Uwp::MakeGuestLoaderFixture();
+      const auto image = ::Core::Uwp::StageRawGuest(fixture);
+      loader_result.passed = ::Core::Uwp::VerifyGuestLoaderFixture(image);
+      loader_result.error = static_cast<std::uint32_t>(
+          loader_result.passed ? ERROR_SUCCESS : ERROR_INVALID_DATA);
+      loader_result.details =
+          image.plan.Details() + ";fixture=authored;staged_bytes=" +
+          std::to_string(image.bytes.size()) +
+          ";copy_bss_verified=" + std::to_string(loader_result.passed) +
+          ";stage_error=" + image.error;
+    } catch (const std::exception &) {
+      loader_result.details += ";error=fixture_allocation_or_staging_failed";
+    }
+    const auto loader_report_error =
+        WriteReport(ApplicationData::Current().LocalFolder(),
+                    L"phase5-loader.jsonl", {loader_result},
+                    {"guest-loader-report", true, ERROR_SUCCESS,
+                     "guest_executed=0;game_frame=0"});
+    results_.push_back(loader_result);
+    results_.push_back(
+        {"guest-loader-storage", loader_report_error == ERROR_SUCCESS,
+         loader_report_error, "report=LocalState/phase5-loader.jsonl"});
     const std::uint32_t bridge_report_error =
         WriteCoreBridgeReport(bridge_status_);
     results_.push_back(
@@ -805,6 +832,7 @@ private:
     std::vector<PendingFolder> pending{{current_folder_, 0U}};
     std::vector<DiscoveredGame> discovered;
     std::vector<ProbeResult> guest_preflight_results;
+    std::vector<ProbeResult> guest_segment_results;
     std::size_t next_folder = 0U;
     std::size_t directories_scanned = 0U;
     std::size_t invalid_metadata = 0U;
@@ -875,6 +903,13 @@ private:
                     stream.Close();
                     const auto inspection =
                         ::Core::Uwp::InspectGuestPrefix(prefix, size);
+                    const auto plan = ::Core::Uwp::PlanGuestLoads(prefix, size);
+                    guest_segment_results.push_back(
+                        {game.display.title_id, plan.valid,
+                         static_cast<std::uint32_t>(
+                             plan.valid ? ERROR_SUCCESS : ERROR_BAD_EXE_FORMAT),
+                         plan.Details() +
+                             ";payload_loaded=0;self_adapter_ready=0"});
                     game.display.guest_header_status =
                         inspection.header_valid
                             ? (inspection.self_container
@@ -890,6 +925,11 @@ private:
                              ";file_bytes=" + std::to_string(size) +
                              ";prefix_bytes=" + std::to_string(loaded)});
                   } catch (const hresult_error &error) {
+                    guest_segment_results.push_back(
+                        {game.display.title_id, false,
+                         static_cast<std::uint32_t>(error.code().value),
+                         "stage=segment_plan;guest_executed=0;game_frame=0;"
+                         "payload_loaded=0;error=storage_read_failed"});
                     game.display.guest_header_status = "EBOOT READ FAILED";
                     guest_preflight_results.push_back(
                         {game.display.title_id, false,
@@ -1036,6 +1076,16 @@ private:
                       {"guest-preflight-scan", true, ERROR_SUCCESS,
                        "stage=header_inspection;guest_executed=0;inspected=" +
                            std::to_string(guest_preflight_results.size())});
+      const auto segment_report_error = WriteReport(
+          ApplicationData::Current().LocalFolder(), L"phase5-segments.jsonl",
+          guest_segment_results,
+          {"guest-segment-scan", true, ERROR_SUCCESS,
+           "stage=segment_plan;guest_executed=0;payload_loaded=0;inspected=" +
+               std::to_string(guest_segment_results.size())});
+      AppendLifecycleEvent(session_id_, "guest-segments",
+                           ("guest_executed=0;payload_loaded=0;report_error=" +
+                            std::to_string(segment_report_error))
+                               .c_str());
       AppendLifecycleEvent(
           session_id_, "guest-preflight",
           ("stage=header_inspection;guest_executed=0;inspected=" +
