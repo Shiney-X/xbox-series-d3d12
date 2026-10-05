@@ -468,6 +468,16 @@ chamada de entry. Limites por arquivo/scan mantêm a leitura delimitada; imagem
 é descartada após `phase5-payload.jsonl`, não armazenada como instância guest.
 Esse caminho ainda não é o filesystem HLE ou o loader/linker upstream (ADR 0049).
 
+`PlanGuestPayloadFile` compartilha os ranges físicos/lógicos validados com
+`InspectGuestLinkManifest`. O manifesto lê PT_DYNAMIC/PT_SCE_DYNLIBDATA,
+dependências, símbolos indefinidos, RELA/JMPREL e PT_TLS sem alocar uma nova
+imagem. PT_DYNAMIC pode ser um subrange do bloco SELF de DYNLIBDATA.
+`phase5-link.jsonl` guarda requisitos por título e erros explícitos; somente
+targets de relocations com largura conhecida são conferidos contra LOAD/RELRO.
+Imports NID continuam strings, módulos/bibliotecas são nomes diagnósticos:
+IDs/versões packed, resolução, aplicação, inicializadores e TLS Orbis não são
+implementados. `ready_for_boot=0` permanece mesmo se `manifest_valid=1` (ADR 0050).
+
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e
 resolvida novamente por objetos `StorageFolder` a cada ativação.

@@ -276,6 +276,42 @@ varredura e 16 MiB/imagem; bibliotecas maiores podem ter resultados skipped.
 O relatório de segments/preflight continua metadata-only. ADR 0049 descreve
 os limites e os módulos ainda pendentes para runtime/boot.
 
+## 5D: manifesto de link read-only
+
+O staging da PR 49 passou no Series S: Sonic e Deltarune com dois LOAD e
+um RELRO, BSS verificado, ready=2. Sessão `134357076266563940-5268`:
+25 probes, retomada e apresentação sem alertas. Nenhum entry foi chamado.
+
+O próximo pacote inspeciona dependências, imports, relocations e PT_TLS.
+Instalar como Game, entrar em Games e usar X RESCAN na mesma pasta USB.
+Esperar a varredura terminar; voltar ao Dev Home e reabrir. Biblioteca e
+ícones devem continuar disponíveis; a UI permanece NOT BOOTED.
+
+Enviar `phase5-link.jsonl`, `phase5-payload.jsonl`, `phase5-execution.jsonl`,
+`phase0-results.jsonl` e `phase0-lifecycle.jsonl`.
+
+Esperado para o Deltarune CUSA15250 fornecido pelo usuário (oracle local):
+
+- `passed=true`, `manifest_valid=1`, `source=uwp_storage_snapshot`.
+- 580 símbolos; 571 funções e 7 objetos indefinidos.
+- 10.773 relocations: 10.125 relativas, 571 jump slots, 77 de símbolos.
+- `relocation_target_checks=10773`, `other_relocations=0`.
+- Um PT_TLS vazio (`tls_file_bytes=0`, `tls_memory_bytes=0`); módulos
+  dependentes ainda podem exigir TLS.
+- `imports_resolved=0`, `relocations_applied=0`, `ready_for_boot=0`,
+  `guest_executed=0`, `game_frame=0`.
+
+Versão/update diferente pode mudar os números. Summary `valid=2` exige
+manifestos positivos dos dois títulos; um relatório vazio não passa.
+No startup, `guest-loader-fixture` também exige
+`link_manifest_fixture_verified=1`, sem nova linha em Diagnostics.
+
+Se falhar, enviar o erro, não remover o título ou copiar sysmodules às cegas.
+O parser não resolve IDs/versões dos módulos, não aplica relocations, não
+executa inicializadores e não implementa TCB/DTV/FS/GS Orbis. Tipos desconhecidos
+são contados, mas seus targets não são validados. ADR 0050 delimita o gate;
+5D continua aberta e o pacote ainda não tenta boot de Deltarune.
+
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
 | Bloco | Entrega/gate | Teste no console |

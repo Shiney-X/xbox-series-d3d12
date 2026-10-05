@@ -1,6 +1,12 @@
 # ADR 0049 — Staging limitado de payloads ELF/SELF por StorageFile
 
-Status: implementado; validação USB no Xbox pendente.
+Status: implementado e validado em dados no Series S; não certifica boot.
+
+Evidência posterior à PR 49: sessão `134357076266563940-5268`, 25 probes
+positivos, retomada/apresentação sem alertas. `phase5-payload.jsonl` reporta
+Sonic/Deltarune prontos em dados (2 LOAD + 1 RELRO cada), BSS verificado e
+summary ready=2. FNV-1a64: Sonic `13675166461837231817`, Deltarune
+`5509961483789055787`; fingerprints diagnósticos, não autenticação.
 
 ## Contexto e viabilidade
 
