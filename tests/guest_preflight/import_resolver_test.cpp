@@ -90,7 +90,7 @@ int main() {
             reject(duplicate_library, "duplicate_library_id");
             const auto name_case = [&](std::string_view name, const char* error) {
                 auto bad = file;
-                std::fill_n(bad.begin() + raw(0x620), 16, 0);
+                std::fill_n(bad.begin() + raw(0x620), 16, std::uint8_t{0});
                 std::copy(name.begin(), name.end(), bad.begin() + raw(0x620));
                 reject(bad, error);
             };
