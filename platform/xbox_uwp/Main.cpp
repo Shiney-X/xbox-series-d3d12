@@ -1782,6 +1782,8 @@ private:
         shell_state_.games[selected].guest_header_status =
             boot.DiagnosticPassed() ? "NATIVE ENTRY  FIRST IMPORT REACHED"
                                     : "NATIVE ENTRY BLOCKED  SEE BOOT LOG";
+        if (!boot.DiagnosticPassed())
+          ReleaseStartup("native_entry_blocked_or_failed");
       } else {
         NativeEntryResult boot;
         boot.blocker = startup_session_->Blocker();

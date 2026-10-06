@@ -215,6 +215,10 @@ GuestStartupSession::AttemptNativeEntry(std::span<const std::uint8_t> snapshot,
       reinterpret_cast<Core::EntryParams *>(startup_.params), !authored_gate);
   native_entry_called_ =
       native_entry_called_ || (result.entered && !authored_gate);
+  if (result.error != ERROR_SUCCESS) {
+    prepared_ = false;
+    protections_verified_ = false;
+  }
   return result;
 }
 std::string GuestStartupSession::Details() const {

@@ -174,9 +174,10 @@ NativeEntryResult RunNativeEntryPrefix(std::span<const std::uint8_t> snapshot,
     const auto restore = [&] {
       bool ok = SetProtection(entry_page, PAGE_READONLY);
       ok = SetProtection(plt_page, PAGE_READONLY) && ok;
-      ok = SetProtection(slot_page, PAGE_READWRITE) && ok;
-      if (ok)
+      const bool slot_writable = SetProtection(slot_page, PAGE_READWRITE);
+      if (slot_writable)
         std::memcpy(mapped + plan.slot_offset, &original, sizeof(original));
+      ok = slot_writable && ok;
       ok = SetProtection(slot_page, slot_protection) && ok;
       if (executable)
         ok = SetProtection(thunk.base, PAGE_READWRITE) && ok;
@@ -265,13 +266,24 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeNativeEntry() {
     const auto file = Core::Uwp::MakeNativeEntryFixture(self);
     const bool prepared = session.Prepare(file);
     const auto result = session.AttemptNativeEntry(file, true);
-    passed =
-        prepared && result.DiagnosticPassed() && session.Release() && passed;
+    const auto repeated = session.AttemptNativeEntry(file, true);
+    passed = prepared && result.DiagnosticPassed() &&
+             repeated.DiagnosticPassed() && session.Release() && passed;
     details = result.Details();
   }
+  GuestStartupSession rejected;
+  auto invalid = Core::Uwp::MakeNativeEntryFixture(false);
+  invalid[0x400] ^= 1; // Different instruction must be rejected, not executed.
+  const bool prepared = rejected.Prepare(invalid);
+  const auto negative = rejected.AttemptNativeEntry(invalid, true);
+  passed = prepared && !negative.entered && !negative.plan_verified &&
+           negative.blocker == "native_entry_prefix_unsupported" &&
+           negative.error == ERROR_NOT_SUPPORTED && rejected.Release() &&
+           passed;
   gate_passed.store(passed);
   return {"native-entry-boundary", passed,
           passed ? DWORD{ERROR_SUCCESS} : DWORD{ERROR_INVALID_DATA},
-          details + ";source=authored_raw_self;native_entry_fixture_verified=" +
-              std::to_string(passed)};
+          details + ";source=authored_raw_self;repeat_and_rejection_verified=" +
+              std::to_string(passed) +
+              ";native_entry_fixture_verified=" + std::to_string(passed)};
 }
