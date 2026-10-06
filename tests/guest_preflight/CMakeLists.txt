@@ -82,7 +82,7 @@ add_executable(xbox_native_entry_plan_test native_entry_test.cpp
 target_compile_features(xbox_native_entry_plan_test PRIVATE cxx_std_20)
 target_include_directories(xbox_native_entry_plan_test PRIVATE ../../src)
 if(MSVC)
-    target_compile_options(xbox_native_entry_plan_test PRIVATE /W4 /WX /permissive- /EHsc)
+    target_compile_options(xbox_native_entry_plan_test PRIVATE /W4 /WX /permissive- /EHsc /bigobj)
 else()
     target_compile_options(xbox_native_entry_plan_test PRIVATE -Wall -Wextra -Werror)
 endif()
