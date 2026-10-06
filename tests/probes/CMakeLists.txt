@@ -38,6 +38,8 @@ endif()
 if(BUILD_TESTING)
     add_subdirectory(../guest_preflight guest_preflight)
     add_executable(xbox_guest_execution_test
+        ../../src/core/aerolib/aerolib.cpp
+        ../../platform/xbox_uwp/native_entry_runtime.cpp
         ../../platform/xbox_uwp/guest_startup_session.cpp
         guest_execution_test.cpp ../../platform/xbox_uwp/guest_execution_probe.cpp)
     target_include_directories(xbox_guest_execution_test PRIVATE
@@ -47,10 +49,25 @@ if(BUILD_TESTING)
         WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
     target_link_libraries(xbox_guest_execution_test PRIVATE WindowsApp)
     if(MSVC)
-        target_compile_options(xbox_guest_execution_test PRIVATE /W4 /WX /permissive- /EHsc)
+        target_compile_options(xbox_guest_execution_test PRIVATE /W4 /WX /permissive- /EHsc /bigobj)
     endif()
     add_test(NAME phase5.guest-execution COMMAND xbox_guest_execution_test)
     set_tests_properties(phase5.guest-execution PROPERTIES TIMEOUT 30)
+    add_executable(xbox_native_entry_test native_entry_test.cpp
+        ../../platform/xbox_uwp/native_entry_runtime.cpp
+        ../../platform/xbox_uwp/guest_startup_session.cpp
+        ../../src/core/aerolib/aerolib.cpp)
+    target_include_directories(xbox_native_entry_test PRIVATE
+        ../../platform/xbox_uwp ../../src ../../src/phase0)
+    target_compile_features(xbox_native_entry_test PRIVATE cxx_std_20)
+    target_compile_definitions(xbox_native_entry_test PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
+    target_link_libraries(xbox_native_entry_test PRIVATE WindowsApp)
+    if(MSVC)
+        target_compile_options(xbox_native_entry_test PRIVATE /W4 /WX /permissive- /EHsc /bigobj)
+    endif()
+    add_test(NAME phase5.native-entry-boundary COMMAND xbox_native_entry_test)
+    set_tests_properties(phase5.native-entry-boundary PROPERTIES TIMEOUT 30)
     add_subdirectory(shaders)
     add_executable(xbox_d3d12_videocore_test
         d3d12_videocore_test.cpp

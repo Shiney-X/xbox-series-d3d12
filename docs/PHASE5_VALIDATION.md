@@ -508,7 +508,47 @@ entry_boundary_ready=0, ready_for_entry=0, game_code_executable=0,
 guest_entry_called=0, game_executed=0, game_frame=0. Preparação válida com
 imports ausentes **não é boot bem-sucedido**. Este bloco ainda é 5D, não 5E.
 Falha de leitura/mapeamento deve aparecer separada do blocker de imports.
-ADR 0056; validação física pendente.
+ADR 0056; preparação validada na sessão `134357171529033926-5968`:
+25 probes, Sonic liberado na suspensão e Deltarune ao voltar, com retomada
+e varredura sem erros. Campos acima descrevem a versão A PREPARE; a nova
+tentativa nativa abaixo tem relatório separado e histórico de entry nas releases.
+
+## Teste 5E inicial — entrada nativa até o primeiro import
+
+Instalar o novo pacote como **Game**, preservando os dumps locais. Não copiar
+firmware/jogos para o Git. Este teste **não deve mostrar vídeo do jogo**.
+
+1. Em Diagnostics, confirmar os probes aprovados e
+   `native_entry_fixture_verified=1` no `phase5-execution.jsonl`.
+2. Em Games, selecionar **Deltarune CUSA15250** e pressionar **A BOOT TEST**.
+   Para o dump já inspecionado, esperar `NATIVE ENTRY FIRST IMPORT REACHED`.
+3. Pressionar A novamente para verificar tentativa nova e cleanup anterior.
+4. Voltar com B, reabrir a biblioteca e repetir. Voltar ao Dev Home, retomar
+   o app e repetir o teste do Deltarune.
+5. Sonic é opcional: um prólogo diferente deve produzir
+   `native_entry_prefix_unsupported` com guest_entry_called=0, não um crash
+   nem um sucesso fictício. Não usar Sonic como gate positivo desse perfil.
+
+Enviar **phase5-boot.jsonl**, phase5-startup.jsonl, phase5-execution.jsonl,
+phase0-results.jsonl e phase0-lifecycle.jsonl. Os relatórios mantêm até 16
+tentativas nesta execução; não misturar arquivos de pacotes/sessões diferentes.
+
+No título suportado: entry_plan_verified, guest_entry_called, guest_executed,
+first_import_reached, capture_verified, host_return_verified, worker_joined,
+cleanup_verified e permissions_verified em 1. Backend native_x86_64,
+interpreter=0, guest_bytes_rewritten=0, first_import_return_ip=entry_address+25,
+argc_observed=1. Deltarune inspecionado deve alcançar `_init_env`, NID
+`bzQExy189ZI`, biblioteca/módulo libc. Captura é real, não nome predeterminado
+no renderer. Verificar sem erro de relatório e releases com cleanup após B
+e suspensão. O gate anterior de 25 probes deve continuar aprovado.
+
+`blocker=first_import_not_implemented` e **game_boot_completed=0,
+game_frame=0** são obrigatórios neste bloco. `passed=true` valida a entrada
+fechada/retorno, não a implementação de libc. Não há chamadas HLE, TLS binding
+ou runtime completo: general_guest_execution_supported=0,
+general_faults_supported=0, upstream_linker_execute_integrated=0. Valores
+game_executed=1/guest_entry_called=1 agora indicam bytes reais do prefixo;
+na fixture autoral, game_executed continua 0. Sempre conferir execution_scope.
 
 ## Gates seguintes (estimativa, não garantia de primeiro frame)
 
