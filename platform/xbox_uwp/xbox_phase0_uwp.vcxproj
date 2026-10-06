@@ -94,6 +94,8 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="guest_execution_probe.cpp" />
     <ClCompile Include="guest_startup_session.cpp" />
+    <ClCompile Include="native_entry_runtime.cpp" />
+    <ClCompile Include="..\..\src\core\aerolib\aerolib.cpp" />
     <ClCompile Include="d3d12_device_context.cpp" />
     <ClCompile Include="d3d12_resource_allocator.cpp" />
     <ClCompile Include="d3d12_pipeline_cache.cpp" />

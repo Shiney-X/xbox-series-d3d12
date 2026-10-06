@@ -46,6 +46,7 @@ bool GuestStartupSession::Prepare(std::span<const std::uint8_t> snapshot) {
       0;
   tls_memory_ = tls_file_ = entry_ = 0;
   unresolved_keys_.clear();
+  native_entry_called_ = false;
   const auto fail = [&](const char *blocker, DWORD error) {
     blocker_ = blocker;
     error_ = error;
@@ -140,6 +141,7 @@ bool GuestStartupSession::Prepare(std::span<const std::uint8_t> snapshot) {
         "/app0/eboot.bin");
     if (!startup.valid)
       return fail("startup_layout_failed", ERROR_INVALID_DATA);
+    startup_ = startup;
     Core::EntryParams params{};
     Core::Tcb tcb{};
     std::array<Core::DtvEntry, 3> dtv{};
@@ -196,6 +198,25 @@ bool GuestStartupSession::Prepare(std::span<const std::uint8_t> snapshot) {
     return fail("startup_exception", ERROR_GEN_FAILURE);
   }
 }
+NativeEntryResult
+GuestStartupSession::AttemptNativeEntry(std::span<const std::uint8_t> snapshot,
+                                        bool authored_gate) {
+  if (!prepared_ || !startup_.valid ||
+      (!authored_gate && !NativeEntryGatePassed())) {
+    NativeEntryResult result;
+    result.blocker = !prepared_ ? "startup_not_prepared"
+                                : "native_entry_fixture_gate_failed";
+    result.error = ERROR_NOT_SUPPORTED;
+    return result;
+  }
+  const auto result = RunNativeEntryPrefix(
+      snapshot, static_cast<std::uint8_t *>(image_) + Core::Uwp::GuestPageSize,
+      static_cast<std::size_t>(image_bytes_),
+      reinterpret_cast<Core::EntryParams *>(startup_.params), !authored_gate);
+  native_entry_called_ =
+      native_entry_called_ || (result.entered && !authored_gate);
+  return result;
+}
 std::string GuestStartupSession::Details() const {
   std::ostringstream out;
   out << "stage=startup_preparation;scope=main_module_data_only;preparation_"
@@ -217,8 +238,9 @@ std::string GuestStartupSession::Details() const {
          "0"
          ";tls_main_module_only=1;tls_bound=0;entry_boundary_ready=0;ready_for_"
          "entry=0"
-         ";game_code_executable=0;guest_entry_called=0;game_executed=0;game_"
-         "frame=0";
+         ";game_code_executable=0;guest_entry_called="
+      << native_entry_called_ << ";game_executed=" << native_entry_called_
+      << ";game_boot_completed=0;game_frame=0";
   return out.str();
 }
 XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestStartup() {

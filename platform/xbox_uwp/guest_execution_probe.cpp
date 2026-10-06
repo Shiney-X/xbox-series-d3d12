@@ -1107,8 +1107,9 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
     memory_probe.passed = false;
   }
   const auto startup_probe = ProbeGuestStartup();
-  const bool passed = startup_probe.passed && kernel_clock_verified &&
-                      memory_probe.passed &&
+  const auto native_probe = ProbeNativeEntry();
+  const bool passed = native_probe.passed && startup_probe.passed &&
+                      kernel_clock_verified && memory_probe.passed &&
                       coordination_error == ERROR_SUCCESS && both_ready &&
                       worker_passed(state) && worker_passed(peer) &&
                       contexts_isolated && parent_isolated &&
@@ -1118,6 +1119,7 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeGuestExecution() {
   details << "stage=fixture_execution;source=authored_elf;loader_linked=0;game_"
              "executed=0;game_frame=0"
           << ";guest_executed=" << (state.value == 42)
+          << ";native_entry_fixture_verified=" << native_probe.passed
           << ";abi=sysv_integer_leaf;arguments=19,23"
           << ";return_value=" << state.value
           << ";return_after_fault=" << state.recovery_value

@@ -1683,10 +1683,29 @@ private:
         WriteReport(ApplicationData::Current().LocalFolder(),
                     L"phase5-startup.jsonl", startup_reports_,
                     {"startup-report-storage", true, ERROR_SUCCESS,
-                     "guest_entry_called=0;game_frame=0"});
+                     "scope=report_storage;game_frame=0"});
     const auto details = "report_error=" + std::to_string(error) +
-                         ";guest_entry_called=0;game_frame=0";
+                         ";scope=startup_report_storage;game_frame=0";
     AppendLifecycleEvent(session_id_, "guest-startup", details.c_str());
+  }
+  void SaveBootReport(const std::string &title,
+                      const NativeEntryResult &result) {
+    if (boot_reports_.size() >= 16)
+      boot_reports_.erase(boot_reports_.begin());
+    boot_reports_.push_back(
+        {title, result.DiagnosticPassed(), result.error,
+         result.Details() +
+             ";source=uwp_storage_snapshot;session=" + session_id_});
+    const auto error = WriteReport(ApplicationData::Current().LocalFolder(),
+                                   L"phase5-boot.jsonl", boot_reports_,
+                                   {"boot-report-storage", true, ERROR_SUCCESS,
+                                    "scope=report_storage;game_frame=0"});
+    const auto details =
+        "report_error=" + std::to_string(error) +
+        ";guest_entry_called=" + std::to_string(result.entered) +
+        ";first_import_reached=" + std::to_string(result.stopped_at_import) +
+        ";game_boot_completed=0;game_frame=0";
+    AppendLifecycleEvent(session_id_, "guest-native-entry", details.c_str());
   }
   void ReleaseStartup(const char *reason) {
     if (!startup_session_)
@@ -1710,7 +1729,7 @@ private:
     const auto generation = ++startup_generation_;
     library_operation_active_ = startup_operation_active_ = true;
     shell_state_.games[selected].guest_header_status =
-        "PREPARING STARTUP  NOT BOOTED";
+        "PREPARING NATIVE ENTRY TEST";
     try {
       ReleaseStartup("next_attempt");
       if (startup_session_)
@@ -1754,6 +1773,21 @@ private:
            startup_session_->Details() + ";source=uwp_storage_snapshot"});
       shell_state_.games[selected].guest_header_status =
           prepared ? "STARTUP BLOCKED  SEE LOG" : "STARTUP PREPARATION FAILED";
+      if (prepared) {
+        // No coroutine suspension between permission changes, native execution
+        // and join: back/suspend can only release backing after the worker
+        // stops.
+        const auto boot = startup_session_->AttemptNativeEntry(snapshot);
+        SaveBootReport(title, boot);
+        shell_state_.games[selected].guest_header_status =
+            boot.DiagnosticPassed() ? "NATIVE ENTRY  FIRST IMPORT REACHED"
+                                    : "NATIVE ENTRY BLOCKED  SEE BOOT LOG";
+      } else {
+        NativeEntryResult boot;
+        boot.blocker = startup_session_->Blocker();
+        boot.error = ERROR_BAD_EXE_FORMAT;
+        SaveBootReport(title, boot);
+      }
     } catch (const hresult_error &error) {
       if (generation != startup_generation_)
         co_return;
@@ -1873,6 +1907,7 @@ private:
   std::vector<StorageFolder> folder_stack_;
   bool library_operation_active_{};
   std::vector<StorageFile> game_executables_;
+  std::vector<ProbeResult> boot_reports_;
   std::unique_ptr<GuestStartupSession> startup_session_;
   std::string startup_title_;
   std::vector<ProbeResult> startup_reports_;
