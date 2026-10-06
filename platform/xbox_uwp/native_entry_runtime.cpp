@@ -45,8 +45,9 @@ bool IsProtection(void *address, DWORD expected) {
 } // namespace
 
 bool NativeEntryResult::DiagnosticPassed() const {
-  return plan_verified && entered && stopped_at_import && capture_verified &&
-         permissions_verified && returned_to_host && worker_joined && cleanup &&
+  return mitigation_policy_verified && plan_verified && entered &&
+         stopped_at_import && capture_verified && permissions_verified &&
+         returned_to_host && worker_joined && cleanup &&
          error == ERROR_SUCCESS && blocker == "first_import_not_implemented";
 }
 std::string NativeEntryResult::Details() const {
@@ -62,6 +63,7 @@ std::string NativeEntryResult::Details() const {
       << ";host_return_verified=" << returned_to_host
       << ";worker_joined=" << worker_joined << ";cleanup_verified=" << cleanup
       << ";permissions_verified=" << permissions_verified
+      << ";mitigation_policy_verified=" << mitigation_policy_verified
       << ";entry_address=" << entry << ";first_plt_address=" << plt
       << ";first_slot_address=" << slot << ";load_bias=" << mapped_bias
       << ";address_scope=actual_owned_mapping;relative_applied="
@@ -94,6 +96,23 @@ NativeEntryResult RunNativeEntryPrefix(std::span<const std::uint8_t> snapshot,
   };
   OwnedCode thunk;
   try {
+    PROCESS_MITIGATION_DYNAMIC_CODE_POLICY dynamic{};
+    PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY shadow{};
+    if (!GetProcessMitigationPolicy(GetCurrentProcess(),
+                                    ProcessDynamicCodePolicy, &dynamic,
+                                    sizeof(dynamic)) ||
+        !GetProcessMitigationPolicy(GetCurrentProcess(),
+                                    ProcessUserShadowStackPolicy, &shadow,
+                                    sizeof(shadow)))
+      return fail("native_entry_mitigation_policy_unavailable", GetLastError());
+    // The nonlocal diagnostic stop does not balance the guest CALL's CET
+    // shadow stack. Reject enabled policies; never disable platform
+    // mitigations.
+    if (dynamic.ProhibitDynamicCode || shadow.EnableUserShadowStack ||
+        shadow.EnableUserShadowStackStrictMode)
+      return fail("native_entry_mitigation_policy_unsupported",
+                  ERROR_NOT_SUPPORTED);
+    out.mitigation_policy_verified = true;
     const auto payload = StageGuestPayload(snapshot);
     const auto manifest = InspectGuestLinkManifest(snapshot, true);
     const auto plan = PlanNativeEntry(payload, manifest);

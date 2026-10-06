@@ -68,6 +68,12 @@ título. Mesmo aprovado, não certifica execução geral: o gate anterior para
 runtime/faults/TLS/MMU continua aberto. Uma falha inesperada nesse código
 experimental pode encerrar o processo; não há promessa de recuperação geral.
 
+Antes da alocação/execução, consultar políticas de código dinâmico e de
+shadow stack. A saída não local não balanceia a shadow stack do CALL guest:
+recusar política habilitada ou consulta indisponível, sem desligar mitigação.
+Não pressupor que todo PC Windows tem a mesma política do Xbox.
+Referência: [política de shadow stack da Microsoft](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-process_mitigation_user_shadow_stack_policy).
+
 ## Evidência e próximo bloqueio
 
 Inspeção read-only do dump local de Deltarune CUSA15250: o perfil é reconhecido
