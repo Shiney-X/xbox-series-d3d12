@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: 2026 Shiney-X and xbox-series-d3d12 contributors
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Preserve the audited donor patch byte-for-byte, including diff context spaces.
+spirv_to_dxil.patch -text -whitespace
