@@ -3,6 +3,7 @@
 #include "native_entry_runtime.h"
 #include "core/aerolib/aerolib.h"
 #include "core/uwp/native_entry_fixture.h"
+#include "core/uwp/probe_fields.h"
 #include "guest_startup_session.h"
 #include <atomic>
 #include <exception>
@@ -64,6 +65,12 @@ std::string NativeEntryResult::Details() const {
       << ";worker_joined=" << worker_joined << ";cleanup_verified=" << cleanup
       << ";permissions_verified=" << permissions_verified
       << ";mitigation_policy_verified=" << mitigation_policy_verified
+      << ";dynamic_policy_available=" << dynamic_policy_available
+      << ";dynamic_code_prohibited=" << dynamic_code_prohibited
+      << ";dynamic_policy_error=" << dynamic_policy_error
+      << ";shadow_policy_available=" << shadow_policy_available
+      << ";shadow_stack_enabled=" << shadow_stack_enabled
+      << ";shadow_policy_error=" << shadow_policy_error
       << ";entry_address=" << entry << ";first_plt_address=" << plt
       << ";first_slot_address=" << slot << ";load_bias=" << mapped_bias
       << ";address_scope=actual_owned_mapping;relative_applied="
@@ -98,18 +105,29 @@ NativeEntryResult RunNativeEntryPrefix(std::span<const std::uint8_t> snapshot,
   try {
     PROCESS_MITIGATION_DYNAMIC_CODE_POLICY dynamic{};
     PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY shadow{};
-    if (!GetProcessMitigationPolicy(GetCurrentProcess(),
-                                    ProcessDynamicCodePolicy, &dynamic,
-                                    sizeof(dynamic)) ||
-        !GetProcessMitigationPolicy(GetCurrentProcess(),
-                                    ProcessUserShadowStackPolicy, &shadow,
-                                    sizeof(shadow)))
-      return fail("native_entry_mitigation_policy_unavailable", GetLastError());
+    out.dynamic_policy_available =
+        GetProcessMitigationPolicy(GetCurrentProcess(),
+                                   ProcessDynamicCodePolicy, &dynamic,
+                                   sizeof(dynamic)) != FALSE;
+    if (!out.dynamic_policy_available)
+      out.dynamic_policy_error = GetLastError();
+    out.shadow_policy_available =
+        GetProcessMitigationPolicy(GetCurrentProcess(),
+                                   ProcessUserShadowStackPolicy, &shadow,
+                                   sizeof(shadow)) != FALSE;
+    if (!out.shadow_policy_available)
+      out.shadow_policy_error = GetLastError();
+    out.dynamic_code_prohibited = dynamic.ProhibitDynamicCode;
+    out.shadow_stack_enabled =
+        shadow.EnableUserShadowStack || shadow.EnableUserShadowStackStrictMode;
+    if (!out.dynamic_policy_available || !out.shadow_policy_available)
+      return fail("native_entry_mitigation_policy_unavailable",
+                  !out.dynamic_policy_available ? out.dynamic_policy_error
+                                                : out.shadow_policy_error);
     // The nonlocal diagnostic stop does not balance the guest CALL's CET
     // shadow stack. Reject enabled policies; never disable platform
     // mitigations.
-    if (dynamic.ProhibitDynamicCode || shadow.EnableUserShadowStack ||
-        shadow.EnableUserShadowStackStrictMode)
+    if (out.dynamic_code_prohibited || out.shadow_stack_enabled)
       return fail("native_entry_mitigation_policy_unsupported",
                   ERROR_NOT_SUPPORTED);
     out.mitigation_policy_verified = true;
@@ -280,29 +298,44 @@ bool NativeEntryGatePassed() noexcept { return gate_passed.load(); }
 XboxSeriesD3D12::Phase0::ProbeResult ProbeNativeEntry() {
   bool passed = true;
   std::string details;
+  DWORD first_error{};
+  const auto record = [&](const std::string &label,
+                          const NativeEntryResult &result) {
+    details += Core::Uwp::ScopeProbeFields(label, result.Details());
+    if (!result.DiagnosticPassed() && !first_error)
+      first_error = result.error ? result.error : ERROR_INVALID_DATA;
+  };
   for (const bool self : {false, true}) {
     GuestStartupSession session;
     const auto file = Core::Uwp::MakeNativeEntryFixture(self);
     const bool prepared = session.Prepare(file);
     const auto result = session.AttemptNativeEntry(file, true);
     const auto repeated = session.AttemptNativeEntry(file, true);
+    const bool released = session.Release();
+    const std::string label = self ? "self_" : "raw_";
+    record(label + "first_", result);
+    record(label + "repeat_", repeated);
+    details += ";" + label + "prepared=" + std::to_string(prepared) + ";" +
+               label + "released=" + std::to_string(released);
     passed = prepared && result.DiagnosticPassed() &&
-             repeated.DiagnosticPassed() && session.Release() && passed;
-    details = result.Details();
+             repeated.DiagnosticPassed() && released && passed;
   }
   GuestStartupSession rejected;
   auto invalid = Core::Uwp::MakeNativeEntryFixture(false);
   invalid[0x400] ^= 1; // Different instruction must be rejected, not executed.
   const bool prepared = rejected.Prepare(invalid);
   const auto negative = rejected.AttemptNativeEntry(invalid, true);
+  const bool released = rejected.Release();
+  details += Core::Uwp::ScopeProbeFields("negative_", negative.Details());
   passed = prepared && !negative.entered && !negative.plan_verified &&
            negative.blocker == "native_entry_prefix_unsupported" &&
-           negative.error == ERROR_NOT_SUPPORTED && rejected.Release() &&
-           passed;
+           negative.error == ERROR_NOT_SUPPORTED && released && passed;
   gate_passed.store(passed);
   return {"native-entry-boundary", passed,
-          passed ? DWORD{ERROR_SUCCESS} : DWORD{ERROR_INVALID_DATA},
-          details + ";source=authored_raw_self;repeat_and_rejection_verified=" +
-              std::to_string(passed) +
+          passed        ? DWORD{ERROR_SUCCESS}
+          : first_error ? first_error
+                        : DWORD{ERROR_INVALID_DATA},
+          "source=authored_raw_self" + details +
+              ";repeat_and_rejection_verified=" + std::to_string(passed) +
               ";native_entry_fixture_verified=" + std::to_string(passed)};
 }

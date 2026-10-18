@@ -12,6 +12,9 @@ struct NativeEntryResult {
   DWORD error{};
   bool title_input{};
   bool mitigation_policy_verified{};
+  bool dynamic_policy_available{}, dynamic_code_prohibited{},
+      shadow_policy_available{}, shadow_stack_enabled{};
+  DWORD dynamic_policy_error{}, shadow_policy_error{};
   std::uint64_t entry{}, plt{}, slot{}, mapped_bias{}, relative_applied{};
   Core::Uwp::NativeEntryCapture capture;
   std::string blocker = "not_started", import_key, import_name;

@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include "core/aerolib/aerolib.h"
 #include "core/uwp/native_entry_fixture.h"
+#include "core/uwp/probe_fields.h"
 #if defined(__linux__) && defined(__x86_64__)
 #include <sys/mman.h>
 #endif
@@ -30,6 +31,10 @@ void Inspect(std::span<const std::uint8_t> file) {
 int main(int argc, char** argv) {
     try {
         using namespace Core::Uwp;
+        Check(ScopeProbeFields("native_", "stage=entry;win32_error=87;blocker=query_failed") ==
+              ";native_stage=entry;native_win32_error=87;native_blocker=query_failed");
+        Check(ScopeProbeFields("raw_", ";x=0;;x=1;") == ";raw_x=0;raw_x=1");
+        Check(ScopeProbeFields("raw_", "").empty());
         if (argc == 2) {
             std::ifstream input(argv[1], std::ios::binary | std::ios::ate);
             Check(input.good());

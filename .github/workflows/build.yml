@@ -16,6 +16,11 @@ on:
       - "src/phase0/**"
       - "tests/probes/**"
       - "tests/guest_preflight/**"
+      - "third_party/kyty_spirv_to_dxil/**"
+      - "scripts/windows/Build-MesaTranslator.ps1"
+      - "scripts/windows/Test-MesaUwpImports.ps1"
+      - ".github/workflows/windows-probes.yml"
+      - "LICENSES/GPL-2.0-only.txt"
 
   pull_request:
     paths-ignore:
@@ -27,6 +32,11 @@ on:
       - "src/phase0/**"
       - "tests/probes/**"
       - "tests/guest_preflight/**"
+      - "third_party/kyty_spirv_to_dxil/**"
+      - "scripts/windows/Build-MesaTranslator.ps1"
+      - "scripts/windows/Test-MesaUwpImports.ps1"
+      - ".github/workflows/windows-probes.yml"
+      - "LICENSES/GPL-2.0-only.txt"
 
   workflow_dispatch:
 

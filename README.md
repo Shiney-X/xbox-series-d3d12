@@ -132,3 +132,8 @@ versionados.
 
 O core shadPS4 e o código deste port são distribuídos sob GPL-2.0-or-later.
 Consulte [LICENSE](LICENSE) e [LICENSES](LICENSES/).
+# Integração experimental KytyPS5 / Mesa
+
+O caminho adicional SPIR-V → DXIL, adaptado do KytyPS5, está documentado em
+[KYTYPS5_INTEGRATION.md](docs/KYTYPS5_INTEGRATION.md). Ele não representa
+integração completa do runtime nem execução de jogos no Xbox.

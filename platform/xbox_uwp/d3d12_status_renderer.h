@@ -7,6 +7,9 @@
 #include "d3d12_resource_allocator.h"
 #include "d3d12_transfer_probe.h"
 #include "d3d12_videocore_probe.h"
+#if defined(XBOX_HAS_MESA)
+#include "d3d12_mesa_probe.h"
+#endif
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -105,6 +108,9 @@ public:
     return graphics_shader_probe_passed_;
   }
   [[nodiscard]] std::string GraphicsShaderDetails() const;
+#if defined(XBOX_HAS_MESA)
+  [[nodiscard]] const D3D12MesaProbe &MesaProbe() const { return mesa_probe_; }
+#endif
   [[nodiscard]] bool PipelineProbePassed() const noexcept {
     return compute_probe_passed_;
   }
@@ -162,6 +168,9 @@ private:
   D3D12TransferStats transfer_stats_;
   D3D12TransferProbeResult transfer_probe_;
   D3D12VideoCoreProbeResult video_core_probe_;
+#if defined(XBOX_HAS_MESA)
+  D3D12MesaProbe mesa_probe_;
+#endif
   UINT64 video_core_presentations_{};
   std::array<FrameContext, FrameCount> frames_;
   // Borrowed only while recording a frame; frames_ owns the command lists.

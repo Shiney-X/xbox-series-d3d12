@@ -957,6 +957,12 @@ void D3D12StatusRenderer::CreateShellPipeline() {
   }
   if (!graphics_shader_probe_passed_)
     winrt::throw_hresult(E_FAIL);
+#if defined(XBOX_HAS_MESA)
+  // Independent route: retain the working SPIRV-Cross renderer and report a
+  // Mesa failure instead of hiding it behind a successful HLSL fallback.
+  mesa_probe_ =
+      RunD3D12MesaProbe(device_context_, resource_allocator_, pipeline_cache_);
+#endif
   icon_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
   icon_range.NumDescriptors = 1;
   icon_range.BaseShaderRegister = 0;
