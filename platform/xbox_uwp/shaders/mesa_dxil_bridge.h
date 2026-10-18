@@ -29,6 +29,7 @@ struct MesaTranslation {
   bool lower_16bit{};
   std::vector<MesaShader> shaders;
   std::string error;
+  std::string diagnostics;
 };
 // Adapted from KytyPS5 dxilCompiler.cpp at
 // cd0c360aa7b432645b915c19fd1ceed394378b75. One compute stage or linked

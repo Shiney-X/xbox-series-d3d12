@@ -13,6 +13,12 @@ D3D12MesaProbe RunD3D12MesaProbe(D3D12DeviceContext &context,
                                  D3D12PipelineCache &cache) {
   using namespace Xbox::Shaders;
   D3D12MesaProbe out;
+  const auto clean = [](std::string text) {
+    for (auto &c : text)
+      if (c == ';' || c == '\r' || c == '\n' || c == '=')
+        c = ' ';
+    return text;
+  };
   out.details = "translator=Mesa.spirv_to_dxil;hlsl_intermediate=0;"
                 "mesa_revision=e24dc5bd1e7fe6101bdc866fb16a15a8fcae1aae;"
                 "donor_revision=cd0c360aa7b432645b915c19fd1ceed394378b75;"
@@ -28,6 +34,8 @@ D3D12MesaProbe RunD3D12MesaProbe(D3D12DeviceContext &context,
         "shader_model_minor=" + std::to_string(cs.shader_model_minor) +
         ";validator_minor=" + std::to_string(cs.validator_minor) +
         ";lower_16bit=" + std::to_string(cs.lower_16bit) + ";";
+    out.details +=
+        "compute_compiler_diagnostics=" + clean(cs.diagnostics) + ";";
     if (!cs.passed)
       throw std::runtime_error(cs.error);
     // These closed probes do not bind Mesa runtime data. Never silently run a
@@ -44,6 +52,8 @@ D3D12MesaProbe RunD3D12MesaProbe(D3D12DeviceContext &context,
         MesaStageInput{vertex, MesaStage::Vertex, 1, true},
         MesaStageInput{fragment, MesaStage::Fragment, 2, true}};
     const auto vs_ps = TranslateMesaDxil(context.Device(), graphics);
+    out.details +=
+        "graphics_compiler_diagnostics=" + clean(vs_ps.diagnostics) + ";";
     if (!vs_ps.passed)
       throw std::runtime_error(vs_ps.error);
     for (const auto &shader : vs_ps.shaders)

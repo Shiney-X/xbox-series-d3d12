@@ -9,7 +9,11 @@ if(XBOX_MESA_ROOT)
     endforeach()
     file(READ "${XBOX_MESA_ROOT}/provenance.json" mesa_provenance)
     # PowerShell 5 can write a BOM; strip it before CMake's JSON parser.
-    string(REGEX REPLACE "^[^{]*" "" mesa_provenance "${mesa_provenance}")
+    string(FIND "${mesa_provenance}" "{" mesa_json_start)
+    if(mesa_json_start LESS 0)
+        message(FATAL_ERROR "Malformed Mesa SDK provenance JSON")
+    endif()
+    string(SUBSTRING "${mesa_provenance}" ${mesa_json_start} -1 mesa_provenance)
     string(JSON mesa_commit GET "${mesa_provenance}" mesa_commit)
     string(JSON mesa_patch GET "${mesa_provenance}" patch_sha256)
     if(NOT mesa_commit STREQUAL "e24dc5bd1e7fe6101bdc866fb16a15a8fcae1aae" OR

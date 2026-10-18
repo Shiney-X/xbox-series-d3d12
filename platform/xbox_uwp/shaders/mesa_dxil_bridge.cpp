@@ -186,6 +186,7 @@ MesaTranslation TranslateMesaDxil(ID3D12Device *device,
                             &confs[0], &logger, &objects.values[0])
             : spirv_to_dxil_linked(inputs.data(), 2, validator_version, &debug,
                                    &logger, objects.values.data());
+    out.diagnostics = messages;
     if (!translated)
       throw std::runtime_error("mesa_translation_failed:" + messages);
     objects.owned = true;
