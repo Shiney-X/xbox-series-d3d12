@@ -7,6 +7,16 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+if ($env:XBOX_MESA_ROOT) {
+    foreach ($file in @('include\spirv_to_dxil.h', 'include\dxil_versions.h', 'lib\spirv_to_dxil.lib', 'bin\spirv_to_dxil.dll', 'provenance.json')) {
+        if (-not (Test-Path (Join-Path $env:XBOX_MESA_ROOT $file))) { throw "Missing Mesa SDK file: $file" }
+    }
+    $provenance = Get-Content (Join-Path $env:XBOX_MESA_ROOT 'provenance.json') -Raw | ConvertFrom-Json
+    if ($provenance.mesa_commit -ne 'e24dc5bd1e7fe6101bdc866fb16a15a8fcae1aae' -or
+        $provenance.patch_sha256 -ne '326b1367c84959a363feeec28c4d1c3adcc6b935ff891dfde1ce1d87b44b29e1') {
+        throw 'Mesa SDK revision/ABI mismatch.'
+    }
+}
 & git -C $repositoryRoot submodule update --init --recursive -- externals/sirit externals/ext-boost externals/fmt externals/magic_enum externals/half
 if ($LASTEXITCODE -ne 0) { throw 'Shader compiler submodule initialization failed.' }
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
@@ -95,6 +105,11 @@ try {
         foreach ($runtimeDependency in @('dxcompiler.dll', 'dxil.dll')) {
             if ($entryNames -notcontains $runtimeDependency) {
                 throw "MSIX is missing the DXC runtime dependency '$runtimeDependency'."
+            }
+        }
+        if ($env:XBOX_MESA_ROOT) {
+            foreach ($dependency in @('spirv_to_dxil.dll', 'ThirdParty/Mesa/provenance.json', 'ThirdParty/Mesa/Mesa-license.rst', 'ThirdParty/Mesa/NOTICE.md', 'ThirdParty/Mesa/GPL-2.0-only.txt')) {
+                if ($entryNames -notcontains $dependency) { throw "MSIX is missing Mesa runtime/license '$dependency'." }
             }
         }
         if ($entryNames -notcontains 'ThirdParty/SPIRV-Cross-Notices.txt') {

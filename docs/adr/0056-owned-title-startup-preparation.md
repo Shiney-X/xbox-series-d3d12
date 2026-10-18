@@ -1,6 +1,6 @@
 # ADR 0056 — Sessão possuída de preparação para entrada Orbis
 
-Status: implementação inicial; gates CI/hardware pendentes.
+Status: preparação validada no Xbox; execução posterior definida na ADR 0057.
 
 ## Decisão e dependências
 
@@ -22,8 +22,8 @@ do desktop; não chamar essa extração de integração de Linker::Execute.
 ## Implementação
 
 `GuestStartupSession` reserva backing possuído com guards e relinka o snapshot
-com bias da alocação real. Verifica cópia completa antes das proteções. Páginas
-da imagem mantêm início alinhado a 16 KiB, com guards reservados de 16 KiB;
+com bias da alocação real. Verifica cópia completa antes das proteções. O início
+da imagem mantém alinhamento de 16 KiB, com guards reservados de 16 KiB;
 proteções são aplicadas em unidades de 4 KiB do host. Esse alinhamento não é
 o modelo completo de reservas de endereço fixo do PS4. Páginas
 X guest tornam-se READONLY na preparação, não RX; outras são RW/RO/NOACCESS.
@@ -83,3 +83,12 @@ ligação do CPU runtime e MMU (incluindo seu modelo de endereços fixos),
 TLS/thread binding e inicialização das dependências, registry/serviços
 necessários ao startup. Estas são as prioridades seguintes, não todo HLE
 do emulador. Não redistribuir binários comerciais ou módulos de firmware.
+
+## Evidência física
+
+Sessão `134357171529033926-5968`: Sonic/Deltarune preparados com readback,
+stack/TCB/DTV e permissões verificados; 1150/10125 relativas e 274/578 imports
+pendentes. Sonic liberado na suspensão; Deltarune liberado com B. Cleanup
+verificado, 25 probes aprovados e nova varredura após retomada sem erros de
+relatório. Nessa versão nenhum entry foi chamado. Isso certifica a preparação,
+não o runtime completo. ADR 0057 acrescenta tentativa nativa limitada separada.

@@ -130,5 +130,12 @@ O projeto não fornece jogos, firmware, módulos, chaves ou conteúdo proprietá
 da Sony ou da Microsoft. SDKs e artefatos protegidos por NDA não devem ser
 versionados.
 
-O core shadPS4 e o código deste port são distribuídos sob GPL-2.0-or-later.
+O core shadPS4 e o código original deste port são distribuídos sob GPL-2.0-or-later.
+Os componentes adaptados do KytyPS5 mantêm GPL-2.0-only; confira os avisos por arquivo.
 Consulte [LICENSE](LICENSE) e [LICENSES](LICENSES/).
+
+## Integração experimental KytyPS5 / Mesa
+
+O caminho adicional SPIR-V → DXIL, adaptado do KytyPS5, está documentado em
+[KYTYPS5_INTEGRATION.md](docs/KYTYPS5_INTEGRATION.md). Ele não representa
+integração completa do runtime nem execução de jogos no Xbox.

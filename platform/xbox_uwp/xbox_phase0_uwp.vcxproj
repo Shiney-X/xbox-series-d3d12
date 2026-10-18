@@ -50,6 +50,9 @@
 
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
+    <MesaRoot Condition="'$(MesaRoot)'==''">$(XBOX_MESA_ROOT)</MesaRoot>
+  </PropertyGroup>
+  <PropertyGroup>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
     <AppxAutoIncrementPackageRevision>false</AppxAutoIncrementPackageRevision>
@@ -90,10 +93,37 @@
     <ClInclude Include="..\..\src\core\uwp\core_bridge.h" />
     <ClInclude Include="..\..\src\phase0\probes.h" />
   </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(MesaRoot)'!=''">
+    <ClCompile>
+      <PreprocessorDefinitions>XBOX_HAS_MESA;XBOX_MESA_UWP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(MesaRoot)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(MesaRoot)\lib\spirv_to_dxil.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(MesaRoot)'!=''">
+    <ClCompile Include="shaders\mesa_dxil_bridge.cpp" />
+    <ClCompile Include="d3d12_mesa_probe.cpp" />
+    <None Include="$(MesaRoot)\bin\spirv_to_dxil.dll">
+      <Link>spirv_to_dxil.dll</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <None Include="$(MesaRoot)\licenses\*">
+      <Link>ThirdParty\Mesa\%(Filename)%(Extension)</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+    <None Include="$(MesaRoot)\provenance.json">
+      <Link>ThirdParty\Mesa\provenance.json</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+  </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="guest_execution_probe.cpp" />
     <ClCompile Include="guest_startup_session.cpp" />
+    <ClCompile Include="native_entry_runtime.cpp" />
+    <ClCompile Include="..\..\src\core\aerolib\aerolib.cpp" />
     <ClCompile Include="d3d12_device_context.cpp" />
     <ClCompile Include="d3d12_resource_allocator.cpp" />
     <ClCompile Include="d3d12_pipeline_cache.cpp" />

@@ -558,6 +558,21 @@ sem RX/RWX. Voltar, reescanear, preparar outro título ou suspender libera
 a sessão; geração cancela leituras assíncronas antigas antes de mapear.
 O autoteste usa essa mesma classe nativa, não uma versão mock. ADR 0056.
 
+A ADR 0057 acrescenta **A BOOT TEST** e `phase5-boot.jsonl`. Após preparar,
+o host certifica um caminho CRT fechado até uma PLT/import; só esse caminho
+pode executar nativamente. Não é interpretação de x86 nem reescrita de código.
+Um stop vinculado pelo resolver captura a primeira chamada e restaura a bridge
+Win64/SysV sem retornar sucesso ao jogo. Apenas entry/PLT/bridge passam a RX
+temporariamente. Join antecede rollback de slot/permissões e liberação.
+O lookup AeroLib original passa a ser compilado no UWP para nomear o import.
+
+O perfil reconhece o início do dump local de Deltarune; outros prólogos são
+recusados antes do entry. Mesmo em sucesso do diagnóstico, libc/startup,
+runtime CPU/MMU/TLS completo, faults gerais e processamento gráfico guest
+continuam pendentes. `game_executed=1` nesse relatório significa execução
+do prefixo do título, **não boot completo**; `game_boot_completed=0` e
+`game_frame=0` permanecem. Nenhuma fixture ou imagem do shell é frame de jogo.
+
 O host não converte permissão WinRT em acesso irrestrito por caminho. A pasta
 selecionada é mantida como uma cadeia relativa ao dispositivo removível e
 resolvida novamente por objetos `StorageFolder` a cada ativação.

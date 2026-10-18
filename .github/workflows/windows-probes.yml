@@ -13,6 +13,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mesa-translator:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        id: mesa-cache
+        with:
+          path: ${{ runner.temp }}/shad-mesa-sdk
+          key: shad-mesa-win2022-${{ hashFiles('third_party/kyty_spirv_to_dxil/*', 'scripts/windows/Build-MesaTranslator.ps1', 'scripts/windows/Test-MesaUwpImports.ps1') }}
+      - name: Install source build tools
+        if: steps.mesa-cache.outputs.cache-hit != 'true'
+        run: python -m pip install meson==1.12.1 ninja==1.13.0 mako==1.3.10 pyyaml==6.0.3 packaging==25.0
+      - name: Build pinned Kyty-patched Mesa from source
+        if: steps.mesa-cache.outputs.cache-hit != 'true'
+        run: ./scripts/windows/Build-MesaTranslator.ps1 -OutputDirectory '${{ runner.temp }}/shad-mesa-sdk'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mesa-translator-sdk
+          path: ${{ runner.temp }}/shad-mesa-sdk/
+          retention-days: 14
   portable-quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -34,11 +58,18 @@ jobs:
           ctest --test-dir out/guest-sanitizers --output-on-failure
 
   build-and-test:
+    needs: mesa-translator
     runs-on: windows-2022
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: mesa-translator-sdk
+          path: ${{ runner.temp }}/shad-mesa-sdk
+      - name: Select pinned Mesa SDK
+        run: '"XBOX_MESA_ROOT=${{ runner.temp }}/shad-mesa-sdk" >> $env:GITHUB_ENV'
 
       - name: Configure
         # Only compiler dependencies; do not pull the desktop renderer's dependency tree.
@@ -56,11 +87,18 @@ jobs:
         run: ctest --preset windows-msvc-debug
 
   build-uwp-package:
+    needs: mesa-translator
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: mesa-translator-sdk
+          path: ${{ runner.temp }}/shad-mesa-sdk
+      - name: Select pinned Mesa SDK
+        run: '"XBOX_MESA_ROOT=${{ runner.temp }}/shad-mesa-sdk" >> $env:GITHUB_ENV'
 
       - name: Build signed UWP sideload package
         shell: powershell

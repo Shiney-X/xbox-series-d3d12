@@ -547,9 +547,14 @@ Ver [procedimento e limites](PHASE5_VALIDATION.md) e ADR 0043.
   - [x] Integrar sessão de preparação por título: bias da alocação real,
     imagem data-only possuída pelo host, stack, TCB/DTV do módulo principal,
     layouts compartilhados com upstream e bloqueio explícito antes do entry.
-  - [ ] Validar preparação selecionada e liberação/retomada no Xbox; ação
+  - [x] Validar preparação selecionada e liberação/retomada no Xbox; ação
     A PREPARE não chama o entry e não conclui 5D/5E. ADR 0056.
 - [ ] 5E: tentar boot Deltarune e registrar o primeiro bloqueio real.
+  - [x] Implementar tentativa nativa fechada do entry real até o primeiro
+    import, com perfil CRT certificado, resolver/stop explícito, bridge
+    SysV/Win64, worker/join e rollback. Não é runtime completo (ADR 0057).
+  - [ ] Validar no Xbox o entry/import de Deltarune e retorno ao shell;
+    não concluir boot geral ou primeiro frame com esse diagnóstico.
 - [ ] 5F: consumir PM4, shaders e recursos necessários à primeira tela.
 - [ ] 5G: primeiro frame real reproduzível, se os gates anteriores passarem.
 

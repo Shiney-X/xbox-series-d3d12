@@ -38,6 +38,8 @@ endif()
 if(BUILD_TESTING)
     add_subdirectory(../guest_preflight guest_preflight)
     add_executable(xbox_guest_execution_test
+        ../../src/core/aerolib/aerolib.cpp
+        ../../platform/xbox_uwp/native_entry_runtime.cpp
         ../../platform/xbox_uwp/guest_startup_session.cpp
         guest_execution_test.cpp ../../platform/xbox_uwp/guest_execution_probe.cpp)
     target_include_directories(xbox_guest_execution_test PRIVATE
@@ -47,11 +49,53 @@ if(BUILD_TESTING)
         WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
     target_link_libraries(xbox_guest_execution_test PRIVATE WindowsApp)
     if(MSVC)
-        target_compile_options(xbox_guest_execution_test PRIVATE /W4 /WX /permissive- /EHsc)
+        target_compile_options(xbox_guest_execution_test PRIVATE /W4 /WX /permissive- /EHsc /bigobj)
     endif()
     add_test(NAME phase5.guest-execution COMMAND xbox_guest_execution_test)
     set_tests_properties(phase5.guest-execution PROPERTIES TIMEOUT 30)
+    add_executable(xbox_native_entry_test native_entry_test.cpp
+        ../../platform/xbox_uwp/native_entry_runtime.cpp
+        ../../platform/xbox_uwp/guest_startup_session.cpp
+        ../../src/core/aerolib/aerolib.cpp)
+    target_include_directories(xbox_native_entry_test PRIVATE
+        ../../platform/xbox_uwp ../../src ../../src/phase0)
+    target_compile_features(xbox_native_entry_test PRIVATE cxx_std_20)
+    target_compile_definitions(xbox_native_entry_test PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
+    target_link_libraries(xbox_native_entry_test PRIVATE WindowsApp)
+    if(MSVC)
+        target_compile_options(xbox_native_entry_test PRIVATE /W4 /WX /permissive- /EHsc /bigobj)
+    endif()
+    add_test(NAME phase5.native-entry-boundary COMMAND xbox_native_entry_test)
+    set_tests_properties(phase5.native-entry-boundary PROPERTIES TIMEOUT 30)
     add_subdirectory(shaders)
+    if(TARGET xbox_mesa_translator)
+        add_executable(xbox_d3d12_mesa_test d3d12_mesa_test.cpp
+            ../../platform/xbox_uwp/shaders/mesa_dxil_bridge.cpp
+            ../../platform/xbox_uwp/d3d12_mesa_probe.cpp
+            ../../platform/xbox_uwp/d3d12_device_context.cpp
+            ../../platform/xbox_uwp/d3d12_resource_allocator.cpp
+            ../../platform/xbox_uwp/d3d12_pipeline_cache.cpp
+            ../../platform/xbox_uwp/d3d12_command_encoder.cpp
+            ../../platform/xbox_uwp/d3d12_compute_probe.cpp
+            ../../platform/xbox_uwp/d3d12_graphics_probe.cpp)
+        target_compile_features(xbox_d3d12_mesa_test PRIVATE cxx_std_20)
+        target_include_directories(xbox_d3d12_mesa_test PRIVATE ../../platform/xbox_uwp ../../src)
+        target_compile_definitions(xbox_d3d12_mesa_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
+        target_compile_options(xbox_d3d12_mesa_test PRIVATE /W4 /WX /permissive- /EHsc)
+        target_link_libraries(xbox_d3d12_mesa_test PRIVATE xbox_mesa_translator xbox_upstream_spirv xbox_spirv_hlsl d3d12 dxgi WindowsApp dxcompiler)
+        cmake_host_system_information(RESULT mesa_sdk_root QUERY WINDOWS_REGISTRY
+            "HKLM/SOFTWARE/Microsoft/Windows Kits/Installed Roots" VALUE "KitsRoot10" VIEW 32_64)
+        file(TO_CMAKE_PATH "${mesa_sdk_root}" mesa_sdk_root)
+        foreach(dll dxil dxcompiler)
+            add_custom_command(TARGET xbox_d3d12_mesa_test POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${mesa_sdk_root}/Redist/D3D/x64/${dll}.dll" "$<TARGET_FILE_DIR:xbox_d3d12_mesa_test>")
+        endforeach()
+        add_custom_command(TARGET xbox_d3d12_mesa_test POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:xbox_mesa_translator>" "$<TARGET_FILE_DIR:xbox_d3d12_mesa_test>")
+        add_test(NAME phase4.mesa-dxil COMMAND xbox_d3d12_mesa_test)
+        set_tests_properties(phase4.mesa-dxil PROPERTIES TIMEOUT 60)
+    endif()
     add_executable(xbox_d3d12_videocore_test
         d3d12_videocore_test.cpp
         ../../platform/xbox_uwp/d3d12_device_context.cpp
