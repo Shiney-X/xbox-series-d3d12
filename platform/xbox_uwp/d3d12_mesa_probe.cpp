@@ -7,6 +7,7 @@
 #include "shaders/upstream_compute.h"
 #include <array>
 #include <exception>
+#include <stdexcept>
 
 D3D12MesaProbe RunD3D12MesaProbe(D3D12DeviceContext &context,
                                  D3D12ResourceAllocator &allocator,

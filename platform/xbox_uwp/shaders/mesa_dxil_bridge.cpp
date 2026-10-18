@@ -5,7 +5,15 @@
 #include <Windows.h>
 #include <d3d12.h>
 #include <dxcapi.h>
+#if defined(_MSC_VER)
+#pragma warning(push)
+// Mesa's C ABI has an anonymous struct; do not weaken warnings in our code.
+#pragma warning(disable : 4201)
+#endif
 #include <spirv_to_dxil.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 #include <wrl/client.h>
 
 #include <algorithm>

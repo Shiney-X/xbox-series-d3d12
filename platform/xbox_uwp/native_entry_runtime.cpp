@@ -309,10 +309,12 @@ XboxSeriesD3D12::Phase0::ProbeResult ProbeNativeEntry() {
     GuestStartupSession session;
     const auto file = Core::Uwp::MakeNativeEntryFixture(self);
     const bool prepared = session.Prepare(file);
+    const auto preparation = session.Details();
     const auto result = session.AttemptNativeEntry(file, true);
     const auto repeated = session.AttemptNativeEntry(file, true);
     const bool released = session.Release();
     const std::string label = self ? "self_" : "raw_";
+    details += Core::Uwp::ScopeProbeFields(label + "prepare_", preparation);
     record(label + "first_", result);
     record(label + "repeat_", repeated);
     details += ";" + label + "prepared=" + std::to_string(prepared) + ";" +
